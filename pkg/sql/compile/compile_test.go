@@ -64,7 +64,7 @@ func testPrint(_ interface{}, _ *batch.Batch) error {
 
 func TestCompile(t *testing.T) {
 	for _, tc := range tcs {
-		c := New("test", tc.sql, "", context.TODO(), tc.e, tc.proc, nil)
+		c := New("test", tc.sql, "", context.TODO(), tc.e, nil, tc.proc, nil)
 		err := c.Compile(tc.pn, nil, testPrint)
 		require.NoError(t, err)
 		c.GetAffectedRows()

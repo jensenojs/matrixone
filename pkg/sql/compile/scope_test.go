@@ -17,6 +17,8 @@ package compile
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/mysql"
@@ -25,7 +27,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/memEngine"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestScopeSerialization(t *testing.T) {
@@ -75,7 +76,7 @@ func generateScopeCases(t *testing.T, testCases []string) []*Scope {
 		require.NoError(t1, err)
 		qry, err := opt.Optimize(stmts[0])
 		require.NoError(t1, err)
-		c := New("test", sql, "", context.Background(), e, proc, nil)
+		c := New("test", sql, "", context.Background(), e, nil, proc, nil)
 		err = c.Compile(&plan.Plan{Plan: &plan.Plan_Query{Query: qry}}, nil, func(a any, batch *batch.Batch) error {
 			return nil
 		})
