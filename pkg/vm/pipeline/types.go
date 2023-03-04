@@ -82,6 +82,7 @@ import (
 //	-> τ(o.year asc, revenue desc)
 //	-> π(c.city, s.city, revenue)
 type Pipeline struct {
+	Sql string
 	// attrs, column list.
 	attrs []string
 	// orders to be executed

@@ -26,10 +26,11 @@ import (
 func NewUnaryAgg[T1, T2 any](op int, priv AggStruct, isCount bool, ityp, otyp types.Type, grows func(int),
 	eval func([]T2) []T2, merge func(int64, int64, T2, T2, bool, bool, any) (T2, bool),
 	fill func(int64, T1, T2, int64, bool, bool) (T2, bool),
-	batchFill func(any, any, int64, int64, []uint64, []int64, *nulls.Nulls) error) Agg[*UnaryAgg[T1, T2]] {
+	batchFill func(any, any, int64, int64, []uint64, []int64, *nulls.Nulls) error,
+	sql string) Agg[*UnaryAgg[T1, T2]] {
 	return &UnaryAgg[T1, T2]{
 		op:        op,
-		priv:      priv,
+		Priv:      priv,
 		otyp:      otyp,
 		eval:      eval,
 		fill:      fill,
@@ -38,18 +39,19 @@ func NewUnaryAgg[T1, T2 any](op int, priv AggStruct, isCount bool, ityp, otyp ty
 		batchFill: batchFill,
 		isCount:   isCount,
 		ityps:     []types.Type{ityp},
+		sql:       sql,
 	}
 }
 
 func (a *UnaryAgg[T1, T2]) String() string {
-	return fmt.Sprintf("%v", a.vs)
+	return fmt.Sprintf("%v", a.Vs)
 }
 
 func (a *UnaryAgg[T1, T2]) Free(m *mpool.MPool) {
 	if a.da != nil {
 		m.Free(a.da)
 		a.da = nil
-		a.vs = nil
+		a.Vs = nil
 	}
 }
 
@@ -74,10 +76,10 @@ func (a *UnaryAgg[T1, T2]) InputTypes() []types.Type {
 
 func (a *UnaryAgg[T1, T2]) Grows(size int, m *mpool.MPool) error {
 	if a.otyp.IsString() {
-		if len(a.vs) == 0 {
+		if len(a.Vs) == 0 {
 			a.es = make([]bool, 0, size)
-			a.vs = make([]T2, 0, size)
-			a.vs = a.vs[:size]
+			a.Vs = make([]T2, 0, size)
+			a.Vs = a.Vs[:size]
 			for i := 0; i < size; i++ {
 				a.es = append(a.es, true)
 			}
@@ -85,14 +87,14 @@ func (a *UnaryAgg[T1, T2]) Grows(size int, m *mpool.MPool) error {
 			var v T2
 			for i := 0; i < size; i++ {
 				a.es = append(a.es, true)
-				a.vs = append(a.vs, v)
+				a.Vs = append(a.Vs, v)
 			}
 		}
 		a.grows(size)
 		return nil
 	}
 	sz := a.otyp.TypeSize()
-	n := len(a.vs)
+	n := len(a.Vs)
 	if n == 0 {
 		data, err := m.Alloc(size * sz)
 		if err != nil {
@@ -100,17 +102,17 @@ func (a *UnaryAgg[T1, T2]) Grows(size int, m *mpool.MPool) error {
 		}
 		a.da = data
 		a.es = make([]bool, 0, size)
-		a.vs = types.DecodeSlice[T2](a.da)
-	} else if n+size >= cap(a.vs) {
+		a.Vs = types.DecodeSlice[T2](a.da)
+	} else if n+size >= cap(a.Vs) {
 		a.da = a.da[:n*sz]
 		data, err := m.Grow(a.da, (n+size)*sz)
 		if err != nil {
 			return err
 		}
 		a.da = data
-		a.vs = types.DecodeSlice[T2](a.da)
+		a.Vs = types.DecodeSlice[T2](a.da)
 	}
-	a.vs = a.vs[:n+size]
+	a.Vs = a.Vs[:n+size]
 	a.da = a.da[:(n+size)*sz]
 	for i := 0; i < size; i++ {
 		a.es = append(a.es, true)
@@ -123,9 +125,9 @@ func (a *UnaryAgg[T1, T2]) Fill(i int64, sel, z int64, vecs []*vector.Vector) er
 	vec := vecs[0]
 	hasNull := vec.GetNulls().Contains(uint64(sel))
 	if vec.Typ.IsString() {
-		a.vs[i], a.es[i] = a.fill(i, (any)(vec.GetBytes(sel)).(T1), a.vs[i], z, a.es[i], hasNull)
+		a.Vs[i], a.es[i] = a.fill(i, (any)(vec.GetBytes(sel)).(T1), a.Vs[i], z, a.es[i], hasNull)
 	} else {
-		a.vs[i], a.es[i] = a.fill(i, vector.GetColumn[T1](vec)[sel], a.vs[i], z, a.es[i], hasNull)
+		a.Vs[i], a.es[i] = a.fill(i, vector.GetColumn[T1](vec)[sel], a.Vs[i], z, a.es[i], hasNull)
 	}
 	return nil
 }
@@ -140,9 +142,9 @@ func (a *UnaryAgg[T1, T2]) BatchFill(start int64, os []uint8, vps []uint64, zs [
 			}
 			j := vps[i] - 1
 			if !vec.IsConst() {
-				a.vs[j], a.es[j] = a.fill(int64(j), (any)(vec.GetBytes(int64(i)+start)).(T1), a.vs[j], zs[int64(i)+start], a.es[j], hasNull)
+				a.Vs[j], a.es[j] = a.fill(int64(j), (any)(vec.GetBytes(int64(i)+start)).(T1), a.Vs[j], zs[int64(i)+start], a.es[j], hasNull)
 			} else {
-				a.vs[j], a.es[j] = a.fill(int64(j), (any)(vec.GetBytes(0)).(T1), a.vs[j], zs[int64(i)+start], a.es[j], hasNull)
+				a.Vs[j], a.es[j] = a.fill(int64(j), (any)(vec.GetBytes(0)).(T1), a.Vs[j], zs[int64(i)+start], a.es[j], hasNull)
 			}
 
 		}
@@ -150,7 +152,7 @@ func (a *UnaryAgg[T1, T2]) BatchFill(start int64, os []uint8, vps []uint64, zs [
 	}
 	vs := vector.GetColumn[T1](vec)
 	if a.batchFill != nil {
-		if err := a.batchFill(a.vs, vs, start, int64(len(os)), vps, zs, vec.GetNulls()); err != nil {
+		if err := a.batchFill(a.Vs, vs, start, int64(len(os)), vps, zs, vec.GetNulls()); err != nil {
 			return err
 		}
 		nsp := vec.GetNulls()
@@ -179,7 +181,7 @@ func (a *UnaryAgg[T1, T2]) BatchFill(start int64, os []uint8, vps []uint64, zs [
 			continue
 		}
 		j := vps[i] - 1
-		a.vs[j], a.es[j] = a.fill(int64(j), vs[int64(i)+start], a.vs[j], zs[int64(i)+start], a.es[j], hasNull)
+		a.Vs[j], a.es[j] = a.fill(int64(j), vs[int64(i)+start], a.Vs[j], zs[int64(i)+start], a.es[j], hasNull)
 	}
 	return nil
 }
@@ -191,9 +193,9 @@ func (a *UnaryAgg[T1, T2]) BulkFill(i int64, zs []int64, vecs []*vector.Vector) 
 		for j := 0; j < len; j++ {
 			hasNull := vec.GetNulls().Contains(uint64(j))
 			if !vec.IsConst() {
-				a.vs[i], a.es[i] = a.fill(i, (any)(vec.GetBytes(int64(j))).(T1), a.vs[i], zs[j], a.es[i], hasNull)
+				a.Vs[i], a.es[i] = a.fill(i, (any)(vec.GetBytes(int64(j))).(T1), a.Vs[i], zs[j], a.es[i], hasNull)
 			} else {
-				a.vs[i], a.es[i] = a.fill(i, (any)(vec.GetBytes(0)).(T1), a.vs[i], zs[j], a.es[i], hasNull)
+				a.Vs[i], a.es[i] = a.fill(i, (any)(vec.GetBytes(0)).(T1), a.Vs[i], zs[j], a.es[i], hasNull)
 			}
 		}
 
@@ -202,7 +204,7 @@ func (a *UnaryAgg[T1, T2]) BulkFill(i int64, zs []int64, vecs []*vector.Vector) 
 	vs := vector.GetColumn[T1](vec)
 	for j, v := range vs {
 		hasNull := vec.GetNulls().Contains(uint64(j))
-		a.vs[i], a.es[i] = a.fill(i, v, a.vs[i], zs[j], a.es[i], hasNull)
+		a.Vs[i], a.es[i] = a.fill(i, v, a.Vs[i], zs[j], a.es[i], hasNull)
 	}
 	return nil
 }
@@ -213,7 +215,7 @@ func (a *UnaryAgg[T1, T2]) Merge(b Agg[any], x, y int64) error {
 	if a.es[x] && !b0.es[y] {
 		a.otyp = b0.otyp
 	}
-	a.vs[x], a.es[x] = a.merge(x, y, a.vs[x], b0.vs[y], a.es[x], b0.es[y], b0.priv)
+	a.Vs[x], a.es[x] = a.merge(x, y, a.Vs[x], b0.Vs[y], a.es[x], b0.es[y], b0.Priv)
 	return nil
 }
 
@@ -227,7 +229,7 @@ func (a *UnaryAgg[T1, T2]) BatchMerge(b Agg[any], start int64, os []uint8, vps [
 		if a.es[j] && !b0.es[int64(i)+start] {
 			a.otyp = b0.otyp
 		}
-		a.vs[j], a.es[j] = a.merge(int64(j), int64(i)+start, a.vs[j], b0.vs[int64(i)+start], a.es[j], b0.es[int64(i)+start], b0.priv)
+		a.Vs[j], a.es[j] = a.merge(int64(j), int64(i)+start, a.Vs[j], b0.Vs[int64(i)+start], a.es[j], b0.es[int64(i)+start], b0.Priv)
 	}
 	return nil
 }
@@ -236,7 +238,7 @@ func (a *UnaryAgg[T1, T2]) Eval(m *mpool.MPool) (*vector.Vector, error) {
 	defer func() {
 		a.Free(m)
 		a.da = nil
-		a.vs = nil
+		a.Vs = nil
 		a.es = nil
 	}()
 	nsp := nulls.NewWithSize(len(a.es))
@@ -250,8 +252,8 @@ func (a *UnaryAgg[T1, T2]) Eval(m *mpool.MPool) (*vector.Vector, error) {
 	if a.otyp.IsString() {
 		vec := vector.New(a.otyp)
 		vec.Nsp = nsp
-		a.vs = a.eval(a.vs)
-		vs := (any)(a.vs).([][]byte)
+		a.Vs = a.eval(a.Vs)
+		vs := (any)(a.Vs).([][]byte)
 		for _, v := range vs {
 			if err := vec.Append(v, false, m); err != nil {
 				vec.Free(m)
@@ -260,7 +262,7 @@ func (a *UnaryAgg[T1, T2]) Eval(m *mpool.MPool) (*vector.Vector, error) {
 		}
 		return vec, nil
 	}
-	return vector.NewWithFixed(a.otyp, a.eval(a.vs), nsp, m), nil
+	return vector.NewWithFixed(a.otyp, a.eval(a.Vs), nsp, m), nil
 }
 
 func (a *UnaryAgg[T1, T2]) WildAggReAlloc(m *mpool.MPool) error {
@@ -287,7 +289,7 @@ func (a *UnaryAgg[T1, T2]) GetInputTypes() []types.Type {
 }
 
 func (a *UnaryAgg[T1, T2]) MarshalBinary() ([]byte, error) {
-	pData, err := a.priv.MarshalBinary()
+	pData, err := a.Priv.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
@@ -312,9 +314,9 @@ func (a *UnaryAgg[T1, T2]) MarshalBinary() ([]byte, error) {
 
 func getUnaryAggStrVs(strUnaryAgg any) []string {
 	agg := strUnaryAgg.(*UnaryAgg[[]byte, []byte])
-	result := make([]string, len(agg.vs))
+	result := make([]string, len(agg.Vs))
 	for i := range result {
-		result[i] = string(agg.vs[i])
+		result[i] = string(agg.Vs[i])
 	}
 	return result
 }
@@ -339,7 +341,7 @@ func (a *UnaryAgg[T1, T2]) UnmarshalBinary(data []byte) error {
 
 	setAggValues[T1, T2](a, a.otyp)
 
-	return a.priv.UnmarshalBinary(decoded.Private)
+	return a.Priv.UnmarshalBinary(decoded.Private)
 }
 
 func setAggValues[T1, T2 any](agg any, typ types.Type) {
@@ -347,12 +349,12 @@ func setAggValues[T1, T2 any](agg any, typ types.Type) {
 	case types.IsString(typ.Oid):
 		a := agg.(*UnaryAgg[[]byte, []byte])
 		values := types.DecodeStringSlice(a.da)
-		a.vs = make([][]byte, len(values))
-		for i := range a.vs {
-			a.vs[i] = []byte(values[i])
+		a.Vs = make([][]byte, len(values))
+		for i := range a.Vs {
+			a.Vs[i] = []byte(values[i])
 		}
 	default:
 		a := agg.(*UnaryAgg[T1, T2])
-		a.vs = types.DecodeSlice[T2](a.da)
+		a.Vs = types.DecodeSlice[T2](a.da)
 	}
 }

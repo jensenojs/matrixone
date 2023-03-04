@@ -58,6 +58,7 @@ type container struct {
 	vecs []*vector.Vector
 
 	bat *batch.Batch
+	Sql string
 }
 
 type Argument struct {
@@ -69,6 +70,7 @@ type Argument struct {
 	Types     []types.Type
 	Aggs      []agg.Aggregate         // aggregations
 	MultiAggs []group_concat.Argument // multiAggs, for now it's group_concat
+	Sql       string
 }
 
 func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {

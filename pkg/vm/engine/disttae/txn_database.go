@@ -27,6 +27,8 @@ import (
 
 var _ engine.Database = new(txnDatabase)
 
+var testTableId uint64
+
 func (db *txnDatabase) Relations(ctx context.Context) ([]string, error) {
 	var rels []string
 
@@ -218,6 +220,9 @@ func (db *txnDatabase) GetDatabaseId(ctx context.Context) string {
 func (db *txnDatabase) Create(ctx context.Context, name string, defs []engine.TableDef) error {
 	accountId, userId, roleId := getAccessInfo(ctx)
 	tableId, err := db.txn.allocateID(ctx)
+	if name == "test_7748" {
+		testTableId = tableId
+	}
 	if err != nil {
 		return err
 	}

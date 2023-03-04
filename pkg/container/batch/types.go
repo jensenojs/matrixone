@@ -32,6 +32,7 @@ type aggInfo struct {
 	Dist       bool
 	inputTypes types.Type
 	Agg        agg.Agg[any]
+	Sql        string
 }
 
 // Batch represents a part of a relationship

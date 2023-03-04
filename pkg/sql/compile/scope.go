@@ -59,8 +59,9 @@ func PrintScope(prefix []byte, ss []*Scope) {
 
 // Run read data from storage engine and run the instructions of scope.
 func (s *Scope) Run(c *Compile) (err error) {
+	s.sql = c.sql
 	s.Proc.Ctx = context.WithValue(s.Proc.Ctx, defines.EngineKey{}, c.e)
-	p := pipeline.New(s.DataSource.Attributes, s.Instructions, s.Reg)
+	p := pipeline.New(s.DataSource.Attributes, s.Instructions, s.Reg, c.sql)
 	if s.DataSource.Bat != nil {
 		if _, err = p.ConstRun(s.DataSource.Bat, s.Proc); err != nil {
 			return err
@@ -128,6 +129,7 @@ func (s *Scope) MergeRun(c *Compile) error {
 		s.notifyAndReceiveFromRemote(errReceiveChan)
 	}
 	p := pipeline.NewMerge(s.Instructions, s.Reg)
+	p.Sql = s.sql
 	if _, err := p.MergeRun(s.Proc); err != nil {
 		return err
 	}
@@ -168,11 +170,17 @@ func (s *Scope) MergeRun(c *Compile) error {
 // if no target node information, just execute it at local.
 func (s *Scope) RemoteRun(c *Compile) error {
 	// if send to itself, just run it parallel at local.
+	s.sql = c.sql
 	if len(s.NodeInfo.Addr) == 0 || !cnclient.IsCNClientReady() ||
 		len(c.addr) == 0 || isCurrentCN(s.NodeInfo.Addr, c.addr) {
+		if s.sql == "SELECT DISTINCT a, AVG( b) FROM t1 GROUP BY a HAVING AVG( b) > 50" {
+			logutil.Errorf("--*:RemoteRun goes ParallelRun")
+		}
 		return s.ParallelRun(c, s.IsRemote)
 	}
-
+	if s.sql == "SELECT DISTINCT a, AVG( b) FROM t1 GROUP BY a HAVING AVG( b) > 50" {
+		logutil.Errorf("--*:RemoteRun goes remoteRun")
+	}
 	err := s.remoteRun(c)
 
 	// tell connect operator that it's over
@@ -184,6 +192,7 @@ func (s *Scope) RemoteRun(c *Compile) error {
 // ParallelRun try to execute the scope in parallel way.
 func (s *Scope) ParallelRun(c *Compile, remote bool) error {
 	var rds []engine.Reader
+	s.sql = c.sql
 
 	s.Proc.Ctx = context.WithValue(s.Proc.Ctx, defines.EngineKey{}, c.e)
 	if s.IsJoin {
@@ -270,7 +279,7 @@ func (s *Scope) PushdownRun(c *Compile) error {
 		bat := <-reg.Ch
 		if bat == nil {
 			s.Proc.Reg.InputBatch = bat
-			_, err = vm.Run(s.Instructions, s.Proc)
+			_, err = vm.Run(s.Instructions, s.Proc, c.sql)
 			s.Proc.Cancel()
 			return err
 		}
@@ -278,7 +287,7 @@ func (s *Scope) PushdownRun(c *Compile) error {
 			continue
 		}
 		s.Proc.Reg.InputBatch = bat
-		if end, err = vm.Run(s.Instructions, s.Proc); err != nil || end {
+		if end, err = vm.Run(s.Instructions, s.Proc, c.sql); err != nil || end {
 			return err
 		}
 	}
@@ -386,12 +395,14 @@ func newParallelScope(c *Compile, s *Scope, ss []*Scope) *Scope {
 		case vm.Group:
 			flg = true
 			arg := in.Arg.(*group.Argument)
+			arg.Sql = c.sql
 			s.Instructions = append(s.Instructions[:1], s.Instructions[i+1:]...)
 			s.Instructions[0] = vm.Instruction{
 				Op:  vm.MergeGroup,
 				Idx: in.Idx,
 				Arg: &mergegroup.Argument{
 					NeedEval: false,
+					Sql:      c.sql,
 				},
 			}
 			for i := range ss {
@@ -404,6 +415,7 @@ func newParallelScope(c *Compile, s *Scope, ss []*Scope) *Scope {
 						Exprs:     arg.Exprs,
 						Types:     arg.Types,
 						MultiAggs: arg.MultiAggs,
+						Sql:       c.sql,
 					},
 				})
 			}
@@ -467,6 +479,7 @@ func newParallelScope(c *Compile, s *Scope, ss []*Scope) *Scope {
 	}
 	j := 0
 	for i := range ss {
+		ss[i].sql = c.sql
 		if !ss[i].IsEnd {
 			ss[i].appendInstruction(vm.Instruction{
 				Op: vm.Connector,
@@ -536,6 +549,7 @@ func copyScope(srcScope *Scope, regMap map[*process.WaitRegister]*process.WaitRe
 		IsEnd:        srcScope.IsEnd,
 		IsRemote:     srcScope.IsRemote,
 		Plan:         srcScope.Plan,
+		sql:          srcScope.sql,
 		PreScopes:    make([]*Scope, len(srcScope.PreScopes)),
 		Instructions: make([]vm.Instruction, len(srcScope.Instructions)),
 		NodeInfo: engine.Node{

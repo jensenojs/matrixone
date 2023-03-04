@@ -29,6 +29,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/defines"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
@@ -45,6 +46,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/util/trace"
 	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/disttae"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -107,6 +109,26 @@ func (c *Compile) Compile(ctx context.Context, pn *plan.Plan, u any, fill func(a
 	c.info = plan2.GetExecTypeFromPlan(pn)
 	// build scope for a single sql
 	s, err := c.compileScope(ctx, pn)
+	// 	Scope 1 (Magic: Merge, Receiver: [4]): [merge -> output]
+	//   PreScopes: {
+	//   Scope 1 (Magic: Merge, Receiver: [3]): [merge group -> projection -> projection -> connect to MergeReceiver 4]
+	//     PreScopes: {
+	//     Scope 1 (Magic: Merge, Receiver: [2]): [merge -> group -> connect to MergeReceiver 3]
+	//       PreScopes: {
+	//       Scope 1 (Magic: Merge, Receiver: [0, 1]): [merge group -> projection -> restrict -> projection -> projection -> connect to MergeReceiver 2]
+	//         PreScopes: {
+	//         Scope 1 (Magic: Remote, Receiver: []): [projection -> group -> connect to MergeReceiver 0]
+	//         DataSource: t.t1[a b],
+	//         Scope 2 (Magic: Remote, Receiver: []): [projection -> group -> connect to MergeReceiver 1]
+	//         DataSource: t.t1[a b],
+	//       }
+	//     }
+	//   }
+	// }
+	// if c.sql == "SELECT DISTINCT a, AVG( b) FROM t1 GROUP BY a HAVING AVG( b) > 50" {
+	if strings.Contains(c.sql, "SELECT DISTINCT a, AVG( b) FROM test_7748 GROUP BY a HAVING AVG( b) > 50") {
+		logutil.Errorf("%s\n", DebugShowScopes([]*Scope{s}))
+	}
 	if err != nil {
 		return err
 	}
@@ -129,6 +151,7 @@ func (c *Compile) Run(_ uint64) (err error) {
 		return nil
 	}
 	defer func() { c.scope = nil }() // free pipeline
+	c.scope.sql = c.sql
 
 	// XXX PrintScope has a none-trivial amount of logging
 	// PrintScope(nil, []*Scope{c.scope})
@@ -320,10 +343,18 @@ func (c *Compile) compileQuery(ctx context.Context, qry *plan.Query) (*Scope, er
 
 	c.initAnalyze(qry)
 	ss, err := c.compilePlanScope(ctx, qry.Nodes[qry.Steps[0]], qry.Nodes)
+	fillSql(ss, c.sql)
 	if err != nil {
 		return nil, err
 	}
 	return c.compileApQuery(qry, ss)
+}
+
+func fillSql(ss []*Scope, sql string) {
+	for _, s := range ss {
+		s.sql = sql
+		fillSql(s.PreScopes, sql)
+	}
 }
 
 func (c *Compile) compileApQuery(qry *plan.Query, ss []*Scope) (*Scope, error) {
@@ -903,7 +934,7 @@ func (c *Compile) compileUnion(n *plan.Node, ss []*Scope, children []*Scope, ns 
 		rs[i].Instructions = append(rs[i].Instructions, vm.Instruction{
 			Op:  vm.Group,
 			Idx: c.anal.curr,
-			Arg: constructGroup(c.ctx, gn, n, i, len(rs), true, c.proc),
+			Arg: constructGroup(c.ctx, gn, n, i, len(rs), true, c.proc, c.sql),
 		})
 	}
 	return rs
@@ -1231,16 +1262,17 @@ func (c *Compile) compileAgg(n *plan.Node, ss []*Scope, ns []*plan.Node) []*Scop
 			Op:      vm.Group,
 			Idx:     c.anal.curr,
 			IsFirst: c.anal.isFirst,
-			Arg:     constructGroup(c.ctx, n, ns[n.Children[0]], 0, 0, false, c.proc),
+			Arg:     constructGroup(c.ctx, n, ns[n.Children[0]], 0, 0, false, c.proc, c.sql),
 		})
 	}
 	c.anal.isFirst = false
-
+	ag := constructMergeGroup(n, true, c.sql)
+	ag.Sql = c.sql
 	rs := c.newMergeScope(ss)
 	rs.Instructions[0] = vm.Instruction{
 		Op:  vm.MergeGroup,
 		Idx: c.anal.curr,
-		Arg: constructMergeGroup(n, true),
+		Arg: ag,
 	}
 	return []*Scope{rs}
 }
@@ -1267,11 +1299,12 @@ func (c *Compile) compileGroup(n *plan.Node, ss []*Scope, ns []*plan.Node) []*Sc
 	}
 
 	for i := range rs {
+		ag := constructGroup(c.ctx, n, ns[n.Children[0]], i, len(rs), true, c.proc, c.sql)
 		rs[i].Instructions = append(rs[i].Instructions, vm.Instruction{
 			Op:      vm.Group,
 			Idx:     c.anal.curr,
 			IsFirst: currentIsFirst,
-			Arg:     constructGroup(c.ctx, n, ns[n.Children[0]], i, len(rs), true, c.proc),
+			Arg:     ag,
 		})
 	}
 	return []*Scope{c.newMergeScope(append(rs, ss...))}
@@ -1565,6 +1598,12 @@ func (c *Compile) fillAnalyzeInfo() {
 	}
 }
 
+func blockUnmarshal(data []byte) disttae.BlockMeta {
+	var meta disttae.BlockMeta
+	types.Decode(data, &meta)
+	return meta
+}
+
 func (c *Compile) generateNodes(n *plan.Node) (engine.Nodes, error) {
 	var err error
 	var db engine.Database
@@ -1602,6 +1641,17 @@ func (c *Compile) generateNodes(n *plan.Node) (engine.Nodes, error) {
 	}
 	expr, _ := plan2.HandleFiltersForZM(n.FilterList, c.proc)
 	ranges, err = rel.Ranges(ctx, expr)
+	if strings.Contains(c.sql, "SELECT DISTINCT a, AVG( b) FROM test_7748 GROUP BY a HAVING AVG( b) > 50") {
+		st := c.proc.TxnOperator.Txn().SnapshotTS
+		logutil.Errorf("+++: SnapshotTs(physical-logical) is %d-%d", st.PhysicalTime, st.LogicalTime)
+		blks := make([]disttae.BlockMeta, len(ranges))
+		for i := range ranges {
+			blks[i] = blockUnmarshal(ranges[i])
+		}
+		for i := range blks {
+			logutil.Errorf("+++: blockid %d, EntryState %v, blockLen %d, CommitTs(physical-logical) is %s", blks[i].Info.BlockID, blks[i].Info.EntryState, blks[i].Rows, blks[i].Info.CommitTs.ToString())
+		}
+	}
 	if err != nil {
 		return nil, err
 	}

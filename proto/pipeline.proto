@@ -54,6 +54,7 @@ message Aggregate {
   int32 op = 1;
   bool dist = 2;
   plan.Expr expr = 3;
+  string sql = 4;
 }
 
 message Group {
@@ -63,6 +64,7 @@ message Group {
   repeated plan.Expr  exprs = 4;
   repeated plan.Type  types = 5;
   repeated Aggregate  aggs = 6;
+  string sql = 7;
 }
 
 message Insert{
@@ -303,6 +305,7 @@ message Pipeline {
   int32 children_count = 11;
 
   repeated UuidToRegIdx uuids_to_reg_idx = 12;
+  string sql = 13;
 }
 
 message WrapNode {

@@ -55,6 +55,7 @@ type container struct {
 type Argument struct {
 	NeedEval bool // need to projection the aggregate column
 	ctr      *container
+	Sql      string
 }
 
 func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {

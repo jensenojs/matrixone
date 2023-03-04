@@ -16,11 +16,13 @@ package disttae
 
 import (
 	"context"
+
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/pb/api"
 )
 
@@ -39,11 +41,19 @@ func consumeEntry(idx, primaryIdx int, tbl *txnTable,
 			if err != nil {
 				return err
 			}
+			vec1, err := vector.ProtoVectorToVector(e.Bat.Vecs[catalog.BLOCKMETA_ENTRYSTATE_IDX+MO_PRIMARY_OFF])
+			if err != nil {
+				return err
+			}
 			vs := vector.MustTCols[uint64](vec)
 			timestamps := vector.MustTCols[types.TS](timeVec)
+			es := vector.MustTCols[bool](vec1)
 			for i, v := range vs {
+				if e.TableId == testTableId {
+					logutil.Errorf("+++: deleted by block id %d, entrystate is %v, ts is %v", v, es[i], timestamps[i].ToTimestamp())
+				}
 				if err := tbl.parts[idx].DeleteByBlockID(ctx, timestamps[i].ToTimestamp(), v); err != nil {
-					if !moerr.IsMoErrCode(err, moerr.ErrTxnWriteConflict) {
+					if !moerr.IsMoErrCode(err, moerr.ErrTxnWriteConflict) { // 1
 						return err
 					}
 				}

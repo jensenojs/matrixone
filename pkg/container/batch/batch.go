@@ -98,7 +98,7 @@ func (info *aggInfo) UnmarshalBinary(data []byte) error {
 	data = data[1:]
 	info.inputTypes = types.DecodeType(data[:types.TSize])
 	data = data[types.TSize:]
-	aggregate, err := agg.New(info.Op, info.Dist, info.inputTypes)
+	aggregate, err := agg.New(info.Op, info.Dist, info.inputTypes, info.Sql)
 	if err != nil {
 		return err
 	}
@@ -113,6 +113,7 @@ func (bat *Batch) MarshalBinary() ([]byte, error) {
 		aggInfo[i].inputTypes = bat.Aggs[i].GetInputTypes()[0]
 		aggInfo[i].Dist = bat.Aggs[i].IsDistinct()
 		aggInfo[i].Agg = bat.Aggs[i]
+		// aggInfo[i].Sql = bat.Sql
 	}
 	return types.Encode(&EncodeBatch{
 		Zs:       bat.Zs,

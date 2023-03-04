@@ -66,6 +66,7 @@ type Aggregate struct {
 	Op   int
 	Dist bool
 	E    *plan.Expr
+	Sql  string
 }
 
 // Agg agg interface
@@ -150,10 +151,10 @@ type UnaryAgg[T1, T2 any] struct {
 	op int
 
 	// aggregate struct
-	priv AggStruct
+	Priv AggStruct
 
-	// vs is result value list
-	vs []T2
+	// Vs is result value list
+	Vs []T2
 	// es, es[i] is true to indicate that this group has not yet been populated with any value
 	es []bool
 	// memory of vs
@@ -190,6 +191,8 @@ type UnaryAgg[T1, T2 any] struct {
 
 	// Optional optimisation function for functions where cgo is used in a single pass.
 	batchFill func(any, any, int64, int64, []uint64, []int64, *nulls.Nulls) error
+
+	sql string
 }
 
 // UnaryDistAgg generic aggregation function with one input vector and with distinct
@@ -241,6 +244,8 @@ type UnaryDistAgg[T1, T2 any] struct {
 	//  fifth represents whether it is a new group
 	//  sixth represents whether the value to be fed is null
 	fill func(int64, T1, T2, int64, bool, bool) (T2, bool)
+
+	sql string
 }
 
 type EncodeAgg struct {

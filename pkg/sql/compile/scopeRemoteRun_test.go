@@ -124,9 +124,10 @@ func TestInstructionSerializationCover(t *testing.T) {
 			&tc.instruction,
 			nil,
 			0,
+			"",
 		)
 		require.NoError(t, err)
-		_, err = convertToVmInstruction(encode, nil)
+		_, err = convertToVmInstruction("", encode, nil)
 		require.NoError(t, err)
 	}
 }

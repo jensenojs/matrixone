@@ -103,6 +103,7 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 			Exprs:    t.Exprs,
 			Types:    t.Types,
 			Aggs:     t.Aggs,
+			Sql:      t.Sql,
 		}
 	case vm.Join:
 		t := sourceIns.Arg.(*join.Argument)
@@ -247,6 +248,7 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 		t := sourceIns.Arg.(*mergegroup.Argument)
 		res.Arg = &mergegroup.Argument{
 			NeedEval: t.NeedEval,
+			Sql:      t.Sql,
 		}
 	case vm.MergeLimit:
 		t := sourceIns.Arg.(*mergelimit.Argument)
@@ -814,7 +816,7 @@ func constructLimit(n *plan.Node, proc *process.Process) *limit.Argument {
 	}
 }
 
-func constructGroup(ctx context.Context, n, cn *plan.Node, ibucket, nbucket int, needEval bool, proc *process.Process) *group.Argument {
+func constructGroup(ctx context.Context, n, cn *plan.Node, ibucket, nbucket int, needEval bool, proc *process.Process, sql string) *group.Argument {
 	var lenAggs, lenMultiAggs int
 	aggs := make([]agg.Aggregate, len(n.AggList))
 	// multiaggs: is not like the normal agg funcs which have only one arg exclude 'distinct'
@@ -844,6 +846,7 @@ func constructGroup(ctx context.Context, n, cn *plan.Node, ibucket, nbucket int,
 				E:    f.F.Args[0],
 				Dist: distinct,
 				Op:   fun.AggregateInfo,
+				Sql:  sql,
 			}
 			lenAggs++
 		}
@@ -866,6 +869,7 @@ func constructGroup(ctx context.Context, n, cn *plan.Node, ibucket, nbucket int,
 		Exprs:     n.GroupBy,
 		Ibucket:   uint64(ibucket),
 		Nbucket:   uint64(nbucket),
+		Sql:       sql,
 	}
 }
 
@@ -953,9 +957,10 @@ func constructBroadcastJoinDispatch(idx int, ss []*Scope, currentCNAddr string, 
 	return arg
 }
 
-func constructMergeGroup(_ *plan.Node, needEval bool) *mergegroup.Argument {
+func constructMergeGroup(_ *plan.Node, needEval bool, sql string) *mergegroup.Argument {
 	return &mergegroup.Argument{
 		NeedEval: needEval,
+		Sql:      sql,
 	}
 }
 
