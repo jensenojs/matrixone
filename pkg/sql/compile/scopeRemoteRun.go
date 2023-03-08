@@ -277,7 +277,7 @@ func decodeScope(data []byte, proc *process.Process, isRemote bool) (*Scope, err
 		regs:   make(map[*process.WaitRegister]int32),
 	}
 	ctx.root = ctx
-	s, err := generateScope(p.Sql, proc, p, ctx, nil, isRemote)
+	s, err := generateScope(proc, p, ctx, nil, isRemote)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +364,6 @@ func generatePipeline(s *Scope, ctx *scopeContext, ctxId int32) (*pipeline.Pipel
 	p.IsEnd = s.IsEnd
 	p.IsJoin = s.IsJoin
 	p.UuidsToRegIdx = convertScopeRemoteReceivInfo(s)
-	p.Sql = s.sql
 
 	// Plan
 	if ctxId == 1 {
@@ -441,7 +440,7 @@ func fillInstructionsForPipeline(s *Scope, ctx *scopeContext, p *pipeline.Pipeli
 	// Instructions
 	p.InstructionList = make([]*pipeline.Instruction, len(s.Instructions))
 	for i := range p.InstructionList {
-		if ctxId, p.InstructionList[i], err = convertToPipelineInstruction(&s.Instructions[i], ctx, ctxId, p.Sql); err != nil {
+		if ctxId, p.InstructionList[i], err = convertToPipelineInstruction(&s.Instructions[i], ctx, ctxId); err != nil {
 			return ctxId, err
 		}
 	}
@@ -477,7 +476,7 @@ func convertScopeRemoteReceivInfo(s *Scope) (ret []*pipeline.UuidToRegIdx) {
 }
 
 // generateScope generate a scope from scope context and pipeline.
-func generateScope(sql string, proc *process.Process, p *pipeline.Pipeline, ctx *scopeContext,
+func generateScope(proc *process.Process, p *pipeline.Pipeline, ctx *scopeContext,
 	analNodes []*process.AnalyzeInfo, isRemote bool) (*Scope, error) {
 	var err error
 	if p.Qry != nil {
@@ -490,7 +489,6 @@ func generateScope(sql string, proc *process.Process, p *pipeline.Pipeline, ctx 
 		IsJoin:   p.IsJoin,
 		Plan:     ctx.plan,
 		IsRemote: isRemote,
-		sql:      sql,
 	}
 	if err := convertPipelineUuid(p, s); err != nil {
 		return s, err
@@ -539,7 +537,7 @@ func generateScope(sql string, proc *process.Process, p *pipeline.Pipeline, ctx 
 			id:     p.Children[i].PipelineId,
 			regs:   make(map[*process.WaitRegister]int32),
 		}
-		if s.PreScopes[i], err = generateScope(sql, s.Proc, p.Children[i], ctx.children[i], analNodes, isRemote); err != nil {
+		if s.PreScopes[i], err = generateScope(s.Proc, p.Children[i], ctx.children[i], analNodes, isRemote); err != nil {
 			return nil, err
 		}
 	}
@@ -557,7 +555,7 @@ func fillInstructionsForScope(s *Scope, ctx *scopeContext, p *pipeline.Pipeline)
 	}
 	s.Instructions = make([]vm.Instruction, len(p.InstructionList))
 	for i := range s.Instructions {
-		if s.Instructions[i], err = convertToVmInstruction(p.Sql, p.InstructionList[i], ctx); err != nil {
+		if s.Instructions[i], err = convertToVmInstruction(p.InstructionList[i], ctx); err != nil {
 			return err
 		}
 	}
@@ -565,7 +563,7 @@ func fillInstructionsForScope(s *Scope, ctx *scopeContext, p *pipeline.Pipeline)
 }
 
 // convert vm.Instruction to pipeline.Instruction
-func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId int32, sql string) (int32, *pipeline.Instruction, error) {
+func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId int32) (int32, *pipeline.Instruction, error) {
 	var err error
 
 	in := &pipeline.Instruction{Op: int32(opr.Op), Idx: int32(opr.Idx), IsFirst: opr.IsFirst, IsLast: opr.IsLast}
@@ -632,7 +630,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 			Exprs:    t.Exprs,
 			Types:    convertToPlanTypes(t.Types),
 			Aggs:     convertToPipelineAggregates(t.Aggs),
-			Sql:      sql,
 		}
 	case *join.Argument:
 		relList, colList := getRelColList(t.Result)
@@ -756,7 +753,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 	case *mergegroup.Argument:
 		in.Agg = &pipeline.Group{
 			NeedEval: t.NeedEval,
-			Sql:      sql,
 		}
 	case *mergelimit.Argument:
 		in.Limit = t.Limit
@@ -828,7 +824,7 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 }
 
 // convert pipeline.Instruction to vm.Instruction
-func convertToVmInstruction(sql string, opr *pipeline.Instruction, ctx *scopeContext) (vm.Instruction, error) {
+func convertToVmInstruction(opr *pipeline.Instruction, ctx *scopeContext) (vm.Instruction, error) {
 	v := vm.Instruction{Op: int(opr.Op), Idx: int(opr.Idx), IsFirst: opr.IsFirst, IsLast: opr.IsLast}
 	switch opr.Op {
 	case vm.Insert:
@@ -898,7 +894,6 @@ func convertToVmInstruction(sql string, opr *pipeline.Instruction, ctx *scopeCon
 			Exprs:    t.Exprs,
 			Types:    convertToTypes(t.Types),
 			Aggs:     convertToAggregates(t.Aggs),
-			Sql:      sql,
 		}
 	case vm.Join:
 		t := opr.GetJoin()
@@ -1044,7 +1039,6 @@ func convertToVmInstruction(sql string, opr *pipeline.Instruction, ctx *scopeCon
 	case vm.MergeGroup:
 		v.Arg = &mergegroup.Argument{
 			NeedEval: opr.Agg.NeedEval,
-			Sql:      sql,
 		}
 	case vm.MergeLimit:
 		v.Arg = &mergelimit.Argument{
@@ -1136,11 +1130,10 @@ func convertToPlanTypes(ts []types.Type) []*plan.Type {
 	result := make([]*plan.Type, len(ts))
 	for i, t := range ts {
 		result[i] = &plan.Type{
-			Id:        int32(t.Oid),
-			Width:     t.Width,
-			Precision: t.Precision,
-			Size:      t.Size,
-			Scale:     t.Scale,
+			Id:    int32(t.Oid),
+			Width: t.Width,
+			Size:  t.Size,
+			Scale: t.Scale,
 		}
 	}
 	return result
@@ -1151,11 +1144,10 @@ func convertToTypes(ts []*plan.Type) []types.Type {
 	result := make([]types.Type, len(ts))
 	for i, t := range ts {
 		result[i] = types.Type{
-			Oid:       types.T(t.Id),
-			Width:     t.Width,
-			Precision: t.Precision,
-			Size:      t.Size,
-			Scale:     t.Scale,
+			Oid:   types.T(t.Id),
+			Width: t.Width,
+			Size:  t.Size,
+			Scale: t.Scale,
 		}
 	}
 	return result
@@ -1169,7 +1161,6 @@ func convertToPipelineAggregates(ags []agg.Aggregate) []*pipeline.Aggregate {
 			Op:   int32(a.Op),
 			Dist: a.Dist,
 			Expr: a.E,
-			Sql:  a.Sql,
 		}
 	}
 	return result
@@ -1183,7 +1174,6 @@ func convertToAggregates(ags []*pipeline.Aggregate) []agg.Aggregate {
 			Op:   int(a.Op),
 			Dist: a.Dist,
 			E:    a.Expr,
-			Sql:  a.Sql,
 		}
 	}
 	return result

@@ -27,8 +27,6 @@ import (
 
 var _ engine.Database = new(txnDatabase)
 
-var testTableId uint64
-
 func (db *txnDatabase) Relations(ctx context.Context) ([]string, error) {
 	var rels []string
 
@@ -108,10 +106,8 @@ func (db *txnDatabase) Relation(ctx context.Context, name string) (engine.Relati
 	if ok := db.txn.engine.catalog.GetTable(item); !ok {
 		return nil, moerr.NewParseError(ctx, "table %q does not exist", name)
 	}
-	parts := db.txn.engine.getPartitions(db.databaseId, item.Id)
 	tbl := &txnTable{
 		db:           db,
-		parts:        parts,
 		tableId:      item.Id,
 		tableName:    item.Name,
 		defs:         item.Defs,
@@ -124,6 +120,7 @@ func (db *txnDatabase) Relation(ctx context.Context, name string) (engine.Relati
 		partition:    item.Partition,
 		createSql:    item.CreateSql,
 		constraint:   item.Constraint,
+		parts:        db.txn.engine.getPartitions(db.databaseId, item.Id).Snapshot(),
 	}
 	columnLength := len(item.TableDef.Cols) - 1 // we use this data to fetch zonemap, but row_id has no zonemap
 	meta, err := db.txn.getTableMeta(ctx, db.databaseId, item.Id,
@@ -220,9 +217,6 @@ func (db *txnDatabase) GetDatabaseId(ctx context.Context) string {
 func (db *txnDatabase) Create(ctx context.Context, name string, defs []engine.TableDef) error {
 	accountId, userId, roleId := getAccessInfo(ctx)
 	tableId, err := db.txn.allocateID(ctx)
-	if name == "test_7748" {
-		testTableId = tableId
-	}
 	if err != nil {
 		return err
 	}
@@ -297,7 +291,7 @@ func (db *txnDatabase) Create(ctx context.Context, name string, defs []engine.Ta
 	tbl.defs = defs
 	tbl.tableName = name
 	tbl.tableId = tableId
-	tbl.parts = db.txn.engine.getPartitions(db.databaseId, tableId)
+	tbl.parts = db.txn.engine.getPartitions(db.databaseId, tableId).Snapshot()
 	tbl.getTableDef()
 	db.txn.createMap.Store(genTableKey(ctx, name, db.databaseId), tbl)
 	return nil
@@ -305,7 +299,7 @@ func (db *txnDatabase) Create(ctx context.Context, name string, defs []engine.Ta
 
 func (db *txnDatabase) openSysTable(key tableKey, id uint64, name string,
 	defs []engine.TableDef) engine.Relation {
-	parts := db.txn.engine.getPartitions(db.databaseId, id)
+	parts := db.txn.engine.getPartitions(db.databaseId, id).Snapshot()
 	tbl := &txnTable{
 		db:           db,
 		tableId:      id,

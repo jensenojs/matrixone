@@ -31,6 +31,7 @@ func consumeEntry(
 ) error {
 
 	state.HandleLogtailEntry(ctx, e, primaryIdx, engine.mp)
+
 	if isMetaTable(e.TableName) {
 		return nil
 	}
@@ -58,63 +59,6 @@ func consumeEntry(
 		bat, _ := batch.ProtoBatchToBatch(e.Bat)
 		engine.catalog.DeleteDatabase(bat)
 	}
+
 	return nil
-
-	/*
-		if isMetaTable(e.TableName) {
-			return nil
-		}
-
-		if e.EntryType == api.Entry_Insert {
-			if isMetaTable(e.TableName) {
-				vec, err := vector.ProtoVectorToVector(e.Bat.Vecs[catalog.BLOCKMETA_ID_IDX+MO_PRIMARY_OFF])
-				if err != nil {
-					return err
-				}
-				timeVec, err := vector.ProtoVectorToVector(e.Bat.Vecs[catalog.BLOCKMETA_COMMITTS_IDX+MO_PRIMARY_OFF])
-				if err != nil {
-					return err
-				}
-				vec1, err := vector.ProtoVectorToVector(e.Bat.Vecs[catalog.BLOCKMETA_ENTRYSTATE_IDX+MO_PRIMARY_OFF])
-				if err != nil {
-					return err
-				}
-				vs := vector.MustTCols[uint64](vec)
-				timestamps := vector.MustTCols[types.TS](timeVec)
-				es := vector.MustTCols[bool](vec1)
-				for i, v := range vs {
-					if e.TableId == testTableId {
-						logutil.Errorf("+++: deleted by block id %d, entrystate is %v, ts is %v", v, es[i], timestamps[i].ToTimestamp())
-					}
-					if err := tbl.parts[idx].DeleteByBlockID(ctx, timestamps[i].ToTimestamp(), v); err != nil {
-						if !moerr.IsMoErrCode(err, moerr.ErrTxnWriteConflict) { // 1
-							return err
-						}
-					}
-				}
-				return engine.getMetaPartitions(e.TableName)[idx].Insert(ctx, -1, e.Bat, false)
-			}
-			switch e.TableId {
-			case catalog.MO_TABLES_ID:
-				bat, _ := batch.ProtoBatchToBatch(e.Bat)
-				engine.catalog.InsertTable(bat)
-			case catalog.MO_DATABASE_ID:
-				bat, _ := batch.ProtoBatchToBatch(e.Bat)
-				engine.catalog.InsertDatabase(bat)
-			case catalog.MO_COLUMNS_ID:
-				bat, _ := batch.ProtoBatchToBatch(e.Bat)
-				engine.catalog.InsertColumns(bat)
-			}
-			return nil
-		}
-
-		switch e.TableId {
-		case catalog.MO_TABLES_ID:
-			bat, _ := batch.ProtoBatchToBatch(e.Bat)
-			engine.catalog.DeleteTable(bat)
-		case catalog.MO_DATABASE_ID:
-			bat, _ := batch.ProtoBatchToBatch(e.Bat)
-			engine.catalog.DeleteDatabase(bat)
-		}
-	*/
 }

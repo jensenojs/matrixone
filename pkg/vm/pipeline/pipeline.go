@@ -16,22 +16,18 @@ package pipeline
 
 import (
 	"bytes"
-	"strings"
 
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/container/vector"
-	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func New(attrs []string, ins vm.Instructions, reg *process.WaitRegister, sql string) *Pipeline {
+func New(attrs []string, ins vm.Instructions, reg *process.WaitRegister) *Pipeline {
 	return &Pipeline{
 		reg:          reg,
 		instructions: ins,
 		attrs:        attrs,
-		Sql:          sql,
 	}
 }
 
@@ -84,20 +80,8 @@ func (p *Pipeline) Run(r engine.Reader, proc *process.Process) (end bool, err er
 			a.Alloc(int64(bat.Size()))
 		}
 
-		// projection -> group -> connect, len(p.instructions) == 3 is not really right, but we have r.Read here, so may not confuse
-		if (strings.Contains(p.Sql, "SELECT DISTINCT a, AVG( b) FROM test_7748 GROUP BY a HAVING AVG( b) > 50")) && bat != nil && len(p.instructions) == 3 {
-			// check count(b) and sum(b)
-			bVec := bat.GetVector(1)
-			var sum int64
-			bCol := vector.GetColumn[int32](bVec)
-			for _, v := range bCol {
-				sum = sum + int64(v)
-			}
-			logutil.Errorf("+++: Before Group : the count(b) is %d, and the sum(b) is %d\n", bVec.Length(), sum)
-		}
-
 		proc.SetInputBatch(bat)
-		end, err = vm.Run(p.instructions, proc, p.Sql)
+		end, err = vm.Run(p.instructions, proc)
 		if err != nil {
 			p.cleanup(proc, true)
 			return end, err
@@ -128,7 +112,7 @@ func (p *Pipeline) ConstRun(bat *batch.Batch, proc *process.Process) (end bool, 
 	for {
 		for i := range pipelineInputBatches {
 			proc.SetInputBatch(pipelineInputBatches[i])
-			end, err = vm.Run(p.instructions, proc, p.Sql)
+			end, err = vm.Run(p.instructions, proc)
 			if err != nil {
 				p.cleanup(proc, true)
 				return end, err
@@ -156,7 +140,7 @@ func (p *Pipeline) MergeRun(proc *process.Process) (end bool, err error) {
 		return false, err
 	}
 	for {
-		end, err = vm.Run(p.instructions, proc, p.Sql)
+		end, err = vm.Run(p.instructions, proc)
 		if err != nil {
 			proc.Cancel()
 			p.cleanup(proc, true)

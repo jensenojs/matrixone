@@ -59,8 +59,6 @@ func DeepCopyInsertCtx(ctx *plan.InsertCtx) *plan.InsertCtx {
 		Ref:            DeepCopyObjectRef(ctx.Ref),
 		OnDuplicateIdx: make([]int32, len(ctx.OnDuplicateIdx)),
 		TableDef:       DeepCopyTableDef(ctx.TableDef),
-
-		ClusterTable: DeepCopyClusterTable(ctx.ClusterTable),
 	}
 
 	copy(newCtx.OnDuplicateIdx, ctx.OnDuplicateIdx)
@@ -385,7 +383,6 @@ func DeepCopyTyp(typ *plan.Type) *plan.Type {
 		Id:          typ.Id,
 		NotNullable: typ.NotNullable,
 		Width:       typ.Width,
-		Precision:   typ.Precision,
 		Size:        typ.Size,
 		Scale:       typ.Scale,
 		AutoIncr:    typ.AutoIncr,
@@ -759,6 +756,12 @@ func DeepCopyDataDefinition(old *plan.DataDefinition) *plan.DataDefinition {
 				TableLocks: df.LockTables.TableLocks,
 			},
 		}
+
+	case *plan.DataDefinition_UnlockTables:
+		newDf.Definition = &plan.DataDefinition_UnlockTables{
+			UnlockTables: &plan.UnLockTables{},
+		}
+
 	}
 
 	return newDf

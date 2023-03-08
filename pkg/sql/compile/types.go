@@ -84,7 +84,6 @@ type Col struct {
 // Scope is the output of the compile process.
 // Each sql will be compiled to one or more execution unit scopes.
 type Scope struct {
-	sql string
 	// Magic specifies the type of Scope.
 	// 0 -  execution unit for reading data.
 	// 1 -  execution unit for processing intermediate results.

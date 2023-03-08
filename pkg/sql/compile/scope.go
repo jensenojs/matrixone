@@ -41,6 +41,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/mergetop"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/offset"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/order"
+	"github.com/matrixorigin/matrixone/pkg/sql/colexec/right"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/top"
 	"github.com/matrixorigin/matrixone/pkg/sql/util"
 	"github.com/matrixorigin/matrixone/pkg/vm"
@@ -59,9 +60,8 @@ func PrintScope(prefix []byte, ss []*Scope) {
 
 // Run read data from storage engine and run the instructions of scope.
 func (s *Scope) Run(c *Compile) (err error) {
-	s.sql = c.sql
 	s.Proc.Ctx = context.WithValue(s.Proc.Ctx, defines.EngineKey{}, c.e)
-	p := pipeline.New(s.DataSource.Attributes, s.Instructions, s.Reg, c.sql)
+	p := pipeline.New(s.DataSource.Attributes, s.Instructions, s.Reg)
 	if s.DataSource.Bat != nil {
 		if _, err = p.ConstRun(s.DataSource.Bat, s.Proc); err != nil {
 			return err
@@ -129,7 +129,6 @@ func (s *Scope) MergeRun(c *Compile) error {
 		s.notifyAndReceiveFromRemote(errReceiveChan)
 	}
 	p := pipeline.NewMerge(s.Instructions, s.Reg)
-	p.Sql = s.sql
 	if _, err := p.MergeRun(s.Proc); err != nil {
 		return err
 	}
@@ -170,17 +169,11 @@ func (s *Scope) MergeRun(c *Compile) error {
 // if no target node information, just execute it at local.
 func (s *Scope) RemoteRun(c *Compile) error {
 	// if send to itself, just run it parallel at local.
-	s.sql = c.sql
 	if len(s.NodeInfo.Addr) == 0 || !cnclient.IsCNClientReady() ||
-		len(c.addr) == 0 || isCurrentCN(s.NodeInfo.Addr, c.addr) {
-		if s.sql == "SELECT DISTINCT a, AVG( b) FROM t1 GROUP BY a HAVING AVG( b) > 50" {
-			logutil.Errorf("--*:RemoteRun goes ParallelRun")
-		}
+		len(c.addr) == 0 || isSameCN(s.NodeInfo.Addr, c.addr) {
 		return s.ParallelRun(c, s.IsRemote)
 	}
-	if s.sql == "SELECT DISTINCT a, AVG( b) FROM t1 GROUP BY a HAVING AVG( b) > 50" {
-		logutil.Errorf("--*:RemoteRun goes remoteRun")
-	}
+
 	err := s.remoteRun(c)
 
 	// tell connect operator that it's over
@@ -192,7 +185,6 @@ func (s *Scope) RemoteRun(c *Compile) error {
 // ParallelRun try to execute the scope in parallel way.
 func (s *Scope) ParallelRun(c *Compile, remote bool) error {
 	var rds []engine.Reader
-	s.sql = c.sql
 
 	s.Proc.Ctx = context.WithValue(s.Proc.Ctx, defines.EngineKey{}, c.e)
 	if s.IsJoin {
@@ -279,7 +271,7 @@ func (s *Scope) PushdownRun(c *Compile) error {
 		bat := <-reg.Ch
 		if bat == nil {
 			s.Proc.Reg.InputBatch = bat
-			_, err = vm.Run(s.Instructions, s.Proc, c.sql)
+			_, err = vm.Run(s.Instructions, s.Proc)
 			s.Proc.Cancel()
 			return err
 		}
@@ -287,7 +279,7 @@ func (s *Scope) PushdownRun(c *Compile) error {
 			continue
 		}
 		s.Proc.Reg.InputBatch = bat
-		if end, err = vm.Run(s.Instructions, s.Proc, c.sql); err != nil || end {
+		if end, err = vm.Run(s.Instructions, s.Proc); err != nil || end {
 			return err
 		}
 	}
@@ -298,6 +290,9 @@ func (s *Scope) JoinRun(c *Compile) error {
 	if mcpu < 1 {
 		mcpu = 1
 	}
+
+	isRight := s.isRight()
+
 	chp := s.PreScopes
 	for i := range chp {
 		chp[i].IsEnd = true
@@ -311,12 +306,28 @@ func (s *Scope) JoinRun(c *Compile) error {
 		ss[i].Proc = process.NewWithAnalyze(s.Proc, c.ctx, 2, c.anal.Nodes())
 		ss[i].Proc.Reg.MergeReceivers[1].Ch = make(chan *batch.Batch, 10)
 	}
-	left, right := c.newLeftScope(s, ss), c.newRightScope(s, ss)
+	left_scope, right_scope := c.newLeftScope(s, ss), c.newRightScope(s, ss)
 	s = newParallelScope(c, s, ss)
+
+	if isRight {
+		channel := make(chan *[]int32)
+		for i := range s.PreScopes {
+			arg := s.PreScopes[i].Instructions[0].Arg.(*right.Argument)
+			arg.Channel = channel
+			arg.NumCPU = uint64(mcpu)
+			if i == 0 {
+				arg.Is_receiver = true
+			}
+		}
+	}
 	s.PreScopes = append(s.PreScopes, chp...)
-	s.PreScopes = append(s.PreScopes, left)
-	s.PreScopes = append(s.PreScopes, right)
+	s.PreScopes = append(s.PreScopes, left_scope)
+	s.PreScopes = append(s.PreScopes, right_scope)
+
 	return s.MergeRun(c)
+}
+func (s *Scope) isRight() bool {
+	return s != nil && s.Instructions[0].Op == vm.Right
 }
 
 func newParallelScope(c *Compile, s *Scope, ss []*Scope) *Scope {
@@ -395,14 +406,12 @@ func newParallelScope(c *Compile, s *Scope, ss []*Scope) *Scope {
 		case vm.Group:
 			flg = true
 			arg := in.Arg.(*group.Argument)
-			arg.Sql = c.sql
 			s.Instructions = append(s.Instructions[:1], s.Instructions[i+1:]...)
 			s.Instructions[0] = vm.Instruction{
 				Op:  vm.MergeGroup,
 				Idx: in.Idx,
 				Arg: &mergegroup.Argument{
 					NeedEval: false,
-					Sql:      c.sql,
 				},
 			}
 			for i := range ss {
@@ -415,7 +424,6 @@ func newParallelScope(c *Compile, s *Scope, ss []*Scope) *Scope {
 						Exprs:     arg.Exprs,
 						Types:     arg.Types,
 						MultiAggs: arg.MultiAggs,
-						Sql:       c.sql,
 					},
 				})
 			}
@@ -479,7 +487,6 @@ func newParallelScope(c *Compile, s *Scope, ss []*Scope) *Scope {
 	}
 	j := 0
 	for i := range ss {
-		ss[i].sql = c.sql
 		if !ss[i].IsEnd {
 			ss[i].appendInstruction(vm.Instruction{
 				Op: vm.Connector,
@@ -549,7 +556,6 @@ func copyScope(srcScope *Scope, regMap map[*process.WaitRegister]*process.WaitRe
 		IsEnd:        srcScope.IsEnd,
 		IsRemote:     srcScope.IsRemote,
 		Plan:         srcScope.Plan,
-		sql:          srcScope.sql,
 		PreScopes:    make([]*Scope, len(srcScope.PreScopes)),
 		Instructions: make([]vm.Instruction, len(srcScope.Instructions)),
 		NodeInfo: engine.Node{
