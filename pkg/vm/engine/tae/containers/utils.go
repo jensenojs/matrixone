@@ -16,6 +16,7 @@ package containers
 
 import (
 	"fmt"
+
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
@@ -63,8 +64,8 @@ func ToDNVector(v *movec.Vector) Vector {
 
 // ### Get Functions
 
-// getNonNullValue Please don't merge it with GetValue(). Used in Vector for getting NonNullValue.
-func getNonNullValue(col *movec.Vector, row uint32) any {
+// GetNonNullValue Please don't merge it with GetValue(). Used in Vector for getting NonNullValue.
+func GetNonNullValue(col *movec.Vector, row uint32) any {
 
 	switch col.GetType().Oid {
 	case types.T_bool:
