@@ -25,66 +25,93 @@ import (
 )
 
 func String(_ any, buf *bytes.Buffer) {
-	buf.WriteString(" check primarykey dup")
+	buf.WriteString(" check primary key dup during insert")
 }
 
 func Prepare(proc *process.Process, arg any) (err error) {
 	ap := arg.(*Argument)
-	ap.potentially_dup_keys = make(map[any]bool)
-	ap.bitmp.InitWithSize(5 * mpool.MB)
+	ap.ctr = new(container)
+	ap.ctr.mayDuplicate = make(map[any]bool)
+	ap.ctr.filter.InitWithSize(5 * mpool.MB)
 	return nil
 }
 
-func hash(v []byte) uint64 {
-	return xxhash.Sum64(v)
-}
+// This operator is used to implement a way to ensure primary keys/unique keys are not duplicate in `INSERT` and `LOAD` statements
+// There are two conditions needed to check
+// 	 new pk/uk are not duplicate with each other
+// 	 new pk/uk are not duplicate with existing data
+//
+// THE big idea is to store
+// 	 pk columns to be loaded
+//   pk columns already exist
+// both in a Bloom Filter-like data structure, let's say bloom filter below
+//
+// if the final Bloom Filter claim that
+// 	 case 1: have no duplicate keys,
+// 		passes duplicate constraint
+//   case 2: may have duplicate keys
+//      start a background SQL to double check
+//
+// However, backgroudSQL may slow, so we can do some optimizations
+//   1. an record the keys that have hash conflict, and manually check them whather duplicate or not
+//   2.
 
 func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
 	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
+
 	ap := arg.(*Argument)
+	ctr := ap.ctr
 	bat := proc.InputBatch()
 	anal.Input(bat, isFirst)
 
 	if bat == nil {
-		if len(ap.potentially_dup_keys) == 0 {
+		if len(ctr.mayDuplicate) == 0 {
+			// case 1
 			return process.ExecStop, nil
 		} else {
-			// need to run background SQL to double check here
+			// case 2
 		}
 	}
-	if bat.RowCount() == 0 {
+
+	var hashes []uint64
+	rowCnt := bat.RowCount()
+	if rowCnt == 0 {
 		return process.ExecNext, nil
-	}
-
-	// build hash array from pk col values
-
-	toCheckVec := bat.GetVector(0) // firstly assume that the index of the column to be checked is 0
-	toCheckBytes := vector.MustBytesCol(toCheckVec)
-	hashes := make([]uint64, toCheckVec.Length())
-	for idx, bytes := range toCheckBytes {
-		hashes[idx] = hash(bytes)
-	}
-
-	// insert into bitmap
-
-	if ap.bitmp.EmptyByFlag() {
-		ap.bitmp.AddMany(hashes)
 	} else {
-		for idx, val := range hashes {
-			if ap.bitmp.Contains(val) {
-				mayDupKey := containers.GetNonNullValue(toCheckVec, uint32(idx))
-				if _, ok := ap.potentially_dup_keys[mayDupKey]; ok {
-					dupentry, _ := mayDupKey.(string)
-					return process.ExecStop, moerr.NewDuplicateEntry(proc.Ctx, dupentry, bat.Attrs[0])
+		hashes = make([]uint64, rowCnt)
+	}
+
+	// build hash array from pk col, temporarily assume that the index of pk column is 0
+	toCheckVec := bat.GetVector(0)
+	generateHashes(toCheckVec, rowCnt, hashes)
+
+	// store hashes in to filter
+	if ctr.filter.EmptyByFlag() {
+		ctr.filter.AddMany(hashes)
+	} else {
+		for idx, hval := range hashes {
+			// hash confile, further check
+			if ctr.filter.Contains(hval) {
+				key := containers.GetNonNullValue(toCheckVec, uint32(idx))
+				if _, ok := ctr.mayDuplicate[key]; ok {
+					// key that has been inserted before, fail to pass constraint
+					dupEntry, _ := key.(string)
+					return process.ExecStop, moerr.NewDuplicateEntry(proc.Ctx, dupEntry, bat.Attrs[0])
 				}
-				ap.potentially_dup_keys[mayDupKey] = true
+				ctr.mayDuplicate[key] = true
 			} else {
-				ap.bitmp.Add(val)
+				ctr.filter.Add(hval)
 			}
 		}
 	}
 
 	return process.ExecNext, nil
+}
+
+func generateHashes(pkCol *vector.Vector, rowCnt int, hashes []uint64) {
+	for idx := 0; idx < rowCnt; idx++ {
+		hashes[idx] = xxhash.Sum64(pkCol.GetRawBytesAt(idx))
+	}
 }

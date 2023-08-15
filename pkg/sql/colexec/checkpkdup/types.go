@@ -18,12 +18,19 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
+type container struct {
+	mayDuplicate map[any]bool
+	filter       *bitmap.Bitmap
+}
+
 type Argument struct {
-	potentially_dup_keys map[any]bool
-	bitmp                bitmap.Bitmap
+	ctr *container
 }
 
 func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {
-	// ctr := arg.ctr
-	// bitmap currently have no Free method, maybe need to add it
+	ctr := arg.ctr
+	if ctr != nil {
+		ctr.mayDuplicate = nil
+		ctr.filter = nil
+	}
 }
