@@ -11,28 +11,41 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package checkpkdup
+package fuzzyfilter
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/matrixorigin/matrixone/pkg/common/bitmap"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
+	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
+const (
+	// One hundred million can be estimated as 2^26, 10MB can be estimated as 2^20.
+	bitmpSize = 10 * mpool.MB
+
+	// FIXME: bitmap always assume that bitmap has been extended to at least row
+	// but currently have no logic about Expand bitmap, so use prime to meet assumptions of bitmap
+	bitmpPrime = 10485763
+)
+
 func String(_ any, buf *bytes.Buffer) {
-	buf.WriteString(" check primary key dup during insert")
+	buf.WriteString(" fuzzy check duplicate constraint")
 }
 
 func Prepare(proc *process.Process, arg any) (err error) {
 	ap := arg.(*Argument)
 	ap.ctr = new(container)
+	ap.ctr.filter = new(bitmap.Bitmap)
+	ap.ctr.filter.InitWithSize(bitmpSize)
 	ap.ctr.mayDuplicate = make(map[any]bool)
-	ap.ctr.filter.InitWithSize(5 * mpool.MB)
 	return nil
 }
 
@@ -50,7 +63,7 @@ func Prepare(proc *process.Process, arg any) (err error) {
 // 	 case 1: have no duplicate keys,
 // 		passes duplicate constraint
 //   case 2: may have duplicate keys
-//      start a background SQL to double check
+//      start a background SQL to double check, it should be a point select
 //
 // However, backgroudSQL may slow, so we can do some optimizations
 //   1. an record the keys that have hash conflict, and manually check them whather duplicate or not
@@ -69,15 +82,20 @@ func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (p
 	if bat == nil {
 		if len(ctr.mayDuplicate) == 0 {
 			// case 1
+			proc.SetInputBatch(nil)
 			return process.ExecStop, nil
 		} else {
 			// case 2
+			proc.SetInputBatch(nil)
+			return process.ExecStop, nil
 		}
 	}
 
 	var hashes []uint64
 	rowCnt := bat.RowCount()
 	if rowCnt == 0 {
+		proc.PutBatch(bat)
+		proc.SetInputBatch(batch.EmptyBatch)
 		return process.ExecNext, nil
 	} else {
 		hashes = make([]uint64, rowCnt)
@@ -87,31 +105,28 @@ func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (p
 	toCheckVec := bat.GetVector(0)
 	generateHashes(toCheckVec, rowCnt, hashes)
 
-	// store hashes in to filter
-	if ctr.filter.EmptyByFlag() {
-		ctr.filter.AddMany(hashes)
-	} else {
-		for idx, hval := range hashes {
-			// hash confile, further check
-			if ctr.filter.Contains(hval) {
-				key := containers.GetNonNullValue(toCheckVec, uint32(idx))
-				if _, ok := ctr.mayDuplicate[key]; ok {
-					// key that has been inserted before, fail to pass constraint
-					dupEntry, _ := key.(string)
-					return process.ExecStop, moerr.NewDuplicateEntry(proc.Ctx, dupEntry, bat.Attrs[0])
-				}
-				ctr.mayDuplicate[key] = true
-			} else {
-				ctr.filter.Add(hval)
+	// store hashes in to fuzzy filter
+	for idx, hval := range hashes {
+		if ctr.filter.Contains(hval) {
+			collisionKey := containers.GetNonNullValue(toCheckVec, uint32(idx))
+			if _, ok := ctr.mayDuplicate[collisionKey]; ok {
+				// key that has been inserted before, fail to pass constraint
+				hashes = nil
+				return process.ExecStop, moerr.NewDuplicateEntry(proc.Ctx, fmt.Sprintf("%v", collisionKey), bat.Attrs[0])
 			}
+			ctr.mayDuplicate[collisionKey] = true
+		} else {
+			ctr.filter.Add(hval)
 		}
 	}
 
+	proc.SetInputBatch(batch.EmptyBatch)
 	return process.ExecNext, nil
 }
 
 func generateHashes(pkCol *vector.Vector, rowCnt int, hashes []uint64) {
 	for idx := 0; idx < rowCnt; idx++ {
-		hashes[idx] = xxhash.Sum64(pkCol.GetRawBytesAt(idx))
+		// hacking : 10485763
+		hashes[idx] = xxhash.Sum64(pkCol.GetRawBytesAt(idx)) % bitmpPrime
 	}
 }

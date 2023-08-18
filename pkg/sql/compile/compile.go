@@ -338,6 +338,7 @@ func (c *Compile) Run(_ uint64) error {
 			}
 			c.anal.analInfos = nil
 		}
+		// TODO: Add background SQL for fuzzyfilter, maybe not here
 
 		c.proc.CleanValueScanBatchs()
 		pool.Put(c)
@@ -980,6 +981,16 @@ func (c *Compile) compilePlanScope(ctx context.Context, step int32, curNodeIdx i
 			Arg: constructOnduplicateKey(n, c.e),
 		}
 		return []*Scope{rs}, nil
+	case plan.Node_FUZZY_FILTER:
+		curr := c.anal.curr
+		c.setAnalyzeCurrent(nil, int(n.Children[0]))
+		ss, err := c.compilePlanScope(ctx, step, n.Children[0], ns)
+		if err != nil {
+			return nil, err
+		}
+		ss = c.compileFuzzyFilter(n, ss)
+		c.setAnalyzeCurrent(ss, curr)
+		return ss, nil
 	case plan.Node_PRE_INSERT_UK:
 		curr := c.anal.curr
 		ss, err := c.compilePlanScope(ctx, step, n.Children[0], ns)
@@ -2179,6 +2190,26 @@ func (c *Compile) compileLimit(n *plan.Node, ss []*Scope) []*Scope {
 		Arg: constructMergeLimit(n, c.proc),
 	}
 	return []*Scope{rs}
+}
+
+func (c *Compile) compileFuzzyFilter(n *plan.Node, ss []*Scope) []*Scope {
+	for i := range ss {
+		ss[i].appendInstruction(vm.Instruction{
+			Op:      vm.FuzzyFilter,
+			Idx:     c.anal.curr,
+			IsFirst: c.anal.isFirst,
+			Arg:     constructFuzzyFilter(),
+		})
+	}
+	c.anal.isFirst = false
+
+	// rs := c.newMergeScope(ss)
+	// rs.Instructions[0] = vm.Instruction{
+	// 	Op:  vm.FuzzyFilter,
+	// 	Idx: c.anal.curr,
+	// 	Arg: constructFuzzyFilter(),
+	// }
+	return ss
 }
 
 func (c *Compile) compileMergeGroup(n *plan.Node, ss []*Scope, ns []*plan.Node) []*Scope {

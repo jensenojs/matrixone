@@ -866,10 +866,11 @@ func makeInsertPlan(
 		builder.appendStep(lastNodeId)
 	}
 
-	// make plan: sink_scan -> group_by -> filter  //check if pk is unique in rows
+	// make plan: sink_scan -> project -> Fuzzyfilter  //check if pk is unique in rows
 	if checkInsertPkDup {
 		if pkPos, pkTyp := getPkPos(tableDef, true); pkPos != -1 {
 			lastNodeId = appendSinkScanNode(builder, bindCtx, sourceStep)
+
 			pkColExpr := &plan.Expr{
 				Typ: pkTyp,
 				Expr: &plan.Expr_Col{
@@ -879,46 +880,61 @@ func makeInsertPlan(
 					},
 				},
 			}
-			lastNodeId, err = appendAggCountGroupByColExpr(builder, bindCtx, lastNodeId, pkColExpr)
-			if err != nil {
-				return err
+			projectNode := &Node{
+				NodeType:    plan.Node_PROJECT,
+				Children:    []int32{lastNodeId},
+				ProjectList: []*Expr{pkColExpr},
 			}
+			lastNodeId = builder.appendNode(projectNode, bindCtx)
 
-			countType := types.T_int64.ToType()
-			countColExpr := &plan.Expr{
-				Typ: makePlan2Type(&countType),
-				Expr: &plan.Expr_Col{
-					Col: &plan.ColRef{
-						Name: tableDef.Pkey.PkeyColName,
-					},
-				},
+			fuzzyFilterNode := &Node{
+				NodeType: plan.Node_FUZZY_FILTER,
+				Children: []int32{lastNodeId},
 			}
+			lastNodeId = builder.appendNode(fuzzyFilterNode, bindCtx)
 
-			eqCheckExpr, err := bindFuncExprImplByPlanExpr(builder.GetContext(), "=", []*Expr{MakePlan2Int64ConstExprWithType(1), countColExpr})
-			if err != nil {
-				return err
-			}
-			varcharType := types.T_varchar.ToType()
-			varcharExpr, err := makePlan2CastExpr(builder.GetContext(), &Expr{
-				Typ: tableDef.Cols[pkPos].Typ,
-				Expr: &plan.Expr_Col{
-					Col: &plan.ColRef{ColPos: 1, Name: tableDef.Cols[pkPos].Name},
-				},
-			}, makePlan2Type(&varcharType))
-			if err != nil {
-				return err
-			}
-			filterExpr, err := bindFuncExprImplByPlanExpr(builder.GetContext(), "assert", []*Expr{eqCheckExpr, varcharExpr, makePlan2StringConstExprWithType(tableDef.Cols[pkPos].Name)})
-			if err != nil {
-				return err
-			}
-			filterNode := &Node{
-				NodeType:   plan.Node_FILTER,
-				Children:   []int32{lastNodeId},
-				FilterList: []*Expr{filterExpr},
-				IsEnd:      true,
-			}
-			lastNodeId = builder.appendNode(filterNode, bindCtx)
+			// lastNodeId, err = appendAggCountGroupByColExpr(builder, bindCtx, lastNodeId, pkColExpr)
+			// if err != nil {
+			// 	return err
+			// }
+
+			// countType := types.T_int64.ToType()
+			// countColExpr := &plan.Expr{
+			// 	Typ: makePlan2Type(&countType),
+			// 	Expr: &plan.Expr_Col{
+			// 		Col: &plan.ColRef{
+			// 			Name: tableDef.Pkey.PkeyColName,
+			// 		},
+			// 	},
+			// }
+
+			// eqCheckExpr, err := bindFuncExprImplByPlanExpr(builder.GetContext(), "=", []*Expr{MakePlan2Int64ConstExprWithType(1), countColExpr})
+			// if err != nil {
+			// 	return err
+			// }
+			// varcharType := types.T_varchar.ToType()
+			// varcharExpr, err := makePlan2CastExpr(builder.GetContext(), &Expr{
+			// 	Typ: tableDef.Cols[pkPos].Typ,
+			// 	Expr: &plan.Expr_Col{
+			// 		Col: &plan.ColRef{ColPos: 1, Name: tableDef.Cols[pkPos].Name},
+			// 	},
+			// }, makePlan2Type(&varcharType))
+			// if err != nil {
+			// 	return err
+			// }
+			// filterExpr, err := bindFuncExprImplByPlanExpr(builder.GetContext(), "assert", []*Expr{eqCheckExpr, varcharExpr, makePlan2StringConstExprWithType(tableDef.Cols[pkPos].Name)})
+			// if err != nil {
+			// 	return err
+			// }
+			// filterNode := &Node{
+			// 	NodeType:   plan.Node_FILTER,
+			// 	Children:   []int32{lastNodeId},
+			// 	FilterList: []*Expr{filterExpr},
+			// 	IsEnd:      true,
+			// }
+
+			// lastNodeId = builder.appendNode(filterNode, bindCtx)
+
 			builder.appendStep(lastNodeId)
 		}
 	}
@@ -1619,6 +1635,15 @@ func appendSinkNodeWithTag(builder *QueryBuilder, bindCtx *BindContext, lastNode
 	lastNodeId = builder.appendNode(sinkNode, bindCtx)
 	return lastNodeId
 }
+
+// func appendFuzzyFilterByColExpf(builder *QueryBuilder, bindCtx *BindContext, lastNodeId int32) (int32, error) {
+// 	fuzzyFilterNode := &Node{
+// 		NodeType:    plan.Node_FUZZY_FILTER,
+// 		Children:    []int32{lastNodeId},
+// 	}
+// 	lastNodeId = builder.appendNode(fuzzyFilterNode, bindCtx)
+// 	return lastNodeId, nil
+// }
 
 func appendAggCountGroupByColExpr(builder *QueryBuilder, bindCtx *BindContext, lastNodeId int32, colExpr *plan.Expr) (int32, error) {
 	aggExpr, err := bindFuncExprImplByPlanExpr(builder.GetContext(), "starcount", []*Expr{colExpr})

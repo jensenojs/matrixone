@@ -11,6 +11,27 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package checkpkdup
+package fuzzyfilter
 
-// TODO
+import (
+	"github.com/matrixorigin/matrixone/pkg/common/bitmap"
+	"github.com/matrixorigin/matrixone/pkg/vm/process"
+)
+
+type container struct {
+	mayDuplicate map[any]bool
+	filter       *bitmap.Bitmap
+}
+
+type Argument struct {
+	ctr *container
+	// hint may be need hint to indicate how large the filter should be init
+}
+
+func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {
+	ctr := arg.ctr
+	if ctr != nil {
+		ctr.mayDuplicate = nil
+		ctr.filter = nil
+	}
+}
