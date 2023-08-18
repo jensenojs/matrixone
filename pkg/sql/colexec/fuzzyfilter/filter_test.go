@@ -13,4 +13,84 @@
 // limitations under the License.
 package fuzzyfilter
 
-// TODO
+import (
+	"bytes"
+	"testing"
+
+	"github.com/matrixorigin/matrixone/pkg/common/mpool"
+	"github.com/matrixorigin/matrixone/pkg/container/batch"
+	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/testutil"
+	"github.com/matrixorigin/matrixone/pkg/vm/process"
+	"github.com/stretchr/testify/require"
+)
+
+// can be used to check hash collision rate
+// FIXME: current implemention will meet collision in rows 1000
+
+const (
+	Rows1          = 100     // default rows
+	Rows2          = 1000    // default rows
+	Rows3          = 10000   // default rows
+
+	BenchmarkRows = 1000000  // default rows for benchmark
+)
+
+// add unit tests for cases
+type fuzzyTestCase struct {
+	arg   *Argument
+	types []types.Type
+	proc  *process.Process
+}
+
+var (
+	tcs []fuzzyTestCase
+)
+
+func init() {
+	tcs = []fuzzyTestCase{
+		{
+			proc: testutil.NewProcessWithMPool(mpool.MustNewZero()),
+			types: []types.Type{
+				types.T_int8.ToType(),
+			},
+			arg: &Argument{},
+		},
+	}
+}
+
+func TestString(t *testing.T) {
+	for _, tc := range tcs {
+		buf := new(bytes.Buffer)
+		String(tc.arg, buf)
+		require.Equal(t, " fuzzy check duplicate constraint", buf.String())
+	}
+}
+
+func TestPrepare(t *testing.T) {
+	for _, tc := range tcs {
+		err := Prepare(tc.proc, tc.arg)
+		require.NoError(t, err)
+	}
+}
+
+func TestFuzzyFilter(t *testing.T) {
+	for _, tc := range tcs {
+		err := Prepare(tc.proc, tc.arg)
+		require.NoError(t, err)
+		tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows1)
+		_, err = Call(0, tc.proc, tc.arg, false, false)
+		require.NoError(t, err)
+	}
+}
+
+// create a new block based on the type information
+func newBatch(t *testing.T, ts []types.Type, proc *process.Process, rows int64) *batch.Batch {
+	// not random
+	bat := testutil.NewBatch(ts, false, int(rows), proc.Mp())
+	pkAttr := make([]string, 1)
+	pkAttr[0] = "pkCol"
+	bat.SetAttributes(pkAttr)
+	return bat
+}
+
