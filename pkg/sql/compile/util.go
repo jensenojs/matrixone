@@ -18,8 +18,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
 	"time"
+
+	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
+	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
@@ -56,7 +58,8 @@ const (
 )
 
 var (
-	selectOriginTableConstraintFormat = "select serial(%s) from %s.%s group by serial(%s) having count(*) > 1 and serial(%s) is not null;"
+	selectOriginTableConstraintFormat  = "select serial(%s) from %s.%s group by serial(%s) having count(*) > 1 and serial(%s) is not null;"
+	selectOriginTableConstraintFormat2 = "select %s, count(*) as cnt from %s.%s where %s in (%s) having cnt > 1;"
 )
 
 var (
@@ -362,6 +365,44 @@ func makeInsertMultiIndexSQL(eg engine.Engine, ctx context.Context, proc *proces
 	return insertMoIndexesSql, nil
 }
 
+func doubleCheckForFuzzyFilter(c *Compile) error {
+
+	// hacking: any better way to do this?
+	var dbName string
+	var tblName string
+	var attrName string
+	var err error
+	switch s := c.stmt.(type) {
+	case *tree.Load:
+		tblName = string(s.Table.ObjectName)
+		dbName = string(s.Table.SchemaName)
+	case *tree.Insert:
+		if baseTbl, ok := s.Table.(*tree.TableName); ok {
+			tblName = string(baseTbl.ObjectName)
+			dbName = string(baseTbl.SchemaName)
+		}
+	}
+	attrName = c.collisionKeys[0]
+	collsionKeys := c.collisionKeys[1]
+	if dbName == "" {
+		dbName = c.db
+	}
+
+	duplicateCheckSql := fmt.Sprintf(selectOriginTableConstraintFormat2, attrName, dbName, tblName, attrName, collsionKeys)
+	res, err := c.runSqlWithResult(duplicateCheckSql)
+	defer res.Close()
+	if err != nil {
+		return err
+	}
+	vecs := res.Batches[0].Vecs
+	if vecs[0].Length() > 0 {
+		dupKey := fmt.Sprintf("%v", getNonNullValue(vecs[0], uint32(0)))
+		err = moerr.NewDuplicateEntry(c.ctx, dupKey, attrName)
+	}
+
+	return err
+}
+
 func genNewUniqueIndexDuplicateCheck(c *Compile, database, table, cols string) error {
 	duplicateCheckSql := fmt.Sprintf(selectOriginTableConstraintFormat, cols, database, table, cols, cols)
 	res, err := c.runSqlWithResult(duplicateCheckSql)
@@ -457,4 +498,58 @@ func genInsertMoTablePartitionsSql(eg engine.Engine, proc *process.Process, data
 	}
 	buffer.WriteString(";")
 	return buffer.String(), nil
+}
+
+func getNonNullValue(col *vector.Vector, row uint32) any {
+	switch col.GetType().Oid {
+	case types.T_bool:
+		return vector.GetFixedAt[bool](col, int(row))
+	case types.T_int8:
+		return vector.GetFixedAt[int8](col, int(row))
+	case types.T_int16:
+		return vector.GetFixedAt[int16](col, int(row))
+	case types.T_int32:
+		return vector.GetFixedAt[int32](col, int(row))
+	case types.T_int64:
+		return vector.GetFixedAt[int64](col, int(row))
+	case types.T_uint8:
+		return vector.GetFixedAt[uint8](col, int(row))
+	case types.T_uint16:
+		return vector.GetFixedAt[uint16](col, int(row))
+	case types.T_uint32:
+		return vector.GetFixedAt[uint32](col, int(row))
+	case types.T_uint64:
+		return vector.GetFixedAt[uint64](col, int(row))
+	case types.T_decimal64:
+		return vector.GetFixedAt[types.Decimal64](col, int(row))
+	case types.T_decimal128:
+		return vector.GetFixedAt[types.Decimal128](col, int(row))
+	case types.T_uuid:
+		return vector.GetFixedAt[types.Uuid](col, int(row))
+	case types.T_float32:
+		return vector.GetFixedAt[float32](col, int(row))
+	case types.T_float64:
+		return vector.GetFixedAt[float64](col, int(row))
+	case types.T_date:
+		return vector.GetFixedAt[types.Date](col, int(row))
+	case types.T_time:
+		return vector.GetFixedAt[types.Time](col, int(row))
+	case types.T_datetime:
+		return vector.GetFixedAt[types.Datetime](col, int(row))
+	case types.T_timestamp:
+		return vector.GetFixedAt[types.Timestamp](col, int(row))
+	case types.T_enum:
+		return vector.GetFixedAt[types.Enum](col, int(row))
+	case types.T_TS:
+		return vector.GetFixedAt[types.TS](col, int(row))
+	case types.T_Rowid:
+		return vector.GetFixedAt[types.Rowid](col, int(row))
+	case types.T_Blockid:
+		return vector.GetFixedAt[types.Blockid](col, int(row))
+	case types.T_char, types.T_varchar, types.T_binary, types.T_varbinary, types.T_json, types.T_blob, types.T_text:
+		return col.GetBytesAt(int(row))
+	default:
+		//return vector.ErrVecTypeNotSupport
+		panic(any("No Support"))
+	}
 }

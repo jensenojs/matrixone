@@ -134,6 +134,7 @@ func (c *Compile) clear() {
 	c.proc = nil
 	c.cnList = nil
 	c.stmt = nil
+	c.collisionKeys = nil
 	for k := range c.nodeRegs {
 		delete(c.nodeRegs, k)
 	}
@@ -338,7 +339,6 @@ func (c *Compile) Run(_ uint64) error {
 			}
 			c.anal.analInfos = nil
 		}
-		// TODO: Add background SQL for fuzzyfilter, maybe not here
 
 		c.proc.CleanValueScanBatchs()
 		pool.Put(c)
@@ -401,6 +401,13 @@ func (c *Compile) Run(_ uint64) error {
 		}
 		return err
 	}
+
+	if len(c.collisionKeys) > 0 {
+		// fuzzy filter not sure whether this insert / load obey duplicate constraints, need double check
+		// qry := c.pn.GetQuery().Get
+		return doubleCheckForFuzzyFilter(c)
+	}
+
 	if c.proc.TxnOperator != nil {
 		return c.proc.TxnOperator.GetWorkspace().Adjust()
 	}
@@ -2193,22 +2200,42 @@ func (c *Compile) compileLimit(n *plan.Node, ss []*Scope) []*Scope {
 }
 
 func (c *Compile) compileFuzzyFilter(n *plan.Node, ss []*Scope) []*Scope {
-	for i := range ss {
-		ss[i].appendInstruction(vm.Instruction{
-			Op:      vm.FuzzyFilter,
-			Idx:     c.anal.curr,
-			IsFirst: c.anal.isFirst,
-			Arg:     constructFuzzyFilter(),
-		})
+	if len(ss) != 1 {
+		panic("fuzzy filter should have only one prescope now")
 	}
 	c.anal.isFirst = false
 
-	// rs := c.newMergeScope(ss)
-	// rs.Instructions[0] = vm.Instruction{
-	// 	Op:  vm.FuzzyFilter,
-	// 	Idx: c.anal.curr,
-	// 	Arg: constructFuzzyFilter(),
-	// }
+	ss[0].appendInstruction(vm.Instruction{
+		Op:      vm.FuzzyFilter,
+		Idx:     c.anal.curr,
+		IsFirst: c.anal.isFirst,
+		Arg:     constructFuzzyFilter(),
+	})
+
+	ss[0].appendInstruction(vm.Instruction{
+		Op: vm.Output,
+		Arg: &output.Argument{
+			Func: func(a any, bat *batch.Batch) error {
+				if bat == nil || bat.IsEmpty() {
+					return nil
+				}
+
+				format := func(str string) string {
+					str = strings.Trim(str, "[]")
+					newStr := strings.ReplaceAll(str, " ", ", ")
+					return newStr
+				}
+
+				c.collisionKeys = make([]string, 0)
+				c.collisionKeys = append(c.collisionKeys, bat.Attrs[0])
+
+				vec := bat.GetVector(0)
+				c.collisionKeys = append(c.collisionKeys, format(vec.String()))
+				return nil
+			},
+		},
+	})
+
 	return ss
 }
 

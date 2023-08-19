@@ -23,31 +23,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
-
-const (
-	// One hundred million can be estimated as 2^26, 10MB can be estimated as 2^20.
-	bitmpSize = 10 * mpool.MB
-
-	// FIXME: bitmap always assume that bitmap has been extended to at least row
-	// but currently have no logic about Expand bitmap, so use prime to meet assumptions of bitmap
-	bitmpPrime = 10485763
-)
-
-func String(_ any, buf *bytes.Buffer) {
-	buf.WriteString(" fuzzy check duplicate constraint")
-}
-
-func Prepare(proc *process.Process, arg any) (err error) {
-	ap := arg.(*Argument)
-	ap.ctr = new(container)
-	ap.ctr.filter = new(bitmap.Bitmap)
-	ap.ctr.filter.InitWithSize(bitmpSize)
-	ap.ctr.mayDuplicate = make(map[any]bool)
-	return nil
-}
 
 // This operator is used to implement a way to ensure primary keys/unique keys are not duplicate in `INSERT` and `LOAD` statements
 // There are two conditions needed to check
@@ -67,7 +44,29 @@ func Prepare(proc *process.Process, arg any) (err error) {
 //
 // However, backgroudSQL may slow, so we can do some optimizations
 //   1. an record the keys that have hash conflict, and manually check them whather duplicate or not
-//   2.
+//   2. shuffle
+
+const (
+	// One hundred million can be estimated as 2^26, 1MB can be estimated as 2^20.
+	bitmpSize = 1 * mpool.MB
+
+	// bitmap always assume that bitmap has been extended to at least row
+	// but currently have no logic about Expand bitmap
+	bitMask = 0xfffff
+)
+
+func String(_ any, buf *bytes.Buffer) {
+	buf.WriteString(" fuzzy check duplicate constraint")
+}
+
+func Prepare(proc *process.Process, arg any) (err error) {
+	ap := arg.(*Argument)
+	ap.ctr = new(container)
+	ap.ctr.filter = new(bitmap.Bitmap)
+	ap.ctr.filter.InitWithSize(bitmpSize)
+	ap.ctr.mayDuplicate = make(map[string]bool)
+	return nil
+}
 
 func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
 	anal := proc.GetAnalyze(idx)
@@ -80,14 +79,17 @@ func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (p
 	anal.Input(bat, isFirst)
 
 	if bat == nil {
-		if len(ctr.mayDuplicate) == 0 {
-			// case 1
+		if ctr.collisionKeys.Length() == 0 {
+			// case 1:
 			proc.SetInputBatch(nil)
 			return process.ExecStop, nil
 		} else {
-			// case 2
-			proc.SetInputBatch(nil)
-			return process.ExecStop, nil
+			// case 2: send collisionKeys to output operator to run background SQL
+			rbat := batch.New(true, ctr.toCheckAttr)
+			rbat.SetVector(0, ctr.collisionKeys)
+			rbat.SetRowCount(ctr.collisionKeys.Length())
+			proc.SetInputBatch(rbat)
+			return process.ExecNext, nil
 		}
 	}
 
@@ -101,18 +103,25 @@ func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (p
 		hashes = make([]uint64, rowCnt)
 	}
 
-	// build hash array from pk col, temporarily assume that the index of pk column is 0
 	toCheckVec := bat.GetVector(0)
+	if ctr.collisionKeys == nil {
+		ctr.collisionKeys = vector.NewVec(*toCheckVec.GetType())
+		ctr.toCheckAttr = bat.Attrs
+	}
+
+	// build hash array from pk col
 	generateHashes(toCheckVec, rowCnt, hashes)
 
-	// store hashes in to fuzzy filter
+	//  check hashes in to fuzzy filter
 	for idx, hval := range hashes {
 		if ctr.filter.Contains(hval) {
-			collisionKey := containers.GetNonNullValue(toCheckVec, uint32(idx))
+			ctr.collisionKeys.UnionOne(toCheckVec, int64(idx), proc.GetMPool())
+
+			// FIXME: %v is the right way to go ?
+			collisionKey := fmt.Sprintf("%v", getNonNullValue(toCheckVec, uint32(idx)))
 			if _, ok := ctr.mayDuplicate[collisionKey]; ok {
 				// key that has been inserted before, fail to pass constraint
-				hashes = nil
-				return process.ExecStop, moerr.NewDuplicateEntry(proc.Ctx, fmt.Sprintf("%v", collisionKey), bat.Attrs[0])
+				return process.ExecStop, moerr.NewDuplicateEntry(proc.Ctx, collisionKey, bat.Attrs[0])
 			}
 			ctr.mayDuplicate[collisionKey] = true
 		} else {
@@ -126,7 +135,6 @@ func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (p
 
 func generateHashes(pkCol *vector.Vector, rowCnt int, hashes []uint64) {
 	for idx := 0; idx < rowCnt; idx++ {
-		// hacking : 10485763
-		hashes[idx] = xxhash.Sum64(pkCol.GetRawBytesAt(idx)) % bitmpPrime
+		hashes[idx] = xxhash.Sum64(pkCol.GetRawBytesAt(idx)) & bitMask
 	}
 }

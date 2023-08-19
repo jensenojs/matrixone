@@ -214,6 +214,9 @@ type Compile struct {
 	cnLabel map[string]string
 
 	buildPlanFunc func() (*plan2.Plan, error)
+	// use for double check duplicate constraint when
+	// fuzzy filter can not draw a definite conclusion
+	collisionKeys []string
 }
 
 type RemoteReceivRegInfo struct {

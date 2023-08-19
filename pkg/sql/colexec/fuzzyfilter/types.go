@@ -15,12 +15,18 @@ package fuzzyfilter
 
 import (
 	"github.com/matrixorigin/matrixone/pkg/common/bitmap"
+	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
 type container struct {
-	mayDuplicate map[any]bool
-	filter       *bitmap.Bitmap
+	mayDuplicate  map[string]bool
+	collisionKeys *vector.Vector
+	toCheckAttr   []string
+
+	// bitmap filter
+	filter *bitmap.Bitmap
 }
 
 type Argument struct {
@@ -33,5 +39,63 @@ func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {
 	if ctr != nil {
 		ctr.mayDuplicate = nil
 		ctr.filter = nil
+		ctr.collisionKeys.Free(proc.GetMPool())
+	}
+	ctr = nil
+}
+
+func getNonNullValue(col *vector.Vector, row uint32) any {
+
+	switch col.GetType().Oid {
+	case types.T_bool:
+		return vector.GetFixedAt[bool](col, int(row))
+	case types.T_int8:
+		return vector.GetFixedAt[int8](col, int(row))
+	case types.T_int16:
+		return vector.GetFixedAt[int16](col, int(row))
+	case types.T_int32:
+		return vector.GetFixedAt[int32](col, int(row))
+	case types.T_int64:
+		return vector.GetFixedAt[int64](col, int(row))
+	case types.T_uint8:
+		return vector.GetFixedAt[uint8](col, int(row))
+	case types.T_uint16:
+		return vector.GetFixedAt[uint16](col, int(row))
+	case types.T_uint32:
+		return vector.GetFixedAt[uint32](col, int(row))
+	case types.T_uint64:
+		return vector.GetFixedAt[uint64](col, int(row))
+	case types.T_decimal64:
+		return vector.GetFixedAt[types.Decimal64](col, int(row))
+	case types.T_decimal128:
+		return vector.GetFixedAt[types.Decimal128](col, int(row))
+	case types.T_uuid:
+		return vector.GetFixedAt[types.Uuid](col, int(row))
+	case types.T_float32:
+		return vector.GetFixedAt[float32](col, int(row))
+	case types.T_float64:
+		return vector.GetFixedAt[float64](col, int(row))
+	case types.T_date:
+		return vector.GetFixedAt[types.Date](col, int(row))
+	case types.T_time:
+		return vector.GetFixedAt[types.Time](col, int(row))
+	case types.T_datetime:
+		return vector.GetFixedAt[types.Datetime](col, int(row))
+	case types.T_timestamp:
+		return vector.GetFixedAt[types.Timestamp](col, int(row))
+	case types.T_enum:
+		return vector.GetFixedAt[types.Enum](col, int(row))
+	case types.T_TS:
+		return vector.GetFixedAt[types.TS](col, int(row))
+	case types.T_Rowid:
+		return vector.GetFixedAt[types.Rowid](col, int(row))
+	case types.T_Blockid:
+		return vector.GetFixedAt[types.Blockid](col, int(row))
+	case types.T_char, types.T_varchar, types.T_binary, types.T_varbinary, types.T_json, types.T_blob, types.T_text:
+		return col.GetBytesAt(int(row))
+	default:
+		//return vector.ErrVecTypeNotSupport
+		panic(any("No Support"))
 	}
 }
+

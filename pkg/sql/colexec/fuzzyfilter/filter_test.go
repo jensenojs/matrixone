@@ -78,7 +78,7 @@ func TestFuzzyFilter(t *testing.T) {
 	for _, tc := range tcs {
 		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
-		tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows1)
+		tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows2)
 		_, err = Call(0, tc.proc, tc.arg, false, false)
 		require.NoError(t, err)
 	}
