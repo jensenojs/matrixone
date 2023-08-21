@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
@@ -366,29 +365,8 @@ func makeInsertMultiIndexSQL(eg engine.Engine, ctx context.Context, proc *proces
 }
 
 func doubleCheckForFuzzyFilter(c *Compile) error {
-
-	// hacking: any better way to do this?
-	var dbName string
-	var tblName string
-	var attrName string
-	var err error
-	switch s := c.stmt.(type) {
-	case *tree.Load:
-		tblName = string(s.Table.ObjectName)
-		dbName = string(s.Table.SchemaName)
-	case *tree.Insert:
-		if baseTbl, ok := s.Table.(*tree.TableName); ok {
-			tblName = string(baseTbl.ObjectName)
-			dbName = string(baseTbl.SchemaName)
-		}
-	}
-	attrName = c.collisionKeys[0]
-	collsionKeys := c.collisionKeys[1]
-	if dbName == "" {
-		dbName = c.db
-	}
-
-	duplicateCheckSql := fmt.Sprintf(selectOriginTableConstraintFormat2, attrName, dbName, tblName, attrName, collsionKeys)
+	info := c.infoForFuzzy
+	duplicateCheckSql := fmt.Sprintf(selectOriginTableConstraintFormat2, info.attr, info.db, info.tbl, info.attr, info.collisionKeys)
 	res, err := c.runSqlWithResult(duplicateCheckSql)
 	defer res.Close()
 	if err != nil {
@@ -397,9 +375,8 @@ func doubleCheckForFuzzyFilter(c *Compile) error {
 	vecs := res.Batches[0].Vecs
 	if vecs[0].Length() > 0 {
 		dupKey := fmt.Sprintf("%v", getNonNullValue(vecs[0], uint32(0)))
-		err = moerr.NewDuplicateEntry(c.ctx, dupKey, attrName)
+		err = moerr.NewDuplicateEntry(c.ctx, dupKey, info.attr)
 	}
-
 	return err
 }
 

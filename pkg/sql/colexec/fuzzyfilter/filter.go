@@ -22,7 +22,9 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
+	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -34,25 +36,30 @@ import (
 // THE big idea is to store
 // 	 pk columns to be loaded
 //   pk columns already exist
-// both in a Bloom Filter-like data structure, let's say bloom filter below
+// both in a bitmap-like data structure, let's say bitmap below
 //
-// if the final Bloom Filter claim that
+// if the final bitmap claim that
 // 	 case 1: have no duplicate keys,
 // 		passes duplicate constraint
-//   case 2: may have duplicate keys
-//      start a background SQL to double check, it should be a point select
+//   case 2: may have duplicate keys because of hash collision
+//      start a background SQL to double check
 //
-// However, backgroudSQL may slow, so we can do some optimizations
-//   1. an record the keys that have hash conflict, and manually check them whather duplicate or not
-//   2. shuffle
+// However, backgroud SQL may slow, so we can do some optimizations
+//   1. an record the keys that have hash collision, and manually check them whether duplicate or not,
+//         if duplicate, then return error timely
+//   2. shuffle inner operator and between operations
 
 const (
 	// One hundred million can be estimated as 2^26, 1MB can be estimated as 2^20.
 	bitmpSize = 1 * mpool.MB
-
 	// bitmap always assume that bitmap has been extended to at least row
 	// but currently have no logic about Expand bitmap
 	bitMask = 0xfffff
+
+	// index for bat that fuzzy filter pass to next operator
+	dbIdx   = 0 // where store dbName
+	tblIdx  = 1 // where store tblName
+	attrIdx = 2 // where store collsion keys for to check attribute
 )
 
 func String(_ any, buf *bytes.Buffer) {
@@ -79,16 +86,18 @@ func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (p
 	anal.Input(bat, isFirst)
 
 	if bat == nil {
-		if ctr.collisionKeys.Length() == 0 {
-			// case 1:
+		collisionCnt := ctr.rbat.GetVector(attrIdx).Length()
+
+		if collisionCnt == 0 {
+			// case 1: pass duplicate constraint
 			proc.SetInputBatch(nil)
 			return process.ExecStop, nil
 		} else {
+			if collisionCnt > 100 {
+				logutil.Warnf("the hash collision cnt for fuzzy filter is too large : %d", collisionCnt)
+			}
 			// case 2: send collisionKeys to output operator to run background SQL
-			rbat := batch.New(true, ctr.toCheckAttr)
-			rbat.SetVector(0, ctr.collisionKeys)
-			rbat.SetRowCount(ctr.collisionKeys.Length())
-			proc.SetInputBatch(rbat)
+			proc.SetInputBatch(ctr.rbat)
 			return process.ExecNext, nil
 		}
 	}
@@ -103,26 +112,28 @@ func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (p
 		hashes = make([]uint64, rowCnt)
 	}
 
-	toCheckVec := bat.GetVector(0)
-	if ctr.collisionKeys == nil {
-		ctr.collisionKeys = vector.NewVec(*toCheckVec.GetType())
-		ctr.toCheckAttr = bat.Attrs
+	toCheck := bat.GetVector(0)
+	if ctr.rbat == nil {
+		if err := wrapUpCollisionBatch(proc, ap, bat.Attrs[0], *toCheck.GetType()); err != nil {
+			return process.ExecStop, err
+		}
 	}
 
 	// build hash array from pk col
-	generateHashes(toCheckVec, rowCnt, hashes)
+	generateHashes(toCheck, rowCnt, hashes)
 
-	//  check hashes in to fuzzy filter
+	// check hashes in to fuzzy filter
 	for idx, hval := range hashes {
 		if ctr.filter.Contains(hval) {
-			ctr.collisionKeys.UnionOne(toCheckVec, int64(idx), proc.GetMPool())
+			ctr.rbat.GetVector(attrIdx).UnionOne(toCheck, int64(idx), proc.GetMPool())
 
-			// FIXME: %v is the right way to go ?
-			collisionKey := fmt.Sprintf("%v", getNonNullValue(toCheckVec, uint32(idx)))
+			// opts 1
+			collisionKey := fmt.Sprintf("%v", getNonNullValue(toCheck, uint32(idx)))
 			if _, ok := ctr.mayDuplicate[collisionKey]; ok {
 				// key that has been inserted before, fail to pass constraint
 				return process.ExecStop, moerr.NewDuplicateEntry(proc.Ctx, collisionKey, bat.Attrs[0])
 			}
+
 			ctr.mayDuplicate[collisionKey] = true
 		} else {
 			ctr.filter.Add(hval)
@@ -137,4 +148,20 @@ func generateHashes(pkCol *vector.Vector, rowCnt int, hashes []uint64) {
 	for idx := 0; idx < rowCnt; idx++ {
 		hashes[idx] = xxhash.Sum64(pkCol.GetRawBytesAt(idx)) & bitMask
 	}
+}
+
+func wrapUpCollisionBatch(proc *process.Process, arg *Argument, attrName string, attrTyp types.Type) error {
+	attrs := []string{"toCheckDb", "toCheckTbl", attrName}
+	rbat := batch.New(true, attrs)
+
+	db := vector.NewConstBytes(types.T_binary.ToType(), []byte(arg.DbName), 1, proc.GetMPool())
+	tbl := vector.NewConstBytes(types.T_binary.ToType(), []byte(arg.TblName), 1, proc.GetMPool())
+
+	rbat.SetVector(dbIdx, db)
+	rbat.SetVector(tblIdx, tbl)
+	rbat.SetVector(attrIdx, vector.NewVec(attrTyp))
+
+	rbat.SetRowCount(1) // only for pass for output operater
+	arg.ctr.rbat = rbat
+	return nil
 }

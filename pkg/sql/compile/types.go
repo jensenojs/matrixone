@@ -214,13 +214,22 @@ type Compile struct {
 	cnLabel map[string]string
 
 	buildPlanFunc func() (*plan2.Plan, error)
-	// use for double check duplicate constraint when
-	// fuzzy filter can not draw a definite conclusion
-	collisionKeys []string
+
+	infoForFuzzy *doubleCheckInfo
 }
 
 type RemoteReceivRegInfo struct {
 	Idx      int
 	Uuid     uuid.UUID
 	FromAddr string
+}
+
+// use to run a background SQL to double check duplicate constraint when
+// fuzzy filter can not draw a definite conclusion
+// for more info, please refer the comments of fuzzy filter operator
+type doubleCheckInfo struct {
+	db            string
+	tbl           string
+	attr          string
+	collisionKeys string
 }

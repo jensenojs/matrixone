@@ -29,11 +29,11 @@ import (
 // FIXME: current implemention will meet collision in rows 1000
 
 const (
-	Rows1          = 100     // default rows
-	Rows2          = 1000    // default rows
-	Rows3          = 10000   // default rows
+	Rows1 = 100   // default rows
+	Rows2 = 1000  // default rows
+	Rows3 = 10000 // default rows
 
-	BenchmarkRows = 1000000  // default rows for benchmark
+	BenchmarkRows = 1000000 // default rows for benchmark
 )
 
 // add unit tests for cases
@@ -54,7 +54,10 @@ func init() {
 			types: []types.Type{
 				types.T_int8.ToType(),
 			},
-			arg: &Argument{},
+			arg: &Argument{
+				TblName: "tblName",
+				DbName:  "dbName",
+			},
 		},
 	}
 }
@@ -74,11 +77,21 @@ func TestPrepare(t *testing.T) {
 	}
 }
 
+func TestReturnBatchAttr(t *testing.T) {
+	tc := tcs[0]
+	err := Prepare(tc.proc, tc.arg)
+	require.NoError(t, err)
+	tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows1)
+	_, err = Call(0, tc.proc, tc.arg, false, false)
+	require.Equal(t, "dbName", tc.arg.ctr.rbat.GetVector(dbIdx).GetStringAt(0), "wrong format for batch that fuzzy filter that returns")
+	require.Equal(t, "tblName", tc.arg.ctr.rbat.GetVector(tblIdx).GetStringAt(0), "wrong format for batch that fuzzy filter that returns")
+}
+
 func TestFuzzyFilter(t *testing.T) {
 	for _, tc := range tcs {
 		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
-		tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows2)
+		tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows1)
 		_, err = Call(0, tc.proc, tc.arg, false, false)
 		require.NoError(t, err)
 	}
@@ -93,4 +106,3 @@ func newBatch(t *testing.T, ts []types.Type, proc *process.Process, rows int64) 
 	bat.SetAttributes(pkAttr)
 	return bat
 }
-

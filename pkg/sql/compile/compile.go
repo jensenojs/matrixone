@@ -134,7 +134,6 @@ func (c *Compile) clear() {
 	c.proc = nil
 	c.cnList = nil
 	c.stmt = nil
-	c.collisionKeys = nil
 	for k := range c.nodeRegs {
 		delete(c.nodeRegs, k)
 	}
@@ -395,6 +394,10 @@ func (c *Compile) Run(_ uint64) error {
 				c.fatalLog(1, err)
 				return err
 			}
+			if c.infoForFuzzy != nil {
+				// fuzzy filter not sure whether this insert / load obey duplicate constraints, need double check
+				return doubleCheckForFuzzyFilter(c)
+			}
 			// set affectedRows to old compile to return
 			c.setAffectedRows(cc.GetAffectedRows())
 			return c.proc.TxnOperator.GetWorkspace().Adjust()
@@ -402,9 +405,8 @@ func (c *Compile) Run(_ uint64) error {
 		return err
 	}
 
-	if len(c.collisionKeys) > 0 {
+	if c.infoForFuzzy != nil {
 		// fuzzy filter not sure whether this insert / load obey duplicate constraints, need double check
-		// qry := c.pn.GetQuery().Get
 		return doubleCheckForFuzzyFilter(c)
 	}
 
@@ -2201,15 +2203,13 @@ func (c *Compile) compileLimit(n *plan.Node, ss []*Scope) []*Scope {
 
 func (c *Compile) compileFuzzyFilter(n *plan.Node, ss []*Scope) []*Scope {
 	if len(ss) != 1 {
-		panic("fuzzy filter should have only one prescope now")
+		panic("fuzzy filter should have only one prescope")
 	}
-	c.anal.isFirst = false
 
 	ss[0].appendInstruction(vm.Instruction{
-		Op:      vm.FuzzyFilter,
-		Idx:     c.anal.curr,
-		IsFirst: c.anal.isFirst,
-		Arg:     constructFuzzyFilter(),
+		Op:  vm.FuzzyFilter,
+		Idx: c.anal.curr,
+		Arg: constructFuzzyFilter(n),
 	})
 
 	ss[0].appendInstruction(vm.Instruction{
@@ -2226,11 +2226,14 @@ func (c *Compile) compileFuzzyFilter(n *plan.Node, ss []*Scope) []*Scope {
 					return newStr
 				}
 
-				c.collisionKeys = make([]string, 0)
-				c.collisionKeys = append(c.collisionKeys, bat.Attrs[0])
+				c.infoForFuzzy = &doubleCheckInfo{
+					// see the comment in fuzzyFilter for magic number means
+					db:            bat.GetVector(0).GetStringAt(0),
+					tbl:           bat.GetVector(1).GetStringAt(0),
+					attr:          bat.Attrs[2],
+					collisionKeys: format(bat.GetVector(2).String()),
+				}
 
-				vec := bat.GetVector(0)
-				c.collisionKeys = append(c.collisionKeys, format(vec.String()))
 				return nil
 			},
 		},

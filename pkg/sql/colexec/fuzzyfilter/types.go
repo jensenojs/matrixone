@@ -15,22 +15,28 @@ package fuzzyfilter
 
 import (
 	"github.com/matrixorigin/matrixone/pkg/common/bitmap"
+	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
 type container struct {
-	mayDuplicate  map[string]bool
-	collisionKeys *vector.Vector
-	toCheckAttr   []string
-
-	// bitmap filter
-	filter *bitmap.Bitmap
+	mayDuplicate map[string]bool
+	filter       *bitmap.Bitmap
+	// There will be three vectors in rbat for fuzzy filter pass to next operator
+	// The first vector record which db is inserted, has only one row
+	// The second vector record which table is inserted, has only one row
+	// The third vector record how many keys that have hash collision
+	rbat *batch.Batch
 }
 
 type Argument struct {
 	ctr *container
+
+	TblName string
+	DbName  string
+
 	// hint may be need hint to indicate how large the filter should be init
 }
 
@@ -39,7 +45,9 @@ func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {
 	if ctr != nil {
 		ctr.mayDuplicate = nil
 		ctr.filter = nil
-		ctr.collisionKeys.Free(proc.GetMPool())
+		if ctr.rbat != nil {
+			ctr.rbat.Clean(proc.GetMPool())
+		}
 	}
 	ctr = nil
 }
@@ -98,4 +106,3 @@ func getNonNullValue(col *vector.Vector, row uint32) any {
 		panic(any("No Support"))
 	}
 }
-

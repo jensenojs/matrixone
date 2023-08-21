@@ -890,6 +890,8 @@ func makeInsertPlan(
 			fuzzyFilterNode := &Node{
 				NodeType: plan.Node_FUZZY_FILTER,
 				Children: []int32{lastNodeId},
+				TableDef: tableDef,
+				ObjRef:   objRef,
 			}
 			lastNodeId = builder.appendNode(fuzzyFilterNode, bindCtx)
 
