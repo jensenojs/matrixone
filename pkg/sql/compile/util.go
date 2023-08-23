@@ -58,7 +58,15 @@ const (
 
 var (
 	selectOriginTableConstraintFormat  = "select serial(%s) from %s.%s group by serial(%s) having count(*) > 1 and serial(%s) is not null;"
-	selectOriginTableConstraintFormat2 = "select %s, count(*) as cnt from %s.%s where %s in (%s) having cnt > 1;"
+	doubleCheckForFuzzyFilterWithoutCK = "select %s, count(*) as cnt from %s.%s where %s in (%s) having cnt > 1;"
+	// currently plan can not support sql like
+	//
+	// SELECT pk1, pk2, COUNT(*) AS cnt
+	// FROM tbl
+	// WHERE (pk1, pk2) IN ((1, 1), (2, 1))
+	// GROUP BY pk1, pk2
+	// HAVING cnt > 1;
+	doubleCheckForFuzzyFilterWithCK = "select %s, count(*) as cnt from %s.%s where %s having cnt > 1;"
 )
 
 var (
@@ -365,19 +373,75 @@ func makeInsertMultiIndexSQL(eg engine.Engine, ctx context.Context, proc *proces
 }
 
 func doubleCheckForFuzzyFilter(c *Compile) error {
-	info := c.infoForFuzzy
-	duplicateCheckSql := fmt.Sprintf(selectOriginTableConstraintFormat2, info.attr, info.db, info.tbl, info.attr, info.collisionKeys)
-	res, err := c.runSqlWithResult(duplicateCheckSql)
-	defer res.Close()
-	if err != nil {
-		return err
+	info := c.forFuzzy
+	var duplicateCheckSql string
+	if !info.isCpk {
+		// not compound primary key
+		duplicateCheckSql = fmt.Sprintf(doubleCheckForFuzzyFilterWithoutCK, info.attr[0], info.db, info.tbl, info.attr[0], info.pkeys)
+		res, err := c.runSqlWithResult(duplicateCheckSql)
+		defer res.Close()
+		if err != nil {
+			return err
+		}
+		if res.Batches != nil {
+			v := res.Batches[0].Vecs
+			if v != nil && v[0].Length() > 0 {
+				dupKey := fmt.Sprintf("%v", getNonNullValue(v[0], uint32(0)))
+				return moerr.NewDuplicateEntry(c.ctx, dupKey, info.attr[0])
+			} else {
+				return nil
+			}
+		} else {
+			panic(fmt.Sprintf("The execution flow caused by the %s should never enter this function", c.sql))
+		}
+	} else {
+		// run multiple sql to check compound primary key
+
+		// helper function to generate string that backgroud SQL need
+		build := func(i int, cpattrs []string, cpkeys [][]string) (string, string, string) {
+			var attrs bytes.Buffer
+			var cond bytes.Buffer
+			var keys bytes.Buffer
+			keys.WriteString(fmt.Sprintf("("))
+
+			if len(cpattrs) != len(cpkeys) {
+				panic("attrs should always equal with cpkeys")
+			}
+
+			var j int
+			for j = 0; j < len(info.cPkeys)-1; j++ {
+				attrs.WriteString(fmt.Sprintf("%s, ", info.attr[j]))
+				cond.WriteString(fmt.Sprintf("%s=%s and ", info.attr[j], info.cPkeys[j][i]))
+				keys.WriteString(fmt.Sprintf("%s, ", info.cPkeys[j][i]))
+			}
+			attrs.WriteString(fmt.Sprintf("%s", info.attr[j]))
+			cond.WriteString(fmt.Sprintf("%s=%s", info.attr[j], info.cPkeys[j][i]))
+			keys.WriteString(fmt.Sprintf("%s)", info.cPkeys[j][i]))
+
+			return attrs.String(), keys.String(), cond.String()
+		}
+
+		for i := 0; i < len(info.cPkeys[0]); i++ {
+			attrs, keys, cond := build(i, info.attr, info.cPkeys)
+			duplicateCheckSql := fmt.Sprintf(doubleCheckForFuzzyFilterWithCK, attrs, info.db, info.tbl, cond)
+			res, err := c.runSqlWithResult(duplicateCheckSql)
+			defer res.Close()
+			if err != nil {
+				return err
+			}
+			if res.Batches != nil {
+				v := res.Batches[0].Vecs
+				if v != nil && v[0].Length() > 0 {
+					return moerr.NewDuplicateEntry(c.ctx, keys, catalog.CPrimaryKeyColName)
+				} else {
+					continue
+				}
+			} else {
+				panic(fmt.Sprintf("The execution flow caused by the %s should never enter this function", c.sql))
+			}
+		}
+		return nil
 	}
-	vecs := res.Batches[0].Vecs
-	if vecs[0].Length() > 0 {
-		dupKey := fmt.Sprintf("%v", getNonNullValue(vecs[0], uint32(0)))
-		err = moerr.NewDuplicateEntry(c.ctx, dupKey, info.attr)
-	}
-	return err
 }
 
 func genNewUniqueIndexDuplicateCheck(c *Compile, database, table, cols string) error {

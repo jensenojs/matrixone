@@ -339,6 +339,8 @@ func (c *Compile) Run(_ uint64) error {
 			c.anal.analInfos = nil
 		}
 
+		c.forFuzzy = nil
+
 		c.proc.CleanValueScanBatchs()
 		pool.Put(c)
 	}()
@@ -394,7 +396,7 @@ func (c *Compile) Run(_ uint64) error {
 				c.fatalLog(1, err)
 				return err
 			}
-			if c.infoForFuzzy != nil {
+			if c.forFuzzy != nil {
 				// fuzzy filter not sure whether this insert / load obey duplicate constraints, need double check
 				return doubleCheckForFuzzyFilter(c)
 			}
@@ -405,7 +407,7 @@ func (c *Compile) Run(_ uint64) error {
 		return err
 	}
 
-	if c.infoForFuzzy != nil {
+	if c.forFuzzy != nil {
 		// fuzzy filter not sure whether this insert / load obey duplicate constraints, need double check
 		return doubleCheckForFuzzyFilter(c)
 	}
@@ -2220,21 +2222,66 @@ func (c *Compile) compileFuzzyFilter(n *plan.Node, ss []*Scope) []*Scope {
 					return nil
 				}
 
-				format := func(str string) string {
+				acnt := int32(len(bat.Attrs))
+				// one primary key attr with two additional vectors at the end to store the database name and table name to run background SQL
+				isCpk := acnt > 1+2
+
+				// FYI, refer func generateRbat in fuzzyFilter operator
+				c.forFuzzy = &doubleCheckInfo{
+					db:    bat.GetVector(acnt - 2).GetStringAt(0),
+					tbl:   bat.GetVector(acnt - 1).GetStringAt(0),
+					attr:  bat.Attrs[:acnt-2],
+					isCpk: isCpk,
+				}
+
+				formatPk := func(str string) string {
 					str = strings.Trim(str, "[]")
-					newStr := strings.ReplaceAll(str, " ", ", ")
-					return newStr
+					return strings.ReplaceAll(str, " ", ", ")
 				}
 
-				c.infoForFuzzy = &doubleCheckInfo{
-					// see the comment in fuzzyFilter for magic number means
-					db:            bat.GetVector(0).GetStringAt(0),
-					tbl:           bat.GetVector(1).GetStringAt(0),
-					attr:          bat.Attrs[2],
-					collisionKeys: format(bat.GetVector(2).String()),
+				formatCPk := func(str string) []string {
+					str = strings.Trim(str, "[]")
+					splitstr := strings.Split(str, " ")
+					var result []string
+					for _, s := range splitstr {
+						trimmed := strings.TrimSpace(s)
+						result = append(result, trimmed)
+					}
+					return result
 				}
 
-				return nil
+				check := func(arr [][]string) bool {
+					if len(arr) == 0 {
+						return false
+					}
+					length := len(arr[0])
+					for i := 1; i < len(arr); i++ {
+						if len(arr[i]) != length {
+							return false
+						}
+					}
+					return true
+				}
+
+				genCollsionKeys := func(info *doubleCheckInfo, bat *batch.Batch) error {
+					if !info.isCpk { // means is not Compound primary key
+						info.pkeys = formatPk(bat.GetVector(0).String())
+						if len(info.pkeys) == 0 {
+							return moerr.NewInternalError(c.ctx, "fuzzyfilter failed to get collsion key to check duplicate constraints")
+						}
+					} else {
+						info.cPkeys = make([][]string, acnt-2)
+						var i int32
+						for i = 0; i < (acnt - 2); i++ {
+							info.cPkeys[i] = formatCPk(bat.GetVector(i).String())
+						}
+						if !check(info.cPkeys) {
+							return moerr.NewInternalError(c.ctx, "fuzzyfilter failed to get collsion keys to check duplicate constraints")
+						}
+					}
+					return nil
+				}
+				return genCollsionKeys(c.forFuzzy, bat)
 			},
 		},
 	})

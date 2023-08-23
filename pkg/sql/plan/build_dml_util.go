@@ -871,19 +871,41 @@ func makeInsertPlan(
 		if pkPos, pkTyp := getPkPos(tableDef, true); pkPos != -1 {
 			lastNodeId = appendSinkScanNode(builder, bindCtx, sourceStep)
 
-			pkColExpr := &plan.Expr{
-				Typ: pkTyp,
-				Expr: &plan.Expr_Col{
-					Col: &plan.ColRef{
-						ColPos: int32(pkPos),
-						Name:   tableDef.Pkey.PkeyColName,
+			plist := []*Expr{
+				&plan.Expr{
+					Typ: pkTyp,
+					Expr: &plan.Expr_Col{
+						Col: &plan.ColRef{
+							ColPos: int32(pkPos),
+							Name:   tableDef.Pkey.PkeyColName,
+						},
 					},
 				},
 			}
+
+			if tableDef.Pkey.PkeyColName == catalog.CPrimaryKeyColName {
+				// need add partial primary key column to project node, otherwise fuzzyfilter can not raise background SQL because composite primary key is unreadable
+				partialPkIdx := make(map[string]int)
+				for i, n := range tableDef.Pkey.Names {
+					partialPkIdx[n] = i
+				}
+				for colName, colPos := range partialPkIdx {
+					plist = append(plist, &plan.Expr{
+						Typ: tableDef.Cols[colPos].GetTyp(),
+						Expr: &plan.Expr_Col{
+							Col: &plan.ColRef{
+								ColPos: int32(colPos),
+								Name:   colName,
+							},
+						},
+					})
+				}
+			}
+
 			projectNode := &Node{
 				NodeType:    plan.Node_PROJECT,
 				Children:    []int32{lastNodeId},
-				ProjectList: []*Expr{pkColExpr},
+				ProjectList: plist,
 			}
 			lastNodeId = builder.appendNode(projectNode, bindCtx)
 

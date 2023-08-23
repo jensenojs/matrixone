@@ -24,10 +24,9 @@ import (
 type container struct {
 	mayDuplicate map[string]bool
 	filter       *bitmap.Bitmap
-	// There will be three vectors in rbat for fuzzy filter pass to next operator
-	// The first vector record which db is inserted, has only one row
-	// The second vector record which table is inserted, has only one row
-	// The third vector record how many keys that have hash collision
+	// whether is Compound primary key or not
+	isCpk bool
+	// refer func generateRbat
 	rbat *batch.Batch
 }
 

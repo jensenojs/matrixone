@@ -52,7 +52,7 @@ func init() {
 		{
 			proc: testutil.NewProcessWithMPool(mpool.MustNewZero()),
 			types: []types.Type{
-				types.T_int8.ToType(),
+				types.T_int32.ToType(),
 			},
 			arg: &Argument{
 				TblName: "tblName",
@@ -81,17 +81,20 @@ func TestReturnBatchAttr(t *testing.T) {
 	tc := tcs[0]
 	err := Prepare(tc.proc, tc.arg)
 	require.NoError(t, err)
-	tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows1)
+	testBatch := newBatch(t, tc.types, tc.proc, Rows1)
+	attrCnt := int32(len(testBatch.Attrs))
+	tc.proc.Reg.InputBatch = testBatch
+
 	_, err = Call(0, tc.proc, tc.arg, false, false)
-	require.Equal(t, "dbName", tc.arg.ctr.rbat.GetVector(dbIdx).GetStringAt(0), "wrong format for batch that fuzzy filter that returns")
-	require.Equal(t, "tblName", tc.arg.ctr.rbat.GetVector(tblIdx).GetStringAt(0), "wrong format for batch that fuzzy filter that returns")
+	require.Equal(t, "dbName", tc.arg.ctr.rbat.GetVector(attrCnt).GetStringAt(0), "wrong format for batch that fuzzy filter that returns")
+	require.Equal(t, "tblName", tc.arg.ctr.rbat.GetVector(attrCnt+1).GetStringAt(0), "wrong format for batch that fuzzy filter that returns")
 }
 
 func TestFuzzyFilter(t *testing.T) {
 	for _, tc := range tcs {
 		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
-		tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows1)
+		tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows3)
 		_, err = Call(0, tc.proc, tc.arg, false, false)
 		require.NoError(t, err)
 	}

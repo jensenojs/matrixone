@@ -215,7 +215,7 @@ type Compile struct {
 
 	buildPlanFunc func() (*plan2.Plan, error)
 
-	infoForFuzzy *doubleCheckInfo
+	forFuzzy *doubleCheckInfo
 }
 
 type RemoteReceivRegInfo struct {
@@ -224,12 +224,18 @@ type RemoteReceivRegInfo struct {
 	FromAddr string
 }
 
-// use to run a background SQL to double check duplicate constraint when
-// fuzzy filter can not draw a definite conclusion
-// for more info, please refer the comments of fuzzy filter operator
+// use to contains some info to run a background SQL when
+// fuzzy filter can not draw a definite conclusion for duplicate check
+// refer 1 : fuzzy filter operator
+// refer 2 : func compileFuzzyFilter
+// refer 3 : func doubleCheckForFuzzyFilter
 type doubleCheckInfo struct {
-	db            string
-	tbl           string
-	attr          string
-	collisionKeys string
+	db     string
+	tbl    string
+	attr   []string
+	isCpk  bool
+	pkeys  string
+	// cpk select SQL is like
+	// select ... where a=x and b=y from ...
+	cPkeys [][]string
 }
