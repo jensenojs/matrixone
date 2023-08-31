@@ -139,11 +139,11 @@ func (vec *vectorWrapper) Get(i int) any {
 		return any(ret)
 	}
 
-	return getNonNullValue(vec.wrapped, uint32(i))
+	return GetNonNullValue(vec.wrapped, uint32(i))
 }
 
 func (vec *vectorWrapper) ShallowGet(i int) any {
-	return getNonNullValue(vec.wrapped, uint32(i))
+	return GetNonNullValue(vec.wrapped, uint32(i))
 }
 
 func (vec *vectorWrapper) Length() int {
