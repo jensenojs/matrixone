@@ -51,6 +51,24 @@ func MakeSlice[T any](b *Buffer, len, cap int) []T {
 	return unsafe.Slice((*T)(unsafe.Pointer(unsafe.SliceData(data))), cap)[:len]
 }
 
+func AppendSlice[T any](b *Buffer, vs []T, v T) []T {
+	if len(vs) < cap(vs) {
+		vs = append(vs, v)
+		return vs
+	}
+
+	nvs := cap(vs) * 2
+	if nvs < 4 {
+		nvs = 4
+	}
+
+	newSlice := MakeSlice[T](b, len(vs)+1, nvs)
+	copy(newSlice, vs)
+	newSlice[len(vs)] = v
+	FreeSlice[T](b, vs)
+	return newSlice
+}
+
 func FreeSlice[T any](b *Buffer, vs []T) {
 	var v T
 

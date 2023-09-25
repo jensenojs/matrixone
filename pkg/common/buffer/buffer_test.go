@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -40,6 +41,17 @@ func TestBuffer(t *testing.T) {
 		FreeSlice(buf, ss)
 	}
 	buf.Free()
+}
+
+func TestAppendSlice(t *testing.T) {
+	buf := New()
+	ss := MakeSlice[int](buf, 0, 1)
+	ss = AppendSlice[int](buf, ss, 1)
+	require.Equal(t, 1, ss[0])
+	require.Equal(t, 1, cap(ss))
+	ss = AppendSlice[int](buf, ss, 2)
+	require.Equal(t, 2, ss[1])
+	require.Equal(t, 4, cap(ss))
 }
 
 func BenchmarkBuffer(b *testing.B) {
