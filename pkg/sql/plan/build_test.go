@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/mysql"
@@ -1109,7 +1110,9 @@ func outPutPlan(logicPlan *Plan, toFile bool, t *testing.T) {
 }
 
 func runOneStmt(opt Optimizer, t *testing.T, sql string) (*Plan, error) {
-	stmts, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1)
+	buf := buffer.New()
+	defer buf.Free()
+	stmts, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1, buf)
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}

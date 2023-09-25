@@ -1972,7 +1972,7 @@ func (bh *BackgroundHandler) Exec(ctx context.Context, sql string) error {
 	if err != nil {
 		return err
 	}
-	statements, err := mysql.Parse(ctx, sql, v.(int64))
+	statements, err := mysql.Parse(ctx, sql, v.(int64), bh.ses.GetBuffer())
 	if err != nil {
 		return err
 	}

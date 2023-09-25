@@ -20,13 +20,14 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 )
 
-func Parse(ctx context.Context, sql string, lower int64) ([]tree.Statement, error) {
-	lexer := NewLexer(dialect.MYSQL, sql, lower)
+func Parse(ctx context.Context, sql string, lower int64, buf *buffer.Buffer) ([]tree.Statement, error) {
+	lexer := NewLexer(dialect.MYSQL, sql, lower, buf)
 	defer PutScanner(lexer.scanner)
 	if yyParse(lexer) != 0 {
 		return nil, lexer.scanner.LastError
@@ -46,8 +47,8 @@ func Parse(ctx context.Context, sql string, lower int64) ([]tree.Statement, erro
 	return lexer.stmts, nil
 }
 
-func ParseOne(ctx context.Context, sql string, lower int64) (tree.Statement, error) {
-	lexer := NewLexer(dialect.MYSQL, sql, lower)
+func ParseOne(ctx context.Context, sql string, lower int64, buf *buffer.Buffer) (tree.Statement, error) {
+	lexer := NewLexer(dialect.MYSQL, sql, lower, buf)
 	defer PutScanner(lexer.scanner)
 	if yyParse(lexer) != 0 {
 		return nil, lexer.scanner.LastError
@@ -63,13 +64,15 @@ type Lexer struct {
 	stmts      []tree.Statement
 	paramIndex int
 	lower      int64
+	buf        *buffer.Buffer
 }
 
-func NewLexer(dialectType dialect.DialectType, sql string, lower int64) *Lexer {
+func NewLexer(dialectType dialect.DialectType, sql string, lower int64, buf *buffer.Buffer) *Lexer {
 	return &Lexer{
 		scanner:    NewScanner(dialectType, sql),
 		paramIndex: 0,
 		lower:      lower,
+		buf:        buf,
 	}
 }
 

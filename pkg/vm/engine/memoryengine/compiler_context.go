@@ -19,6 +19,7 @@ import (
 	"strconv"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/defines"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
@@ -87,6 +88,10 @@ func (*CompilerContext) GetStatsCache() *plan.StatsCache {
 
 func (c *CompilerContext) GetSubscriptionMeta(dbName string) (*plan.SubscriptionMeta, error) {
 	return nil, nil
+}
+
+func (c *CompilerContext) GetBuffer() *buffer.Buffer {
+	return nil
 }
 
 func (c *CompilerContext) GetProcess() *process.Process {

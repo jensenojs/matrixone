@@ -18,6 +18,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers"
@@ -511,7 +512,9 @@ func TestPartitionKeysShouldShowError(t *testing.T) {
 }
 
 func buildSingleStmt(opt Optimizer, t *testing.T, sql string) (*Plan, error) {
-	statements, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1)
+	buf := buffer.New()
+	defer buf.Free()
+	statements, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -585,7 +588,9 @@ func mockPartitionBinder(tableDef *plan.TableDef) (*PartitionBinder, error) {
 
 func mockExpr(t *testing.T, s string) (tree.Expr, error) {
 	selStr := "select " + s
-	one, err := parsers.ParseOne(context.TODO(), dialect.MYSQL, selStr, 1)
+	buf := buffer.New()
+	defer buf.Free()
+	one, err := parsers.ParseOne(context.TODO(), dialect.MYSQL, selStr, 1, buf)
 	require.Nil(t, err)
 	return one.(*tree.Select).Select.(*tree.SelectClause).Exprs[0].Expr, err
 }

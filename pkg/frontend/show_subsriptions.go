@@ -112,7 +112,7 @@ func doShowSubscriptions(ctx context.Context, ses *Session, sp *tree.ShowSubscri
 				return err
 			}
 
-			ast, err = mysql.Parse(ctx, createSql, lowerInt64)
+			ast, err = mysql.Parse(ctx, createSql, lowerInt64, ses.GetBuffer())
 			if err != nil {
 				return err
 			}

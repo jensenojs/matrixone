@@ -17,6 +17,7 @@ package proxy
 import (
 	"context"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
@@ -86,7 +87,11 @@ func makeEvent(msg []byte) (IEvent, bool) {
 	}
 	if isCmdQuery(msg) {
 		sql := getStatement(msg)
-		stmts, err := parsers.Parse(context.Background(), dialect.MYSQL, sql, 0)
+
+		buf := buffer.New()
+		defer buf.Free()
+
+		stmts, err := parsers.Parse(context.Background(), dialect.MYSQL, sql, 0, buf)
 		if err != nil {
 			return nil, false
 		}

@@ -18,21 +18,22 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 )
 
-func Parse(ctx context.Context, sql string) ([]tree.Statement, error) {
-	lexer := NewLexer(dialect.POSTGRESQL, sql)
+func Parse(ctx context.Context, sql string, buf *buffer.Buffer) ([]tree.Statement, error) {
+	lexer := NewLexer(dialect.POSTGRESQL, sql, buf)
 	if yyParse(lexer) != 0 {
 		return nil, lexer.scanner.LastError
 	}
 	return lexer.stmts, nil
 }
 
-func ParseOne(ctx context.Context, sql string) (tree.Statement, error) {
-	lexer := NewLexer(dialect.POSTGRESQL, sql)
+func ParseOne(ctx context.Context, sql string, buf *buffer.Buffer) (tree.Statement, error) {
+	lexer := NewLexer(dialect.POSTGRESQL, sql, buf)
 	if yyParse(lexer) != 0 {
 		return nil, lexer.scanner.LastError
 	}
@@ -44,12 +45,14 @@ func ParseOne(ctx context.Context, sql string) (tree.Statement, error) {
 
 type Lexer struct {
 	scanner *Scanner
+	buf     *buffer.Buffer
 	stmts   []tree.Statement
 }
 
-func NewLexer(dialectType dialect.DialectType, sql string) *Lexer {
+func NewLexer(dialectType dialect.DialectType, sql string, buf *buffer.Buffer) *Lexer {
 	return &Lexer{
 		scanner: NewScanner(dialectType, sql),
+		buf : buf,
 	}
 }
 

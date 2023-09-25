@@ -18,6 +18,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 )
@@ -36,7 +37,9 @@ func TestDebug(t *testing.T) {
 	if debugSQL.output == "" {
 		debugSQL.output = debugSQL.input
 	}
-	ast, err := ParseOne(context.TODO(), debugSQL.input, 1)
+	buf := buffer.New()
+	defer buf.Free()
+	ast, err := ParseOne(context.TODO(), debugSQL.input, 1, buf)
 	if err != nil {
 		t.Errorf("Parse(%q) err: %v", debugSQL.input, err)
 		return
@@ -62,7 +65,9 @@ func TestOriginSQL(t *testing.T) {
 	if orginSQL.output == "" {
 		orginSQL.output = orginSQL.input
 	}
-	ast, err := ParseOne(context.TODO(), orginSQL.input, 0)
+	buf := buffer.New()
+	defer buf.Free()
+	ast, err := ParseOne(context.TODO(), orginSQL.input, 0, buf)
 	if err != nil {
 		t.Errorf("Parse(%q) err: %v", orginSQL.input, err)
 		return
@@ -2615,11 +2620,13 @@ var (
 
 func TestValid(t *testing.T) {
 	ctx := context.TODO()
+	buf := buffer.New()
+	defer buf.Free()
 	for _, tcase := range validSQL {
 		if tcase.output == "" {
 			tcase.output = tcase.input
 		}
-		ast, err := ParseOne(ctx, tcase.input, 1)
+		ast, err := ParseOne(ctx, tcase.input, 1, buf)
 		if err != nil {
 			t.Errorf("Parse(%q) err: %v", tcase.input, err)
 			continue
@@ -2720,11 +2727,13 @@ var (
 
 func TestMulti(t *testing.T) {
 	ctx := context.TODO()
+	buf := buffer.New()
+	defer buf.Free()
 	for _, tcase := range multiSQL {
 		if tcase.output == "" {
 			tcase.output = tcase.input
 		}
-		asts, err := Parse(ctx, tcase.input, 1)
+		asts, err := Parse(ctx, tcase.input, 1, buf)
 		if err != nil {
 			t.Errorf("Parse(%q) err: %v", tcase.input, err)
 			continue
@@ -2771,8 +2780,10 @@ var (
 
 func TestFaultTolerance(t *testing.T) {
 	ctx := context.TODO()
+	buf := buffer.New()
+	defer buf.Free()
 	for _, tcase := range invalidSQL {
-		_, err := ParseOne(ctx, tcase.input, 1)
+		_, err := ParseOne(ctx, tcase.input, 1, buf)
 		if err == nil {
 			t.Errorf("Fault tolerant ases (%q) should parse errors", tcase.input)
 			continue

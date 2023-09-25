@@ -155,7 +155,7 @@ func newTestCase(sql string, t *testing.T) compileTestCase {
 	proc := testutil.NewProcess()
 	proc.SessionInfo.Buf = buffer.New()
 	e, _, compilerCtx := testengine.New(context.Background())
-	stmts, err := mysql.Parse(compilerCtx.GetContext(), sql, 1)
+	stmts, err := mysql.Parse(compilerCtx.GetContext(), sql, 1, proc.SessionInfo.Buf)
 	require.NoError(t, err)
 	pn, err := plan2.BuildPlan(compilerCtx, stmts[0], false)
 	if err != nil {

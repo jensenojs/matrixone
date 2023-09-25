@@ -19,6 +19,7 @@ import (
 	gotrace "runtime/trace"
 	"strings"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/mysql"
@@ -26,25 +27,25 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 )
 
-func Parse(ctx context.Context, dialectType dialect.DialectType, sql string, lower int64) ([]tree.Statement, error) {
+func Parse(ctx context.Context, dialectType dialect.DialectType, sql string, lower int64, buf *buffer.Buffer) ([]tree.Statement, error) {
 	_, task := gotrace.NewTask(context.TODO(), "parser.Parse")
 	defer task.End()
 	switch dialectType {
 	case dialect.MYSQL:
-		return mysql.Parse(ctx, sql, lower)
+		return mysql.Parse(ctx, sql, lower, buf)
 	case dialect.POSTGRESQL:
-		return postgresql.Parse(ctx, sql)
+		return postgresql.Parse(ctx, sql, buf)
 	default:
 		return nil, moerr.NewInternalError(ctx, "type of dialect error")
 	}
 }
 
-func ParseOne(ctx context.Context, dialectType dialect.DialectType, sql string, lower int64) (tree.Statement, error) {
+func ParseOne(ctx context.Context, dialectType dialect.DialectType, sql string, lower int64, buf *buffer.Buffer) (tree.Statement, error) {
 	switch dialectType {
 	case dialect.MYSQL:
-		return mysql.ParseOne(ctx, sql, lower)
+		return mysql.ParseOne(ctx, sql, lower, buf)
 	case dialect.POSTGRESQL:
-		return postgresql.ParseOne(ctx, sql)
+		return postgresql.ParseOne(ctx, sql, buf)
 	default:
 		return nil, moerr.NewInternalError(ctx, "type of dialect error")
 	}

@@ -18,6 +18,7 @@ import (
 	"context"
 	"math"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
@@ -98,6 +99,7 @@ type CompilerContext interface {
 	GetContext() context.Context
 	// GetDatabaseId Get database id
 	GetDatabaseId(dbName string) (uint64, error)
+	GetBuffer() *buffer.Buffer
 
 	GetProcess() *process.Process
 

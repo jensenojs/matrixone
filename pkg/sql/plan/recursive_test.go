@@ -16,16 +16,22 @@ package plan
 
 import (
 	"context"
+	"testing"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestSplitRecursiveMember(t *testing.T) {
+
+	buf := buffer.New()
+	defer buf.Free()
+
 	sql := "with recursive c as (select a from t1 union all select a+1 from c where a < 3 union all select a+1 from c where a < 4) select * from c"
-	stmts, err := parsers.Parse(context.TODO(), dialect.MYSQL, sql, 1)
+	stmts, err := parsers.Parse(context.TODO(), dialect.MYSQL, sql, 1, buf)
 	if err != nil {
 		t.Errorf("Parse(%q) err: %v", sql, err)
 		return

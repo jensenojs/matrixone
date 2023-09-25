@@ -23,6 +23,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/testutil"
 	"github.com/stretchr/testify/require"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
@@ -386,7 +387,9 @@ func TestExpr_B(t *testing.T) {
 }
 
 func runOneExprStmt(opt Optimizer, t *testing.T, sql string) (*plan.Plan, error) {
-	stmts, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1)
+	buf := buffer.New()
+	defer buf.Free()
+	stmts, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1, buf)
 	if err != nil {
 		return nil, err
 	}

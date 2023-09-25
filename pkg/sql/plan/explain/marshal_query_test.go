@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	plan2 "github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/mysql"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
@@ -266,7 +267,9 @@ func buildPlanMarshalTest(opt plan.Optimizer, t *testing.T, sqls []string) {
 }
 
 func runSingleSql(opt plan.Optimizer, t *testing.T, sql string) (*plan.Plan, error) {
-	stmts, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1)
+	buf := buffer.New()
+	defer buf.Free()
+	stmts, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1, buf)
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}

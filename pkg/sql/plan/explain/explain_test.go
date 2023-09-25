@@ -19,6 +19,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/mysql"
@@ -322,7 +323,9 @@ func runTestShouldPass(opt plan.Optimizer, t *testing.T, sqls []string) {
 
 func runOneStmt(opt plan.Optimizer, t *testing.T, sql string) error {
 	t.Logf("SQL: %v\n", sql)
-	stmts, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1)
+	buf := buffer.New()
+	defer buf.Free()
+	stmts, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1, buf)
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}

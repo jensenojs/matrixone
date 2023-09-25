@@ -1165,7 +1165,7 @@ func doPrepareString(ctx context.Context, ses *Session, st *tree.PrepareString) 
 	if err != nil {
 		return nil, err
 	}
-	stmts, err := mysql.Parse(ctx, st.Sql, v.(int64))
+	stmts, err := mysql.Parse(ctx, st.Sql, v.(int64), ses.GetBuffer())
 	if err != nil {
 		return nil, err
 	}
@@ -1752,7 +1752,7 @@ var GetComputationWrapper = func(db string, input *UserInput, user string, eng e
 		if err != nil {
 			v = int64(1)
 		}
-		stmts, err = parsers.Parse(proc.Ctx, dialect.MYSQL, input.getSql(), v.(int64))
+		stmts, err = parsers.Parse(proc.Ctx, dialect.MYSQL, input.getSql(), v.(int64), ses.GetBuffer())
 		if err != nil {
 			return nil, err
 		}
@@ -2295,7 +2295,7 @@ var GetStmtExecList = func(db, sql, user string, eng engine.Engine, proc *proces
 		if err != nil {
 			return nil, err
 		}
-		stmts, err = parsers.Parse(proc.Ctx, dialect.MYSQL, sql, v.(int64))
+		stmts, err = parsers.Parse(proc.Ctx, dialect.MYSQL, sql, v.(int64), ses.GetBuffer())
 		if err != nil {
 			return nil, err
 		}

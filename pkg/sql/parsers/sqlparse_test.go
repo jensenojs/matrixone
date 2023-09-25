@@ -16,9 +16,11 @@ package parsers
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/mysql"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/postgresql"
@@ -36,10 +38,13 @@ var (
 
 func TestMysql(t *testing.T) {
 	ctx := context.TODO()
+	buf := buffer.New()
+	defer buf.Free()
+
 	if debugSQL.output == "" {
 		debugSQL.output = debugSQL.input
 	}
-	ast, err := mysql.ParseOne(ctx, debugSQL.input, 1)
+	ast, err := mysql.ParseOne(ctx, debugSQL.input, 1, buf)
 	if err != nil {
 		t.Errorf("Parse(%q) err: %v", debugSQL.input, err)
 		return
@@ -52,10 +57,12 @@ func TestMysql(t *testing.T) {
 
 func TestPostgresql(t *testing.T) {
 	ctx := context.TODO()
+	buf := buffer.New()
+	defer buf.Free()
 	if debugSQL.output == "" {
 		debugSQL.output = debugSQL.input
 	}
-	ast, err := postgresql.ParseOne(ctx, debugSQL.input)
+	ast, err := postgresql.ParseOne(ctx, debugSQL.input, buf)
 	if err != nil {
 		t.Errorf("Parse(%q) err: %v", debugSQL.input, err)
 		return

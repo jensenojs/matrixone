@@ -3394,7 +3394,7 @@ func checkSubscriptionValid(ctx context.Context, ses *Session, createSql string)
 		return nil, err
 	}
 	lowerInt64 = lowerAny.(int64)
-	ast, err = mysql.Parse(ctx, createSql, lowerInt64)
+	ast, err = mysql.Parse(ctx, createSql, lowerInt64, ses.GetBuffer())
 	if err != nil {
 		return nil, err
 	}
@@ -8845,7 +8845,7 @@ func doInterpretCall(ctx context.Context, ses *Session, call *tree.CallStmt) ([]
 		return nil, moerr.NewNoUDFNoCtx(string(call.Name.Name.ObjectName))
 	}
 
-	stmt, err := parsers.Parse(ctx, dialect.MYSQL, spBody, 1)
+	stmt, err := parsers.Parse(ctx, dialect.MYSQL, spBody, 1, ses.GetBuffer())
 	if err != nil {
 		return nil, err
 	}

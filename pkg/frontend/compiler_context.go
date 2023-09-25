@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/defines"
@@ -84,6 +85,12 @@ func (tcc *TxnCompilerContext) GetSession() *Session {
 	tcc.mu.Lock()
 	defer tcc.mu.Unlock()
 	return tcc.ses
+}
+
+func (tcc *TxnCompilerContext) GetBuffer() *buffer.Buffer {
+	tcc.mu.Lock()
+	defer tcc.mu.Unlock()
+	return tcc.ses.buf
 }
 
 func (tcc *TxnCompilerContext) GetTxnHandler() *TxnHandler {

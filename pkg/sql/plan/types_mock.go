@@ -23,6 +23,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	plan "github.com/matrixorigin/matrixone/pkg/pb/plan"
 	tree "github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 	process "github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -30,6 +31,7 @@ import (
 
 // MockCompilerContext2 is a mock of CompilerContext interface.
 type MockCompilerContext2 struct {
+	buf      *buffer.Buffer
 	ctrl     *gomock.Controller
 	recorder *MockCompilerContext2MockRecorder
 }
@@ -41,7 +43,7 @@ type MockCompilerContext2MockRecorder struct {
 
 // NewMockCompilerContext2 creates a new mock instance.
 func NewMockCompilerContext2(ctrl *gomock.Controller) *MockCompilerContext2 {
-	mock := &MockCompilerContext2{ctrl: ctrl}
+	mock := &MockCompilerContext2{ctrl: ctrl, buf: buffer.New()}
 	mock.recorder = &MockCompilerContext2MockRecorder{mock}
 	return mock
 }
@@ -174,10 +176,19 @@ func (m *MockCompilerContext2) GetProcess() *process.Process {
 	return ret0
 }
 
+
+func (m *MockCompilerContext2) GetBuffer() *buffer.Buffer {
+    return m.buf
+}
+
 // GetProcess indicates an expected call of GetProcess.
 func (mr *MockCompilerContext2MockRecorder) GetProcess() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProcess", reflect.TypeOf((*MockCompilerContext2)(nil).GetProcess))
+}
+
+func (mr *MockCompilerContext2MockRecorder) GetBuffer() *buffer.Buffer {
+    return mr.mock.buf
 }
 
 // GetQueryResultMeta mocks base method.

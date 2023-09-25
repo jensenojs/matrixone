@@ -35,6 +35,7 @@ import (
 	goetty_buf "github.com/fagongzi/goetty/v2/buf"
 	"github.com/golang/mock/gomock"
 	fuzz "github.com/google/gofuzz"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/config"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -168,6 +169,10 @@ func TestKIll(t *testing.T) {
 	//ion method: mysql -h 127.0.0.1 -P 6001 -udump -p
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+
+	buf := buffer.New()
+	defer buf.Free()
+
 	var conn1, conn2 *sql.DB
 	var err error
 	var connIdRow *sql.Row
@@ -229,7 +234,7 @@ func TestKIll(t *testing.T) {
 			}
 			stmts = append(stmts, cmdFieldStmt)
 		} else {
-			stmts, err = parsers.Parse(proc.Ctx, dialect.MYSQL, input.getSql(), 1)
+			stmts, err = parsers.Parse(proc.Ctx, dialect.MYSQL, input.getSql(), 1, buf)
 			if err != nil {
 				return nil, err
 			}
@@ -2047,6 +2052,8 @@ func Test_openpacket(t *testing.T) {
 
 func TestSendPrepareResponse(t *testing.T) {
 	ctx := context.TODO()
+	buf := buffer.New()
+	defer buf.Free()
 	convey.Convey("send Prepare response succ", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -2065,7 +2072,7 @@ func TestSendPrepareResponse(t *testing.T) {
 		proto.SetSession(&Session{})
 
 		st := tree.NewPrepareString(tree.Identifier(getPrepareStmtName(1)), "select ?, 1")
-		stmts, err := mysql.Parse(ctx, st.Sql, 1)
+		stmts, err := mysql.Parse(ctx, st.Sql, 1, buf)
 		if err != nil {
 			t.Error(err)
 		}
@@ -2101,7 +2108,7 @@ func TestSendPrepareResponse(t *testing.T) {
 		proto := NewMysqlClientProtocol(0, ioses, 1024, sv)
 
 		st := tree.NewPrepareString("stmt1", "select ?, 1")
-		stmts, err := mysql.Parse(ctx, st.Sql, 1)
+		stmts, err := mysql.Parse(ctx, st.Sql, 1, buf)
 		if err != nil {
 			t.Error(err)
 		}
@@ -2123,6 +2130,8 @@ func TestSendPrepareResponse(t *testing.T) {
 
 func FuzzParseExecuteData(f *testing.F) {
 	ctx := context.TODO()
+	buf := buffer.New()
+	defer buf.Free()
 
 	ctrl := gomock.NewController(f)
 	defer ctrl.Finish()
@@ -2141,7 +2150,7 @@ func FuzzParseExecuteData(f *testing.F) {
 	proto := NewMysqlClientProtocol(0, ioses, 1024, sv)
 
 	st := tree.NewPrepareString(tree.Identifier(getPrepareStmtName(1)), "select ?, 1")
-	stmts, err := mysql.Parse(ctx, st.Sql, 1)
+	stmts, err := mysql.Parse(ctx, st.Sql, 1, buf)
 	if err != nil {
 		f.Error(err)
 	}

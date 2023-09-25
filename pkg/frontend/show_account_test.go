@@ -16,7 +16,10 @@ package frontend
 
 import (
 	"context"
+	"testing"
+
 	"github.com/golang/mock/gomock"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -25,7 +28,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func Test_getSqlForAccountInfo(t *testing.T) {
@@ -44,8 +46,11 @@ func Test_getSqlForAccountInfo(t *testing.T) {
 		},
 	}
 
+	buf := buffer.New()
+	defer buf.Free()
+
 	for _, a := range args {
-		one, err := parsers.ParseOne(context.Background(), dialect.MYSQL, a.s, 1)
+		one, err := parsers.ParseOne(context.Background(), dialect.MYSQL, a.s, 1, buf)
 		assert.NoError(t, err)
 		sa1 := one.(*tree.ShowAccounts)
 		r1 := getSqlForAllAccountInfo(sa1.Like)

@@ -23,6 +23,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
@@ -36,6 +37,7 @@ type MockCompilerContext struct {
 	id2name         map[uint64]string
 	isDml           bool
 	mysqlCompatible bool
+	buf             *buffer.Buffer
 
 	// ctx default: nil
 	ctx context.Context
@@ -756,6 +758,7 @@ func NewMockCompilerContext(isDml bool) *MockCompilerContext {
 		tables:  tables,
 		id2name: id2name,
 		pks:     pks,
+		buf:     buffer.New(),
 		ctx:     context.TODO(),
 	}
 }
@@ -842,6 +845,10 @@ func (m *MockCompilerContext) GetContext() context.Context {
 
 func (m *MockCompilerContext) GetProcess() *process.Process {
 	return testutil.NewProc()
+}
+
+func (m *MockCompilerContext) GetBuffer() *buffer.Buffer {
+	return m.buf
 }
 
 func (m *MockCompilerContext) GetQueryResultMeta(uuid string) ([]*ColDef, string, error) {

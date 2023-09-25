@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
@@ -25,8 +26,10 @@ import (
 
 func main() {
 	sql := `select u.a, (select t.a from sa.t, u) from u, (select t.a, u.a from sa.t, u where t.a = u.a) as t where (u.a, u.b, u.c) in (select t.a, u.a, t.b * u.b as tubb from t)`
+	buf := buffer.New()
+	defer buf.Free()
 
-	ast, err := parsers.ParseOne(context.TODO(), dialect.MYSQL, sql, 1)
+	ast, err := parsers.ParseOne(context.TODO(), dialect.MYSQL, sql, 1, buf)
 	if err != nil {
 		fmt.Println(err)
 	}

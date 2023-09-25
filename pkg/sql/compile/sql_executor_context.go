@@ -19,6 +19,7 @@ import (
 	"strconv"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/defines"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
@@ -87,6 +88,10 @@ func (c *compilerContext) GetSubscriptionMeta(dbName string) (*plan.Subscription
 
 func (c *compilerContext) GetProcess() *process.Process {
 	return c.proc
+}
+
+func (c *compilerContext) GetBuffer() *buffer.Buffer {
+	return c.proc.SessionInfo.Buf
 }
 
 func (c *compilerContext) GetQueryResultMeta(uuid string) ([]*plan.ColDef, string, error) {

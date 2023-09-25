@@ -126,7 +126,7 @@ func (interpreter *Interpreter) GetSimpleExprValueWithSpVar(e tree.Expr) (interf
 	if err != nil {
 		return nil, err
 	}
-	retStmt, err := parsers.ParseOne(interpreter.ctx, dialect.MYSQL, "select "+interpreter.GetExprString(newExpr), 1)
+	retStmt, err := parsers.ParseOne(interpreter.ctx, dialect.MYSQL, "select "+interpreter.GetExprString(newExpr), 1, interpreter.ses.GetBuffer())
 	if err != nil {
 		return nil, err
 	}
