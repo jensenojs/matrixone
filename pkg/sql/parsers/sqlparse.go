@@ -57,8 +57,8 @@ const (
 	stripSaveQuery    = "/* save_result */"
 )
 
-var HandleSqlForRecord = func(sql string) []string {
-	split := SplitSqlBySemicolon(sql)
+var HandleSqlForRecord = func(sql string, buf *buffer.Buffer) []string {
+	split := SplitSqlBySemicolon(sql, buf)
 	for i := range split {
 		//!!! remove method here assumes that the format of stripCloudUser or stripCloudNonUser
 		// can not be changed, otherwise, the following code will not work.
@@ -95,7 +95,7 @@ var HandleSqlForRecord = func(sql string) []string {
 		// And if len(split[i]) is 10, then we get slice indexes:
 		// -1, 1, 2, 3, 3, 10
 		// These mean we need to get (-1, 1), (2, 3), (3, 10) from split[i]
-		scanner := mysql.NewScanner(dialect.MYSQL, split[i])
+		scanner := mysql.NewScanner(dialect.MYSQL, split[i], buf)
 		indexes := []int{-1}
 		eq := int('=')
 		for scanner.Pos < len(split[i]) {
@@ -133,13 +133,15 @@ var HandleSqlForRecord = func(sql string) []string {
 	return split
 }
 
-func SplitSqlBySemicolon(sql string) []string {
+func SplitSqlBySemicolon(sql string, buf *buffer.Buffer) []string {
 	var ret []string
 	if len(sql) == 0 {
 		// case 1 : "" => [""]
 		return []string{sql}
 	}
-	scanner := mysql.NewScanner(dialect.MYSQL, sql)
+
+	// ret := buffer.MakeSlice[string](buf, 0, 10)
+	scanner := mysql.NewScanner(dialect.MYSQL, sql, buf)
 	lastEnd := 0
 	endWithSemicolon := false
 	for scanner.Pos < len(sql) {
@@ -149,10 +151,12 @@ func SplitSqlBySemicolon(sql string) []string {
 		}
 		if typ == ';' {
 			ret = append(ret, sql[lastEnd:scanner.Pos-1])
+			// ret = buffer.AppendSlice[string](buf, ret, sql[lastEnd:scanner.Pos-1])
 			lastEnd = scanner.Pos
 			endWithSemicolon = true
 		} else {
 			ret = append(ret, sql[lastEnd:scanner.Pos])
+			// ret = buffer.AppendSlice[string](buf, ret, sql[lastEnd:scanner.Pos])
 			endWithSemicolon = false
 		}
 	}

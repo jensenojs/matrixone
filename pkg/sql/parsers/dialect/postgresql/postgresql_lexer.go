@@ -50,10 +50,11 @@ type Lexer struct {
 }
 
 func NewLexer(dialectType dialect.DialectType, sql string, buf *buffer.Buffer) *Lexer {
-	return &Lexer{
-		scanner: NewScanner(dialectType, sql),
-		buf : buf,
-	}
+	// lexer := buffer.Alloc[Lexer](buf)
+	lexer := new(Lexer)
+	lexer.scanner = NewScanner(dialectType, sql, buf)
+	lexer.buf = buf
+	return lexer
 }
 
 func (l *Lexer) Lex(lval *yySymType) int {

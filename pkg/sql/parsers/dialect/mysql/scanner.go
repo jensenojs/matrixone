@@ -22,6 +22,7 @@ import (
 	"sync"
 	"unicode"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 )
 
@@ -47,12 +48,13 @@ type Scanner struct {
 	Line        int
 	Col         int
 	PrePos      int
-	buf         string
+	sql         string
+	buf         *buffer.Buffer
 
 	strBuilder *bytes.Buffer
 }
 
-func NewScanner(dialectType dialect.DialectType, sql string) *Scanner {
+func NewScanner(dialectType dialect.DialectType, sql string, buf *buffer.Buffer) *Scanner {
 	scanner := scannerPool.Get().(*Scanner)
 	scanner.dialectType = dialectType
 	scanner.LastToken = ""
@@ -63,7 +65,8 @@ func NewScanner(dialectType dialect.DialectType, sql string) *Scanner {
 	scanner.Line = 0
 	scanner.Col = 0
 	scanner.PrePos = 0
-	scanner.buf = sql
+	scanner.sql = sql
+	scanner.buf = buf
 	scanner.strBuilder.Reset()
 	return scanner
 }
@@ -240,9 +243,9 @@ func (s *Scanner) Scan() (int, string) {
 }
 
 func (s *Scanner) readVersion() bool {
-	if s.Pos < len(s.buf) {
+	if s.Pos < len(s.sql) {
 		if isDigit(s.cur()) {
-			if s.Pos+4 < len(s.buf) {
+			if s.Pos+4 < len(s.sql) {
 				for i := 0; i < 5; i++ {
 					if !isDigit(s.cur()) {
 						return false
@@ -357,7 +360,7 @@ func (s *Scanner) scanString(delim uint16, typ int) (int, string) {
 	ch := s.cur()
 	buf := s.strBuilder
 	defer s.strBuilder.Reset()
-	for s.Pos < len(s.buf) {
+	for s.Pos < len(s.sql) {
 		if ch == delim {
 			if delim != '$' {
 				s.inc()
@@ -374,7 +377,7 @@ func (s *Scanner) scanString(delim uint16, typ int) (int, string) {
 			}
 		}
 		buf.WriteByte(byte(ch))
-		if s.Pos < len(s.buf) {
+		if s.Pos < len(s.sql) {
 			s.inc()
 			ch = s.cur()
 		}
@@ -390,7 +393,7 @@ func (s *Scanner) scanStringAddPlus(delim uint16, typ int) (int, string) {
 	buf := s.strBuilder
 	defer s.strBuilder.Reset()
 	buf.WriteByte(byte('+'))
-	for s.Pos < len(s.buf) {
+	for s.Pos < len(s.sql) {
 		if ch == delim {
 			if delim != '$' {
 				s.inc()
@@ -407,7 +410,7 @@ func (s *Scanner) scanStringAddPlus(delim uint16, typ int) (int, string) {
 			}
 		}
 		buf.WriteByte(byte(ch))
-		if s.Pos < len(s.buf) {
+		if s.Pos < len(s.sql) {
 			s.inc()
 			ch = s.cur()
 		}
@@ -450,16 +453,16 @@ func (s *Scanner) scanLiteralIdentifier() (int, string) {
 					return LEX_ERROR, ""
 				}
 				s.inc()
-				return QUOTE_ID, s.buf[start : s.Pos-1]
+				return QUOTE_ID, s.sql[start : s.Pos-1]
 			}
 
 			var buf strings.Builder
-			buf.WriteString(s.buf[start:s.Pos])
+			buf.WriteString(s.sql[start:s.Pos])
 			s.inc()
 			return s.scanLiteralIdentifierSlow(&buf)
 		case eofChar:
 			// Premature EOF.
-			return LEX_ERROR, s.buf[start:s.Pos]
+			return LEX_ERROR, s.sql[start:s.Pos]
 		default:
 			s.inc()
 		}
@@ -513,11 +516,11 @@ func (s *Scanner) scanCommentTypeBlock() (int, string) {
 			continue
 		}
 		if s.cur() == eofChar {
-			return LEX_ERROR, s.buf[start:s.Pos]
+			return LEX_ERROR, s.sql[start:s.Pos]
 		}
 		s.inc()
 	}
-	return COMMENT, s.buf[start:s.Pos]
+	return COMMENT, s.sql[start:s.Pos]
 }
 
 // scanMySQLSpecificComment scans a MySQL comment pragma, which always starts with '//*`
@@ -579,7 +582,7 @@ func (s *Scanner) scanCommentTypeLine(prefixLen int) (int, string) {
 		}
 		s.inc()
 	}
-	return COMMENT, s.buf[start:s.Pos]
+	return COMMENT, s.sql[start:s.Pos]
 }
 
 // ?
@@ -594,7 +597,7 @@ func (s *Scanner) scanBindVar() (int, string) {
 		s.inc()
 	}
 	if !isLetter(s.cur()) {
-		return LEX_ERROR, s.buf[start:s.Pos]
+		return LEX_ERROR, s.sql[start:s.Pos]
 	}
 	for {
 		ch := s.cur()
@@ -603,7 +606,7 @@ func (s *Scanner) scanBindVar() (int, string) {
 		}
 		s.inc()
 	}
-	return token, s.buf[start:s.Pos]
+	return token, s.sql[start:s.Pos]
 }
 
 // scanNumber scans any SQL numeric literal, either floating point or integer
@@ -663,7 +666,7 @@ exit:
 		s.scanIdentifier(false)
 	}
 
-	return token, strings.ToLower(s.buf[start:s.Pos])
+	return token, strings.ToLower(s.sql[start:s.Pos])
 }
 
 func (s *Scanner) scanIdentifier(isVariable bool) (int, string) {
@@ -687,7 +690,7 @@ func (s *Scanner) scanIdentifier(isVariable bool) (int, string) {
 		}
 		s.inc()
 	}
-	keywordName := s.buf[start:s.Pos]
+	keywordName := s.sql[start:s.Pos]
 	lower := strings.ToLower(keywordName)
 	if keywordID, found := keywords[lower]; found {
 		// make transaction statements coexist with plsql
@@ -719,7 +722,7 @@ func (s *Scanner) scanIdentifier(isVariable bool) (int, string) {
 func (s *Scanner) scanBitLiteral() (int, string) {
 	start := s.Pos
 	s.scanMantissa(2)
-	bit := s.buf[start:s.Pos]
+	bit := s.sql[start:s.Pos]
 	if s.cur() != '\'' {
 		return LEX_ERROR, bit
 	}
@@ -730,7 +733,7 @@ func (s *Scanner) scanBitLiteral() (int, string) {
 func (s *Scanner) scanHex() (int, string) {
 	start := s.Pos
 	s.scanMantissa(16)
-	hex := s.buf[start:s.Pos]
+	hex := s.sql[start:s.Pos]
 	if s.cur() != '\'' {
 		return LEX_ERROR, hex
 	}
@@ -773,10 +776,10 @@ func (s *Scanner) cur() uint16 {
 }
 
 func (s *Scanner) inc() {
-	if s.Pos >= len(s.buf) {
+	if s.Pos >= len(s.sql) {
 		return
 	}
-	if s.buf[s.Pos] == '\n' {
+	if s.sql[s.Pos] == '\n' {
 		s.Line++
 		s.Col = 0
 	}
@@ -791,10 +794,10 @@ func (s *Scanner) incN(dist int) {
 }
 
 func (s *Scanner) peek(dist int) uint16 {
-	if s.Pos+dist >= len(s.buf) {
+	if s.Pos+dist >= len(s.sql) {
 		return eofChar
 	}
-	return uint16(s.buf[s.Pos+dist])
+	return uint16(s.sql[s.Pos+dist])
 }
 
 func isLetter(ch uint16) bool {

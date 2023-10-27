@@ -68,12 +68,13 @@ type Lexer struct {
 }
 
 func NewLexer(dialectType dialect.DialectType, sql string, lower int64, buf *buffer.Buffer) *Lexer {
-	return &Lexer{
-		scanner:    NewScanner(dialectType, sql),
-		paramIndex: 0,
-		lower:      lower,
-		buf:        buf,
-	}
+	// lexer := buffer.Alloc[Lexer](buf)
+	lexer := new(Lexer)
+	lexer.scanner = NewScanner(dialectType, sql, buf)
+	lexer.paramIndex = 0
+	lexer.lower = lower
+	lexer.buf = buf
+	return lexer
 }
 
 func (l *Lexer) GetParamIndex() int {
@@ -104,7 +105,7 @@ func (l *Lexer) Lex(lval *yySymType) int {
 
 func (l *Lexer) Error(err string) {
 	errMsg := fmt.Sprintf("You have an error in your SQL syntax; check the manual that corresponds to your MatrixOne server version for the right syntax to use. %s", err)
-	near := l.scanner.buf[l.scanner.PrePos:]
+	near := l.scanner.sql[l.scanner.PrePos:]
 	var lenStr string
 	if len(near) > 1024 {
 		lenStr = " (total length " + strconv.Itoa(len(lenStr)) + ")"
@@ -115,6 +116,7 @@ func (l *Lexer) Error(err string) {
 
 func (l *Lexer) AppendStmt(stmt tree.Statement) {
 	l.stmts = append(l.stmts, stmt)
+	// l.stmts = buffer.AppendSlice[tree.Statement](l.buf, l.stmts, stmt)
 }
 
 func (l *Lexer) toInt(lval *yySymType, str string) int {

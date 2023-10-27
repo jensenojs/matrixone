@@ -74,89 +74,92 @@ func TestPostgresql(t *testing.T) {
 }
 
 func TestSplitSqlBySemicolon(t *testing.T) {
-	ret := SplitSqlBySemicolon("select 1;select 2;select 3;")
+	buf := buffer.New()
+	defer buf.Free()
+
+	ret := SplitSqlBySemicolon("select 1;select 2;select 3;", buf)
 	require.Equal(t, 3, len(ret))
 	require.Equal(t, "select 1", ret[0])
 	require.Equal(t, "select 2", ret[1])
 	require.Equal(t, "select 3", ret[2])
 
-	ret = SplitSqlBySemicolon("select 1;select 2/*;;;*/;select 3;")
+	ret = SplitSqlBySemicolon("select 1;select 2/*;;;*/;select 3;", buf)
 	require.Equal(t, 3, len(ret))
 	require.Equal(t, "select 1", ret[0])
 	require.Equal(t, "select 2/*;;;*/", ret[1])
 	require.Equal(t, "select 3", ret[2])
 
-	ret = SplitSqlBySemicolon("select 1;select \"2;;\";select 3;")
+	ret = SplitSqlBySemicolon("select 1;select \"2;;\";select 3;", buf)
 	require.Equal(t, 3, len(ret))
 	require.Equal(t, "select 1", ret[0])
 	require.Equal(t, "select \"2;;\"", ret[1])
 	require.Equal(t, "select 3", ret[2])
 
-	ret = SplitSqlBySemicolon("select 1;select '2;;';select 3;")
+	ret = SplitSqlBySemicolon("select 1;select '2;;';select 3;", buf)
 	require.Equal(t, 3, len(ret))
 	require.Equal(t, "select 1", ret[0])
 	require.Equal(t, "select '2;;'", ret[1])
 	require.Equal(t, "select 3", ret[2])
 
-	ret = SplitSqlBySemicolon("select 1;select '2;;';select 3")
+	ret = SplitSqlBySemicolon("select 1;select '2;;';select 3", buf)
 	require.Equal(t, 3, len(ret))
 	require.Equal(t, "select 1", ret[0])
 	require.Equal(t, "select '2;;'", ret[1])
 	require.Equal(t, "select 3", ret[2])
 
-	ret = SplitSqlBySemicolon("select 1")
+	ret = SplitSqlBySemicolon("select 1", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "select 1", ret[0])
 
-	ret = SplitSqlBySemicolon(";;;")
+	ret = SplitSqlBySemicolon(";;;", buf)
 	require.Equal(t, 3, len(ret))
 	require.Equal(t, "", ret[0])
 	require.Equal(t, "", ret[1])
 	require.Equal(t, "", ret[2])
 
-	ret = SplitSqlBySemicolon(";;;  ")
+	ret = SplitSqlBySemicolon(";;;  ", buf)
 	require.Equal(t, 3, len(ret))
 	require.Equal(t, "", ret[0])
 	require.Equal(t, "", ret[1])
 	require.Equal(t, "", ret[2])
 
-	ret = SplitSqlBySemicolon(";")
+	ret = SplitSqlBySemicolon(";", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "", ret[0])
 
-	ret = SplitSqlBySemicolon("")
+	ret = SplitSqlBySemicolon("", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "", ret[0])
 
-	ret = SplitSqlBySemicolon("   ;   ")
+	ret = SplitSqlBySemicolon("   ;   ", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "", ret[0])
 
-	ret = SplitSqlBySemicolon("   ")
+	ret = SplitSqlBySemicolon("   ", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "", ret[0])
 
-	ret = SplitSqlBySemicolon("  ; /* abc */ ")
+	ret = SplitSqlBySemicolon("  ; /* abc */ ", buf)
 	require.Equal(t, 2, len(ret))
 	require.Equal(t, "", ret[0])
 	require.Equal(t, "/* abc */", ret[1])
 
-	ret = SplitSqlBySemicolon(" /* cde */  ; /* abc */ ")
+	ret = SplitSqlBySemicolon(" /* cde */  ; /* abc */ ", buf)
 	require.Equal(t, 2, len(ret))
 	require.Equal(t, "/* cde */", ret[0])
 	require.Equal(t, "/* abc */", ret[1])
 
-	ret = SplitSqlBySemicolon("   ;    ;  ")
+	ret = SplitSqlBySemicolon("   ;    ;  ", buf)
 	require.Equal(t, 2, len(ret))
 	require.Equal(t, "", ret[0])
 	require.Equal(t, "", ret[1])
 
-	ret = SplitSqlBySemicolon("   ;    ;")
+	ret = SplitSqlBySemicolon("   ;    ;", buf)
 	require.Equal(t, 2, len(ret))
 	require.Equal(t, "", ret[0])
 	require.Equal(t, "", ret[1])
 
-	ret = SplitSqlBySemicolon("   ;   ")
+	ret = SplitSqlBySemicolon("   ;   ", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "", ret[0])
 }
@@ -164,111 +167,114 @@ func TestSplitSqlBySemicolon(t *testing.T) {
 func TestHandleSqlForRecord(t *testing.T) {
 	// Test remove /* cloud_user */ prefix
 	var ret []string
-	ret = HandleSqlForRecord(" ;   ;  ")
+	buf := buffer.New()
+	defer buf.Free()
+
+	ret = HandleSqlForRecord(" ;   ;  ", buf)
 	require.Equal(t, 2, len(ret))
 	require.Equal(t, "", ret[0])
 	require.Equal(t, "", ret[1])
 
-	ret = HandleSqlForRecord(" ; /* abc */  ")
+	ret = HandleSqlForRecord(" ; /* abc */  ", buf)
 	require.Equal(t, 2, len(ret))
 	require.Equal(t, "", ret[0])
 	require.Equal(t, "/* abc */", ret[1])
 
-	ret = HandleSqlForRecord(" /* cde */  ; /* abc */ ")
+	ret = HandleSqlForRecord(" /* cde */  ; /* abc */ ", buf)
 	require.Equal(t, 2, len(ret))
 	require.Equal(t, "/* cde */", ret[0])
 	require.Equal(t, "/* abc */", ret[1])
 
-	ret = HandleSqlForRecord(" /* cde */  ; /* abc */ ; " + stripCloudNonUser + " ; " + stripCloudUser)
+	ret = HandleSqlForRecord(" /* cde */  ; /* abc */ ; "+stripCloudNonUser+" ; "+stripCloudUser, buf)
 	require.Equal(t, 4, len(ret))
 	require.Equal(t, "/* cde */", ret[0])
 	require.Equal(t, "/* abc */", ret[1])
 	require.Equal(t, "", ret[2])
 	require.Equal(t, "", ret[3])
 
-	ret = HandleSqlForRecord("  /* cloud_user */ select 1;   ")
+	ret = HandleSqlForRecord("  /* cloud_user */ select 1;   ", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "select 1", ret[0])
 
-	ret = HandleSqlForRecord("  /* cloud_user */ select 1;  ")
+	ret = HandleSqlForRecord("  /* cloud_user */ select 1;  ", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "select 1", ret[0])
 
-	ret = HandleSqlForRecord("  /* cloud_user */select * from t;/* cloud_user */select * from t;/* cloud_user */select * from t;")
+	ret = HandleSqlForRecord("  /* cloud_user */select * from t;/* cloud_user */select * from t;/* cloud_user */select * from t;", buf)
 	require.Equal(t, 3, len(ret))
 	require.Equal(t, "select * from t", ret[0])
 	require.Equal(t, "select * from t", ret[1])
 	require.Equal(t, "select * from t", ret[2])
 
-	ret = HandleSqlForRecord("  /* cloud_user */  select * from t ;  /* cloud_user */  select * from t ; /* cloud_user */ select * from t ; ")
+	ret = HandleSqlForRecord("  /* cloud_user */  select * from t ;  /* cloud_user */  select * from t ; /* cloud_user */ select * from t ; ", buf)
 	require.Equal(t, 3, len(ret))
 	require.Equal(t, "select * from t", ret[0])
 	require.Equal(t, "select * from t", ret[1])
 	require.Equal(t, "select * from t", ret[2])
 
-	ret = HandleSqlForRecord("  /* cloud_user */  select * from t ;  /* cloud_user */  select * from t ; /* cloud_user */ select * from t ; /* abc */ ")
+	ret = HandleSqlForRecord("  /* cloud_user */  select * from t ;  /* cloud_user */  select * from t ; /* cloud_user */ select * from t ; /* abc */ ", buf)
 	require.Equal(t, 4, len(ret))
 	require.Equal(t, "select * from t", ret[0])
 	require.Equal(t, "select * from t", ret[1])
 	require.Equal(t, "select * from t", ret[2])
 	require.Equal(t, "/* abc */", ret[3])
 
-	ret = HandleSqlForRecord("  /* cloud_user */  ")
+	ret = HandleSqlForRecord("  /* cloud_user */  ", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "", ret[0])
 
-	ret = HandleSqlForRecord("  /* cloud_user */   ")
+	ret = HandleSqlForRecord("  /* cloud_user */   ", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "", ret[0])
 
-	ret = HandleSqlForRecord("   " + stripCloudNonUser + "  select 1;   ")
+	ret = HandleSqlForRecord("   "+stripCloudNonUser+"  select 1;   ", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "select 1", ret[0])
 
-	ret = HandleSqlForRecord("  " + stripCloudNonUser + "  select * from t  ;  " + stripCloudNonUser + "   select * from t  ;   " + stripCloudNonUser + "   select * from t  ;   ")
+	ret = HandleSqlForRecord("  "+stripCloudNonUser+"  select * from t  ;  "+stripCloudNonUser+"   select * from t  ;   "+stripCloudNonUser+"   select * from t  ;   ", buf)
 	require.Equal(t, 3, len(ret))
 	require.Equal(t, "select * from t", ret[0])
 	require.Equal(t, "select * from t", ret[1])
 	require.Equal(t, "select * from t", ret[2])
 
-	ret = HandleSqlForRecord("  " + stripCloudNonUser + "  select * from t  ;  " + stripCloudNonUser + "   select * from t  ;   " + stripCloudNonUser + "   select * from t  ; /* abc */  ")
+	ret = HandleSqlForRecord("  "+stripCloudNonUser+"  select * from t  ;  "+stripCloudNonUser+"   select * from t  ;   "+stripCloudNonUser+"   select * from t  ; /* abc */  ", buf)
 	require.Equal(t, 4, len(ret))
 	require.Equal(t, "select * from t", ret[0])
 	require.Equal(t, "select * from t", ret[1])
 	require.Equal(t, "select * from t", ret[2])
 	require.Equal(t, "/* abc */", ret[3])
 
-	ret = HandleSqlForRecord("   " + stripCloudNonUser + "  ")
+	ret = HandleSqlForRecord("   "+stripCloudNonUser+"  ", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "", ret[0])
 
-	ret = HandleSqlForRecord("   " + stripCloudUser + "  ")
+	ret = HandleSqlForRecord("   "+stripCloudUser+"  ", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "", ret[0])
 
-	ret = HandleSqlForRecord("")
+	ret = HandleSqlForRecord("", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "", ret[0])
 
 	// Test hide secret key
 
-	ret = HandleSqlForRecord("create user u identified by '123456';")
+	ret = HandleSqlForRecord("create user u identified by '123456';", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "create user u identified by '******'", ret[0])
 
-	ret = HandleSqlForRecord("create user u identified with '12345';")
+	ret = HandleSqlForRecord("create user u identified with '12345';", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "create user u identified with '******'", ret[0])
 
-	ret = HandleSqlForRecord("create user u identified by random password;")
+	ret = HandleSqlForRecord("create user u identified by random password;", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "create user u identified by random password", ret[0])
 
-	ret = HandleSqlForRecord("create user if not exists abc1 identified by '123', abc2 identified by '234', abc3 identified with '111', abc3 identified by random password;")
+	ret = HandleSqlForRecord("create user if not exists abc1 identified by '123', abc2 identified by '234', abc3 identified with '111', abc3 identified by random password;", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "create user if not exists abc1 identified by '******', abc2 identified by '******', abc3 identified with '******', abc3 identified by random password", ret[0])
 
-	ret = HandleSqlForRecord("create external table t (a int) URL s3option{'endpoint'='s3.us-west-2.amazonaws.com', 'access_key_id'='123', 'secret_access_key'='123', 'bucket'='test', 'filepath'='*.txt', 'region'='us-west-2'};")
+	ret = HandleSqlForRecord("create external table t (a int) URL s3option{'endpoint'='s3.us-west-2.amazonaws.com', 'access_key_id'='123', 'secret_access_key'='123', 'bucket'='test', 'filepath'='*.txt', 'region'='us-west-2'};", buf)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, "create external table t (a int) URL s3option{'endpoint'='s3.us-west-2.amazonaws.com', 'access_key_id'='******', 'secret_access_key'='******', 'bucket'='test', 'filepath'='*.txt', 'region'='us-west-2'}", ret[0])
 }
