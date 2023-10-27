@@ -183,9 +183,7 @@ func newTxnExecutor(
 }
 
 func (exec *txnExecutor) Exec(sql string) (executor.Result, error) {
-	buf := buffer.New()
-	defer buf.Free()
-	stmts, err := parsers.Parse(exec.ctx, dialect.MYSQL, sql, 1, buf)
+	stmts, err := parsers.Parse(exec.ctx, dialect.MYSQL, sql, 1, exec.s.buf)
 	if err != nil {
 		return executor.Result{}, err
 	}

@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 
 	"github.com/stretchr/testify/require"
@@ -333,6 +334,8 @@ func Test_createTablesInMoCatalogOfGeneralTenant(t *testing.T) {
 
 func Test_initFunction(t *testing.T) {
 	convey.Convey("init function", t, func() {
+		buf := buffer.New()
+		defer buf.Free()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -362,6 +365,7 @@ func Test_initFunction(t *testing.T) {
 					ExplicitSchema:  true,
 					ExplicitCatalog: false,
 				},
+				buf,
 			),
 			Args: nil,
 			ReturnType: tree.NewReturnType(&tree.T{
@@ -372,7 +376,7 @@ func Test_initFunction(t *testing.T) {
 					Locale:       &locale,
 					Oid:          uint32(defines.MYSQL_TYPE_INT24),
 				},
-			}),
+			}, buf),
 			Body:     "",
 			Language: "sql",
 		}
@@ -2811,11 +2815,13 @@ func Test_determineShowDatabase(t *testing.T) {
 
 func Test_determineUseDatabase(t *testing.T) {
 	convey.Convey("use database succ", t, func() {
+		buf := buffer.New()
+		defer buf.Free()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
 		stmt := &tree.Use{
-			Name: tree.NewCStr("db", 1),
+			Name: tree.NewCStr("db", 1, buf),
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -2851,8 +2857,11 @@ func Test_determineUseDatabase(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
+		buf := buffer.New()
+		defer buf.Free()
+
 		stmt := &tree.Use{
-			Name: tree.NewCStr("db", 1),
+			Name: tree.NewCStr("db", 1, buf),
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -2897,9 +2906,11 @@ func Test_determineUseDatabase(t *testing.T) {
 	convey.Convey("use database fail", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
+		buf := buffer.New()
+		defer buf.Free()
 
 		stmt := &tree.Use{
-			Name: tree.NewCStr("db", 1),
+			Name: tree.NewCStr("db", 1, buf),
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -4957,7 +4968,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_DATABASE,
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_TABLE,
-					TabName: "d",
+					TblName: "d",
 				},
 				Roles: []*tree.Role{
 					{UserName: "r1"},
@@ -4993,7 +5004,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 				})
 				bh.sql2result[sql] = mrs
 			} else if stmt.Level.Level == tree.PRIVILEGE_LEVEL_TYPE_TABLE {
-				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.TabName)
+				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.TblName)
 				mrs := newMrsForCheckDatabase([][]interface{}{
 					{0},
 				})
@@ -5075,7 +5086,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_DATABASE_TABLE,
 					DbName:  dbName,
-					TabName: tableName,
+					TblName: tableName,
 				},
 				Roles: []*tree.Role{
 					{UserName: "r1"},
@@ -5088,7 +5099,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_TABLE,
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_TABLE,
-					TabName: tableName,
+					TblName: tableName,
 				},
 				Roles: []*tree.Role{
 					{UserName: "r1"},
@@ -5259,7 +5270,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_DATABASE,
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_TABLE,
-					TabName: "d",
+					TblName: "d",
 				},
 				Roles: []*tree.Role{
 					{UserName: "r1"},
@@ -5295,7 +5306,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 				})
 				bh.sql2result[sql] = mrs
 			} else if stmt.Level.Level == tree.PRIVILEGE_LEVEL_TYPE_TABLE {
-				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.TabName)
+				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.TblName)
 				mrs := newMrsForCheckDatabase([][]interface{}{
 					{0},
 				})
@@ -5377,7 +5388,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_DATABASE_TABLE,
 					DbName:  dbName,
-					TabName: tableName,
+					TblName: tableName,
 				},
 				Roles: []*tree.Role{
 					{UserName: "r1"},
@@ -5390,7 +5401,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_TABLE,
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_TABLE,
-					TabName: tableName,
+					TblName: tableName,
 				},
 				Roles: []*tree.Role{
 					{UserName: "r1"},
@@ -5459,6 +5470,8 @@ func Test_doDropFunction(t *testing.T) {
 	convey.Convey("drop function", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
+		buf := buffer.New()
+		defer buf.Free()
 
 		pu := config.NewParameterUnit(&config.FrontendParameters{}, nil, nil, nil)
 		pu.SV.SetDefaultValues()
@@ -5484,6 +5497,7 @@ func Test_doDropFunction(t *testing.T) {
 					ExplicitSchema:  true,
 					ExplicitCatalog: false,
 				},
+				buf,
 			),
 			Args: nil,
 		}
@@ -5808,6 +5822,8 @@ func Test_doInterpretCall(t *testing.T) {
 	convey.Convey("call precedure (not exist)fail", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
+		buf := buffer.New()
+		defer buf.Free()
 
 		bh := &backgroundExecTest{}
 		bh.init()
@@ -5815,7 +5831,7 @@ func Test_doInterpretCall(t *testing.T) {
 		bhStub := gostub.StubFunc(&NewBackgroundHandler, bh)
 		defer bhStub.Reset()
 		call := &tree.CallStmt{
-			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}),
+			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}, buf),
 		}
 
 		priv := determinePrivilegeSetOfStatement(call)
@@ -5849,6 +5865,8 @@ func Test_doInterpretCall(t *testing.T) {
 	convey.Convey("call precedure (not support)fail", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
+		buf := buffer.New()
+		defer buf.Free()
 
 		bh := &backgroundExecTest{}
 		bh.init()
@@ -5856,7 +5874,7 @@ func Test_doInterpretCall(t *testing.T) {
 		bhStub := gostub.StubFunc(&NewBackgroundHandler, bh)
 		defer bhStub.Reset()
 		call := &tree.CallStmt{
-			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}),
+			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}, buf),
 		}
 
 		priv := determinePrivilegeSetOfStatement(call)
@@ -5902,6 +5920,8 @@ func Test_doInterpretCall(t *testing.T) {
 	convey.Convey("call precedure (not support)fail", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
+		buf := buffer.New()
+		defer buf.Free()
 
 		bh := &backgroundExecTest{}
 		bh.init()
@@ -5909,7 +5929,7 @@ func Test_doInterpretCall(t *testing.T) {
 		bhStub := gostub.StubFunc(&NewBackgroundHandler, bh)
 		defer bhStub.Reset()
 		call := &tree.CallStmt{
-			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}),
+			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}, buf),
 		}
 
 		priv := determinePrivilegeSetOfStatement(call)
@@ -5967,6 +5987,8 @@ func Test_initProcedure(t *testing.T) {
 	convey.Convey("init precedure fail", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
+		buf := buffer.New()
+		defer buf.Free()
 
 		bh := &backgroundExecTest{}
 		bh.init()
@@ -5974,7 +5996,7 @@ func Test_initProcedure(t *testing.T) {
 		bhStub := gostub.StubFunc(&NewBackgroundHandler, bh)
 		defer bhStub.Reset()
 		cp := &tree.CreateProcedure{
-			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}),
+			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}, buf),
 			Args: nil,
 			Body: "'begin DECLARE v1 INT; SET v1 = 5; IF v1 > 5 THEN select * from tbh1; ELSEIF v1 = 5 THEN select * from tbh2; ELSEIF v1 = 4 THEN select * from tbh2 limit 1; ELSE select * from tbh3; END IF; end'",
 		}
@@ -5994,6 +6016,8 @@ func Test_initProcedure(t *testing.T) {
 	convey.Convey("init precedure succ", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
+		buf := buffer.New()
+		defer buf.Free()
 
 		bh := &backgroundExecTest{}
 		bh.init()
@@ -6001,7 +6025,7 @@ func Test_initProcedure(t *testing.T) {
 		bhStub := gostub.StubFunc(&NewBackgroundHandler, bh)
 		defer bhStub.Reset()
 		cp := &tree.CreateProcedure{
-			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}),
+			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}, buf),
 			Args: nil,
 			Body: "'begin DECLARE v1 INT; SET v1 = 5; IF v1 > 5 THEN select * from tbh1; ELSEIF v1 = 5 THEN select * from tbh2; ELSEIF v1 = 4 THEN select * from tbh2 limit 1; ELSE select * from tbh3; END IF; end'",
 		}
@@ -6226,6 +6250,8 @@ func TestDoRevokePrivilegeImplicitly(t *testing.T) {
 	convey.Convey("do grant privilege implicitly for drop table succ", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
+		buf := buffer.New()
+		defer buf.Free()
 
 		bh := &backgroundExecTest{}
 		bh.init()
@@ -6235,7 +6261,7 @@ func TestDoRevokePrivilegeImplicitly(t *testing.T) {
 
 		stmt := &tree.DropTable{
 			Names: tree.TableNames{
-				tree.NewTableName(tree.Identifier("test1"), tree.ObjectNamePrefix{}),
+				tree.NewTableName(tree.Identifier("test1"), tree.ObjectNamePrefix{}, buf),
 			},
 		}
 
@@ -6301,6 +6327,8 @@ func TestDoSetGlobalSystemVariable(t *testing.T) {
 	convey.Convey("set global system variable succ", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
+		buf := buffer.New()
+		defer buf.Free()
 
 		bh := &backgroundExecTest{}
 		bh.init()
@@ -6314,7 +6342,7 @@ func TestDoSetGlobalSystemVariable(t *testing.T) {
 					System: true,
 					Global: true,
 					Name:   "sql_mode",
-					Value:  tree.NewStrVal(""),
+					Value:  tree.NewStrVal("", buf),
 				},
 			},
 		}
@@ -6338,6 +6366,8 @@ func TestDoSetGlobalSystemVariable(t *testing.T) {
 	convey.Convey("set global system variable succ", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
+		buf := buffer.New()
+		defer buf.Free()
 
 		bh := &backgroundExecTest{}
 		bh.init()
@@ -6351,7 +6381,7 @@ func TestDoSetGlobalSystemVariable(t *testing.T) {
 					System: true,
 					Global: true,
 					Name:   "sql_mode",
-					Value:  tree.NewStrVal("NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"),
+					Value:  tree.NewStrVal("NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION", buf),
 				},
 			},
 		}

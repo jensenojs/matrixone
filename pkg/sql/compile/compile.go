@@ -32,7 +32,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/cnservice/cnclient"
-	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/morpc"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -118,9 +117,9 @@ func putCompile(c *Compile) {
 		return
 	}
 	if c.anal != nil {
-		for i := range c.anal.analInfos {
-			buffer.Free(c.proc.SessionInfo.Buf, c.anal.analInfos[i])
-		}
+		// for i := range c.anal.analInfos {
+		// 	buffer.Free(c.proc.SessionInfo.Buf, c.anal.analInfos[i])
+		// }
 		c.anal.analInfos = nil
 	}
 	if c.scope != nil {
@@ -2937,7 +2936,8 @@ func (c *Compile) generateCPUNumber(cpunum, blocks int) int {
 func (c *Compile) initAnalyze(qry *plan.Query) {
 	anals := make([]*process.AnalyzeInfo, len(qry.Nodes))
 	for i := range anals {
-		anals[i] = buffer.Alloc[process.AnalyzeInfo](c.proc.SessionInfo.Buf)
+		// anals[i] = buffer.Alloc[process.AnalyzeInfo](c.proc.SessionInfo.Buf)
+		anals[i] = new(process.AnalyzeInfo)
 	}
 	c.anal = &anaylze{
 		qry:       qry,

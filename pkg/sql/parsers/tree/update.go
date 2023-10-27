@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 )
 
@@ -31,6 +32,16 @@ type Update struct {
 	OrderBy OrderBy
 	Limit   *Limit
 	With    *With
+}
+
+func NewUpdate(tbl TableExprs, expr UpdateExprs, where *Where, order OrderBy, limit *Limit, buf *buffer.Buffer) *Update {
+	up := buffer.Alloc[Update](buf)
+	up.Where = where
+	up.OrderBy = order
+	up.Limit = limit
+	up.Tables = tbl
+	up.Exprs = expr
+	return up
 }
 
 func (node *Update) Format(ctx *FmtCtx) {
@@ -97,12 +108,11 @@ func (node *UpdateExpr) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewUpdateExpr(t bool, n []*UnresolvedName, e Expr) *UpdateExpr {
-	return &UpdateExpr{
-		Tuple: t,
-		Names: n,
-		Expr:  e,
-	}
+func NewUpdateExpr(n []*UnresolvedName, e Expr, buf *buffer.Buffer) *UpdateExpr {
+	up := buffer.Alloc[UpdateExpr](buf)
+	up.Names = n
+	up.Expr = e
+	return up
 }
 
 const (
@@ -142,6 +152,14 @@ type ExternParam struct {
 	ExParam
 }
 
+func NewExternParam(ec *ExParamConst, buf *buffer.Buffer) *ExternParam {
+	extermParam := buffer.Alloc[ExternParam](buf)
+	if ec != nil {
+		extermParam.ExParamConst = *ec
+	}
+	return extermParam
+}
+
 type ExParamConst struct {
 	ScanType     int
 	Filepath     string
@@ -150,6 +168,17 @@ type ExParamConst struct {
 	Option       []string
 	Data         string
 	Tail         *TailParameter
+}
+
+func NewExParamConst(scantype int, filepath, compressType, format string, option []string, data string, buf *buffer.Buffer) *ExParamConst {
+	ex := buffer.Alloc[ExParamConst](buf)
+	ex.ScanType = scantype
+	ex.Filepath = filepath
+	ex.CompressType = compressType
+	ex.Format = format
+	ex.Option = option
+	ex.Data = data
+	return ex
 }
 
 type ExParam struct {
@@ -189,6 +218,16 @@ type TailParameter struct {
 	Assignments UpdateExprs
 }
 
+func NewTailParameter(f *Fields, l *Lines, i uint64, clist []LoadColumn, as UpdateExprs, buf *buffer.Buffer) *TailParameter {
+	tail := buffer.Alloc[TailParameter](buf)
+	tail.Fields = f
+	tail.Lines = l
+	tail.IgnoredLines = i
+	tail.ColumnList = clist
+	tail.Assignments = as
+	return tail
+}
+
 // Load data statement
 type Load struct {
 	statementImpl
@@ -198,6 +237,15 @@ type Load struct {
 	Accounts          IdentifierList
 	//Partition
 	Param *ExternParam
+}
+
+func NewLoad(local bool, param *ExternParam, dup DuplicateKey, table *TableName, buf *buffer.Buffer) *Load {
+	lo := buffer.Alloc[Load](buf)
+	lo.Local = local
+	lo.Param = param
+	lo.DuplicateHandling = dup
+	lo.Table = table
+	return lo
 }
 
 func (node *Load) Format(ctx *FmtCtx) {
@@ -313,24 +361,27 @@ type DuplicateKeyError struct {
 	duplicateKeyImpl
 }
 
-func NewDuplicateKeyError() *DuplicateKeyError {
-	return &DuplicateKeyError{}
+func NewDuplicateKeyError(buf *buffer.Buffer) *DuplicateKeyError {
+	duplicateKeyError := buffer.Alloc[DuplicateKeyError](buf)
+	return duplicateKeyError
 }
 
 type DuplicateKeyReplace struct {
 	duplicateKeyImpl
 }
 
-func NewDuplicateKeyReplace() *DuplicateKeyReplace {
-	return &DuplicateKeyReplace{}
+func NewDuplicateKeyReplace(buf *buffer.Buffer) *DuplicateKeyReplace {
+	duplicateKeyReplace := buffer.Alloc[DuplicateKeyReplace](buf)
+	return duplicateKeyReplace
 }
 
 type DuplicateKeyIgnore struct {
 	duplicateKeyImpl
 }
 
-func NewDuplicateKeyIgnore() *DuplicateKeyIgnore {
-	return &DuplicateKeyIgnore{}
+func NewDuplicateKeyIgnore(buf *buffer.Buffer) *DuplicateKeyIgnore {
+	duplicateKeyIgnore := buffer.Alloc[DuplicateKeyIgnore](buf)
+	return duplicateKeyIgnore
 }
 
 type Fields struct {
@@ -364,13 +415,13 @@ func (node *Fields) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewFields(t string, o bool, en byte, es byte) *Fields {
-	return &Fields{
-		Terminated: t,
-		Optionally: o,
-		EnclosedBy: en,
-		EscapedBy:  es,
-	}
+func NewFields(t string, o bool, en byte, es byte, buf *buffer.Buffer) *Fields {
+	fields := buffer.Alloc[Fields](buf)
+	fields.Terminated = t
+	fields.Optionally = o
+	fields.EnclosedBy = en
+	fields.EscapedBy = es
+	return fields
 }
 
 type Lines struct {
@@ -390,11 +441,11 @@ func (node *Lines) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewLines(s string, t string) *Lines {
-	return &Lines{
-		StartingBy:   s,
-		TerminatedBy: t,
-	}
+func NewLines(s string, t string, buf *buffer.Buffer) *Lines {
+	lines := buffer.Alloc[Lines](buf)
+	lines.StartingBy = s
+	lines.TerminatedBy = t
+	return lines
 }
 
 // column element in load data column list
@@ -420,6 +471,19 @@ type ExportParam struct {
 	ForceQuote []string
 	// stage filename path
 	StageFilePath string
+}
+
+func NewExportParam(outfile bool, queryid string, filepath string, fields *Fields, lines *Lines, header bool, maxfilesize uint64, forcequote []string, buf *buffer.Buffer) *ExportParam {
+	ep := buffer.Alloc[ExportParam](buf)
+	ep.Outfile = outfile
+	ep.QueryId = queryid
+	ep.FilePath = filepath
+	ep.Fields = fields
+	ep.Lines = lines
+	ep.Header = header
+	ep.MaxFileSize = maxfilesize
+	ep.ForceQuote = forcequote
+	return ep
 }
 
 func (ep *ExportParam) Format(ctx *FmtCtx) {

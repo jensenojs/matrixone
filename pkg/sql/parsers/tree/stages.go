@@ -14,7 +14,11 @@
 
 package tree
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
+)
 
 type CreateStage struct {
 	statementImpl
@@ -24,6 +28,17 @@ type CreateStage struct {
 	Credentials StageCredentials
 	Status      StageStatus
 	Comment     StageComment
+}
+
+func NewCreateStage(ifs bool, name Identifier, url string, cs StageCredentials, st StageStatus, co StageComment, buf *buffer.Buffer) *CreateStage {
+	cr := buffer.Alloc[CreateStage](buf)	
+	cr.IfNotExists = ifs
+	cr.Name = name
+	cr.Url = url
+	cr.Credentials = cs
+	cr.Status = st
+	cr.Comment = co
+	return cr
 }
 
 func (node *CreateStage) Format(ctx *FmtCtx) {
@@ -50,6 +65,13 @@ type DropStage struct {
 	Name        Identifier
 }
 
+func NewDropStage(i bool, n Identifier, buf *buffer.Buffer) *DropStage {
+	d := buffer.Alloc[DropStage ](buf)
+	d.IfNotExists = i
+	d.Name = n
+	return d
+}
+
 func (node *DropStage) Format(ctx *FmtCtx) {
 	ctx.WriteString("drop stage ")
 	if node.IfNotExists {
@@ -69,6 +91,17 @@ type AlterStage struct {
 	CredentialsOption StageCredentials
 	StatusOption      StageStatus
 	Comment           StageComment
+}
+
+func NewAlterStage(ifn bool, name Identifier, url StageUrl, cop StageCredentials, sop StageStatus, co StageComment, buf *buffer.Buffer) *AlterStage {
+	al := buffer.Alloc[AlterStage](buf)
+	al.IfNotExists = ifn
+	al.Name = name
+	al.UrlOption = url
+	al.CredentialsOption = cop
+	al.StatusOption = sop
+	al.Comment = co
+	return al
 }
 
 func (node *AlterStage) Format(ctx *FmtCtx) {
@@ -110,6 +143,13 @@ type StageStatus struct {
 	Option StageStatusOption
 }
 
+func NewStageStatus(e bool, o StageStatusOption, buf *buffer.Buffer) *StageStatus {
+	s := buffer.Alloc[StageStatus](buf)
+	s.Exist = e
+	s.Option = o
+	return s
+}
+
 func (node *StageStatus) Format(ctx *FmtCtx) {
 	if node.Exist {
 		switch node.Option {
@@ -126,6 +166,13 @@ type StageComment struct {
 	Comment string
 }
 
+func NewStageComment(e bool, c string, buf *buffer.Buffer) *StageComment{
+	s := buffer.Alloc[StageComment](buf)
+	s.Exist = e
+	s.Comment = c
+	return s
+}
+
 func (node *StageComment) Format(ctx *FmtCtx) {
 	if node.Exist {
 		ctx.WriteString(" comment ")
@@ -136,6 +183,13 @@ func (node *StageComment) Format(ctx *FmtCtx) {
 type StageCredentials struct {
 	Exist       bool
 	Credentials []string
+}
+
+func NewStageCredentials (e bool, cs []string, buf *buffer.Buffer) *StageCredentials {
+	s := buffer.Alloc[StageCredentials ](buf)
+	s.Exist = e
+	s.Credentials = cs
+	return s
 }
 
 func (node *StageCredentials) Format(ctx *FmtCtx) {
@@ -160,6 +214,13 @@ type StageUrl struct {
 	Url   string
 }
 
+func NewStageUrl(e bool, u string, buf *buffer.Buffer) *StageUrl{
+	s := buffer.Alloc[StageUrl](buf)
+	s.Exist = e
+	s.Url = u
+	return s
+}
+
 func (node *StageUrl) Format(ctx *FmtCtx) {
 	if node.Exist {
 		ctx.WriteString(" url=")
@@ -170,6 +231,12 @@ func (node *StageUrl) Format(ctx *FmtCtx) {
 type ShowStages struct {
 	showImpl
 	Like *ComparisonExpr
+}
+
+func NewShowStages(l *ComparisonExpr, buf *buffer.Buffer) *ShowStages {
+	s := buffer.Alloc[ShowStages](buf)
+	s.Like = l
+	return s
 }
 
 func (node *ShowStages) Format(ctx *FmtCtx) {

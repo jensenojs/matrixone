@@ -14,14 +14,18 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // truncate table statement
 type TruncateTable struct {
 	statementImpl
 	Name *TableName
 }
 
-func NewTruncateTable(name *TableName) *TruncateTable {
-	return &TruncateTable{Name: name}
+func NewTruncateTable(name *TableName, buf *buffer.Buffer) *TruncateTable {
+	tTable := buffer.Alloc[TruncateTable](buf)
+	tTable.Name = name
+	return tTable
 }
 
 func (node *TruncateTable) Format(ctx *FmtCtx) {

@@ -179,21 +179,21 @@ func buildChangeColumnAndConstraint(ctx CompilerContext, alterPlan *plan.AlterTa
 			}
 			alterPlan.CopyTableDef.Indexes = append(alterPlan.CopyTableDef.Indexes, indexDef)
 		case *tree.AttributeDefault:
-			defaultValue, err := buildDefaultExpr(specNewColumn, colType, ctx.GetProcess())
+			defaultValue, err := buildDefaultExpr(specNewColumn, colType, ctx.GetProcess(), ctx.GetBuffer())
 			if err != nil {
 				return nil, err
 			}
 			newCol.Default = defaultValue
 			hasDefaultValue = true
 		case *tree.AttributeNull:
-			defaultValue, err := buildDefaultExpr(specNewColumn, colType, ctx.GetProcess())
+			defaultValue, err := buildDefaultExpr(specNewColumn, colType, ctx.GetProcess(), ctx.GetBuffer())
 			if err != nil {
 				return nil, err
 			}
 			newCol.Default = defaultValue
 			hasNullFlag = true
 		case *tree.AttributeOnUpdate:
-			onUpdateExpr, err := buildOnUpdate(specNewColumn, colType, ctx.GetProcess())
+			onUpdateExpr, err := buildOnUpdate(specNewColumn, colType, ctx.GetProcess(), ctx.GetBuffer())
 			if err != nil {
 				return nil, err
 			}
@@ -206,7 +206,7 @@ func buildChangeColumnAndConstraint(ctx CompilerContext, alterPlan *plan.AlterTa
 		return nil, moerr.NewErrInvalidDefault(ctx.GetContext(), specNewColumn.Name.Parts[0])
 	}
 	if !hasDefaultValue {
-		defaultValue, err := buildDefaultExpr(specNewColumn, colType, ctx.GetProcess())
+		defaultValue, err := buildDefaultExpr(specNewColumn, colType, ctx.GetProcess(), ctx.GetBuffer())
 		if err != nil {
 			return nil, err
 		}

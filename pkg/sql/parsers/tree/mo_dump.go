@@ -14,9 +14,17 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type MoDump struct {
 	statementImpl
 	ExportParams *ExportParam
+}
+
+func NewMoDump(e *ExportParam, buf *buffer.Buffer) *MoDump {
+	m := buffer.Alloc[MoDump](buf)
+	m.ExportParams = e
+	return m
 }
 
 func (node *MoDump) Format(ctx *FmtCtx) {

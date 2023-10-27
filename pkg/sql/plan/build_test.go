@@ -34,12 +34,14 @@ import (
 
 func BenchmarkInsert(b *testing.B) {
 	typ := types.T_varchar.ToType()
+	buf := buffer.New()
+	defer buf.Free()
 	typ.Width = 1024
 	targetType := makePlan2Type(&typ)
 	targetType.Width = 1024
 
 	originStr := "0123456789"
-	testExpr := tree.NewNumValWithType(constant.MakeString(originStr), originStr, false, tree.P_char)
+	testExpr := tree.NewNumValWithType(constant.MakeString(originStr), originStr, false, tree.P_char, buf)
 	targetT := &plan.Expr{
 		Typ: targetType,
 		Expr: &plan.Expr_T{
@@ -50,7 +52,7 @@ func BenchmarkInsert(b *testing.B) {
 	}
 	ctx := context.TODO()
 	for i := 0; i < b.N; i++ {
-		binder := NewDefaultBinder(ctx, nil, nil, targetType, nil)
+		binder := NewDefaultBinder(ctx, nil, nil, targetType, nil, buf)
 		expr, err := binder.BindExpr(testExpr, 0, true)
 		if err != nil {
 			break

@@ -45,14 +45,15 @@ func ParseOne(ctx context.Context, sql string, buf *buffer.Buffer) (tree.Stateme
 
 type Lexer struct {
 	scanner *Scanner
-	buf     *buffer.Buffer
 	stmts   []tree.Statement
+	buf     *buffer.Buffer
 }
 
 func NewLexer(dialectType dialect.DialectType, sql string, buf *buffer.Buffer) *Lexer {
 	// lexer := buffer.Alloc[Lexer](buf)
 	lexer := new(Lexer)
 	lexer.scanner = NewScanner(dialectType, sql, buf)
+	lexer.stmts = buffer.MakeSlice[tree.Statement](buf)
 	lexer.buf = buf
 	return lexer
 }
@@ -83,7 +84,7 @@ func (l *Lexer) Error(err string) {
 }
 
 func (l *Lexer) AppendStmt(stmt tree.Statement) {
-	l.stmts = append(l.stmts, stmt)
+	l.stmts = buffer.AppendSlice[tree.Statement](l.buf, l.stmts, stmt)
 }
 
 func (l *Lexer) toInt(lval *yySymType, str string) int {

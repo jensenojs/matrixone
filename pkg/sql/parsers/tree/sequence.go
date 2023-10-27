@@ -16,6 +16,8 @@ package tree
 
 import (
 	"fmt"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 )
 
 type CreateSequence struct {
@@ -29,6 +31,19 @@ type CreateSequence struct {
 	MaxValue    *MaxValueOption
 	StartWith   *StartWithOption
 	Cycle       bool
+}
+
+func NewCreateSequence(ifs bool, name *TableName, typ ResolvableTypeReference, incrementBy *IncrementByOption, min *MinValueOption, max *MaxValueOption, start *StartWithOption, cycle bool, buf *buffer.Buffer) *CreateSequence {
+	cr := buffer.Alloc[CreateSequence](buf)
+	cr.IfNotExists = ifs
+	cr.Name = name
+	cr.Type = typ
+	cr.IncrementBy = incrementBy
+	cr.MinValue = min
+	cr.MaxValue = max
+	cr.StartWith = start
+	cr.Cycle = cycle
+	return cr
 }
 
 func (node *CreateSequence) Format(ctx *FmtCtx) {
@@ -70,6 +85,13 @@ type IncrementByOption struct {
 	Num   any
 }
 
+func NewIncrementByOption(m bool, n any, buf *buffer.Buffer) *IncrementByOption {
+	s := buffer.Alloc[IncrementByOption](buf)
+	s.Minus = m
+	s.Num = n
+	return s
+}
+
 func (node *IncrementByOption) Format(ctx *FmtCtx) {
 	ctx.WriteString("increment by ")
 	formatAny(node.Minus, node.Num, ctx)
@@ -78,6 +100,13 @@ func (node *IncrementByOption) Format(ctx *FmtCtx) {
 type MinValueOption struct {
 	Minus bool
 	Num   any
+}
+
+func NewMinValueOption(m bool, n any, buf *buffer.Buffer) *MinValueOption {
+	s := buffer.Alloc[MinValueOption](buf)
+	s.Minus = m
+	s.Num = n
+	return s
 }
 
 func (node *MinValueOption) Format(ctx *FmtCtx) {
@@ -90,6 +119,13 @@ type MaxValueOption struct {
 	Num   any
 }
 
+func NewMaxValueOption(m bool, n any, buf *buffer.Buffer) *MaxValueOption {
+	s := buffer.Alloc[MaxValueOption](buf)
+	s.Minus = m
+	s.Num = n
+	return s
+}
+
 func (node *MaxValueOption) Format(ctx *FmtCtx) {
 	ctx.WriteString("maxvalue ")
 	formatAny(node.Minus, node.Num, ctx)
@@ -100,6 +136,13 @@ type StartWithOption struct {
 	Num   any
 }
 
+func NewStartWithOption(m bool, n any, buf *buffer.Buffer) *StartWithOption {
+	s := buffer.Alloc[StartWithOption](buf)
+	s.Minus = m
+	s.Num = n
+	return s
+}
+
 func (node *StartWithOption) Format(ctx *FmtCtx) {
 	ctx.WriteString("start with ")
 	formatAny(node.Minus, node.Num, ctx)
@@ -107,6 +150,12 @@ func (node *StartWithOption) Format(ctx *FmtCtx) {
 
 type CycleOption struct {
 	Cycle bool
+}
+
+func NewCycleOption(cycle bool, buf *buffer.Buffer) *CycleOption {
+	c := buffer.Alloc[CycleOption](buf)
+	c.Cycle = cycle
+	return c
 }
 
 func (node *CycleOption) Format(ctx *FmtCtx) {
@@ -119,6 +168,12 @@ func (node *CycleOption) Format(ctx *FmtCtx) {
 
 type TypeOption struct {
 	Type ResolvableTypeReference
+}
+
+func NewTypeOption(t ResolvableTypeReference, buf *buffer.Buffer) *TypeOption {
+	typ := buffer.Alloc[TypeOption](buf)
+	typ.Type = t
+	return typ
 }
 
 func (node *TypeOption) Format(ctx *FmtCtx) {
@@ -147,6 +202,13 @@ type DropSequence struct {
 	Names    TableNames
 }
 
+func NewDropSequence(ife bool, n TableNames, buf *buffer.Buffer) *DropSequence {
+	dr := buffer.Alloc[DropSequence](buf)
+	dr.IfExists = ife
+	dr.Names = n
+	return dr
+}
+
 func (node *DropSequence) Format(ctx *FmtCtx) {
 	ctx.WriteString("drop sequence")
 	if node.IfExists {
@@ -170,6 +232,19 @@ type AlterSequence struct {
 	MaxValue    *MaxValueOption
 	StartWith   *StartWithOption
 	Cycle       *CycleOption
+}
+
+func NewAlterSequence(ifs bool, name *TableName, typ *TypeOption, incBy *IncrementByOption, min *MinValueOption, max *MaxValueOption, start *StartWithOption, cy *CycleOption, buf *buffer.Buffer) *AlterSequence {
+	al := buffer.Alloc[AlterSequence](buf)
+	al.IfExists = ifs
+	al.Name = name
+	al.Type = typ
+	al.IncrementBy = incBy
+	al.MinValue = min
+	al.MaxValue = max
+	al.StartWith = start
+	al.Cycle = cy
+	return al
 }
 
 func (node *AlterSequence) Format(ctx *FmtCtx) {

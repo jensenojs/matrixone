@@ -17,16 +17,19 @@ package plan
 import (
 	"go/constant"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 )
 
-func NewOrderBinder(projectionBinder *ProjectionBinder, selectList tree.SelectExprs) *OrderBinder {
-	return &OrderBinder{
+func NewOrderBinder(projectionBinder *ProjectionBinder, selectList tree.SelectExprs, buf *buffer.Buffer) *OrderBinder {
+	var o = &OrderBinder{
 		ProjectionBinder: projectionBinder,
 		selectList:       selectList,
 	}
+	o.ProjectionBinder.buf = buf
+	return o
 }
 
 func (b *OrderBinder) BindExpr(astExpr tree.Expr) (*plan.Expr, error) {

@@ -583,7 +583,7 @@ func mockPartitionBinder(tableDef *plan.TableDef) (*PartitionBinder, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewPartitionBinder(builder, bindContext), err
+	return NewPartitionBinder(builder, bindContext, builder.compCtx.GetBuffer()), err
 }
 
 func mockExpr(t *testing.T, s string) (tree.Expr, error) {

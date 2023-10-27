@@ -1301,6 +1301,8 @@ func (builder *QueryBuilder) createQuery() (*Query, error) {
 }
 
 func (builder *QueryBuilder) buildUnion(stmt *tree.UnionClause, astOrderBy tree.OrderBy, astLimit *tree.Limit, ctx *BindContext, isRoot bool) (int32, error) {
+	buf := builder.compCtx.GetBuffer()
+
 	var selectStmts []tree.Statement
 	var unionTypes []plan.Node_NodeType
 
@@ -1528,8 +1530,8 @@ func (builder *QueryBuilder) buildUnion(stmt *tree.UnionClause, astOrderBy tree.
 			},
 		})
 	}
-	havingBinder := NewHavingBinder(builder, ctx)
-	projectionBinder := NewProjectionBinder(builder, ctx, havingBinder)
+	havingBinder := NewHavingBinder(builder, ctx, buf)
+	projectionBinder := NewProjectionBinder(builder, ctx, havingBinder, buf)
 
 	// append a project node
 	lastNodeID = builder.appendNode(&plan.Node{
@@ -1541,7 +1543,7 @@ func (builder *QueryBuilder) buildUnion(stmt *tree.UnionClause, astOrderBy tree.
 
 	// append orderBy
 	if astOrderBy != nil {
-		orderBinder := NewOrderBinder(projectionBinder, nil)
+		orderBinder := NewOrderBinder(projectionBinder, nil, buf)
 		orderBys := make([]*plan.OrderBySpec, 0, len(astOrderBy))
 
 		for _, order := range astOrderBy {
@@ -1583,7 +1585,7 @@ func (builder *QueryBuilder) buildUnion(stmt *tree.UnionClause, astOrderBy tree.
 	if astLimit != nil {
 		node := builder.qry.Nodes[lastNodeID]
 
-		limitBinder := NewLimitBinder(builder, ctx)
+		limitBinder := NewLimitBinder(builder, ctx, buf)
 		if astLimit.Offset != nil {
 			node.Offset, err = limitBinder.BindExpr(astLimit.Offset, 0, true)
 			if err != nil {
@@ -1677,6 +1679,8 @@ func (bc *BindContext) generateForceWinSpecList() ([]*plan.Expr, error) {
 }
 
 func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, isRoot bool) (int32, error) {
+	buf := builder.compCtx.GetBuffer()
+
 	// preprocess CTEs
 	if stmt.With != nil {
 		ctx.cteByName = make(map[string]*CTERef)
@@ -1883,7 +1887,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 			Name:  "",
 			Cols:  make([]*plan.ColDef, colCount),
 		}
-		ctx.binder = NewWhereBinder(builder, ctx)
+		ctx.binder = NewWhereBinder(builder, ctx, builder.compCtx.GetBuffer())
 		for i := 0; i < colCount; i++ {
 			vec := proc.GetVector(types.T_text.ToType())
 			bat.Vecs[i] = vec
@@ -1909,7 +1913,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 			}
 
 			colName := fmt.Sprintf("column_%d", i) // like MySQL
-			as := tree.NewCStr(colName, 0)
+			as := tree.NewCStr(colName, 0, nil)
 			selectList = append(selectList, tree.SelectExpr{
 				Expr: &tree.UnresolvedName{
 					NumParts: 1,
@@ -1957,19 +1961,19 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 			return 0, err
 		}
 
-		ctx.binder = NewWhereBinder(builder, ctx)
+		ctx.binder = NewWhereBinder(builder, ctx, builder.compCtx.GetBuffer())
 		if !ctx.isTryBindingCTE {
 			if ctx.initSelect {
-				clause.Exprs = append(clause.Exprs, makeZeroRecursiveLevel())
+				clause.Exprs = append(clause.Exprs, makeZeroRecursiveLevel(nil))
 			} else if ctx.recSelect {
-				clause.Exprs = append(clause.Exprs, makePlusRecursiveLevel(ctx.cteName))
+				clause.Exprs = append(clause.Exprs, makePlusRecursiveLevel(ctx.cteName, nil))
 			}
 		}
 		// unfold stars and generate headings
 		for _, selectExpr := range clause.Exprs {
 			switch expr := selectExpr.Expr.(type) {
 			case tree.UnqualifiedStar:
-				cols, names, err := ctx.unfoldStar(builder.GetContext(), "", builder.compCtx.GetAccountId() == catalog.System_Account)
+				cols, names, err := ctx.unfoldStar(builder.GetContext(), buf, "", builder.compCtx.GetAccountId() == catalog.System_Account)
 				if err != nil {
 					return 0, err
 				}
@@ -1983,7 +1987,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 
 			case *tree.UnresolvedName:
 				if expr.Star {
-					cols, names, err := ctx.unfoldStar(builder.GetContext(), expr.Parts[0], builder.compCtx.GetAccountId() == catalog.System_Account)
+					cols, names, err := ctx.unfoldStar(builder.GetContext(), buf, expr.Parts[0], builder.compCtx.GetAccountId() == catalog.System_Account)
 					if err != nil {
 						return 0, err
 					}
@@ -2080,17 +2084,17 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 
 		if !ctx.isTryBindingCTE && ctx.recSelect {
 			f := &tree.FuncExpr{
-				Func:  tree.FuncName2ResolvableFunctionReference(tree.SetUnresolvedName(moCheckRecursionLevelFun)),
-				Exprs: tree.Exprs{tree.NewComparisonExpr(tree.LESS_THAN, tree.SetUnresolvedName(ctx.cteName, moRecursiveLevelCol), tree.NewNumValWithType(constant.MakeInt64(moDefaultRecursionMax), fmt.Sprintf("%d", moDefaultRecursionMax), false, tree.P_int64))},
+				Func:  tree.FuncName2ResolvableFunctionReference(tree.SetUnresolvedName(nil, moCheckRecursionLevelFun), nil),
+				Exprs: tree.Exprs{tree.NewComparisonExpr(tree.LESS_THAN, tree.SetUnresolvedName(nil, ctx.cteName, moRecursiveLevelCol), tree.NewNumValWithType(constant.MakeInt64(moDefaultRecursionMax), fmt.Sprintf("%d", moDefaultRecursionMax), false, tree.P_int64, nil), nil)},
 			}
 			if clause.Where != nil {
-				clause.Where = &tree.Where{Type: tree.AstWhere, Expr: tree.NewAndExpr(clause.Where.Expr, f)}
+				clause.Where = &tree.Where{Type: tree.AstWhere, Expr: tree.NewAndExpr(clause.Where.Expr, f, nil)}
 			} else {
 				clause.Where = &tree.Where{Type: tree.AstWhere, Expr: f}
 			}
 		}
 		if clause.Where != nil {
-			whereList, err := splitAndBindCondition(clause.Where.Expr, NoAlias, ctx)
+			whereList, err := splitAndBindCondition(clause.Where.Expr, NoAlias, ctx, nil)
 			if err != nil {
 				return 0, err
 			}
@@ -2141,7 +2145,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 			if ctx.recSelect {
 				return 0, moerr.NewParseError(builder.GetContext(), "not support group by in recursive cte: '%v'", tree.String(&clause.GroupBy, dialect.MYSQL))
 			}
-			groupBinder := NewGroupBinder(builder, ctx)
+			groupBinder := NewGroupBinder(builder, ctx, buf)
 			for _, group := range clause.GroupBy {
 				group, err = ctx.qualifyColumnNames(group, AliasAfterColumn)
 				if err != nil {
@@ -2156,13 +2160,13 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 		}
 
 		// bind HAVING clause
-		havingBinder = NewHavingBinder(builder, ctx)
+		havingBinder = NewHavingBinder(builder, ctx, buf)
 		if clause.Having != nil {
 			if ctx.recSelect {
 				return 0, moerr.NewParseError(builder.GetContext(), "not support having in recursive cte: '%v'", tree.String(clause.Having, dialect.MYSQL))
 			}
 			ctx.binder = havingBinder
-			havingList, err = splitAndBindCondition(clause.Having.Expr, AliasAfterColumn, ctx)
+			havingList, err = splitAndBindCondition(clause.Having.Expr, AliasAfterColumn, ctx, nil)
 			if err != nil {
 				return 0, err
 			}
@@ -2172,7 +2176,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 	}
 
 	// bind SELECT clause (Projection List)
-	projectionBinder = NewProjectionBinder(builder, ctx, havingBinder)
+	projectionBinder = NewProjectionBinder(builder, ctx, havingBinder, buf)
 	ctx.binder = projectionBinder
 	for i := range selectList {
 		expr, err := projectionBinder.BindExpr(selectList[i].Expr, 0, true)
@@ -2197,7 +2201,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 		if ctx.recSelect {
 			return 0, moerr.NewParseError(builder.GetContext(), "not support order by in recursive cte: '%v'", tree.String(&astOrderBy, dialect.MYSQL))
 		}
-		orderBinder := NewOrderBinder(projectionBinder, selectList)
+		orderBinder := NewOrderBinder(projectionBinder, selectList, buf)
 		orderBys = make([]*plan.OrderBySpec, 0, len(astOrderBy))
 
 		for _, order := range astOrderBy {
@@ -2233,7 +2237,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 	var limitExpr *Expr
 	var offsetExpr *Expr
 	if astLimit != nil {
-		limitBinder := NewLimitBinder(builder, ctx)
+		limitBinder := NewLimitBinder(builder, ctx, buf)
 		if astLimit.Offset != nil {
 			offsetExpr, err = limitBinder.BindExpr(astLimit.Offset, 0, true)
 			if err != nil {
@@ -2602,6 +2606,8 @@ func getSelectTree(s *tree.Select) *tree.Select {
 }
 
 func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, preNodeId int32, leftCtx *BindContext) (nodeID int32, err error) {
+	buf := builder.compCtx.GetBuffer()
+
 	switch tbl := stmt.(type) {
 	case *tree.Select:
 		if builder.isForUpdate {
@@ -2740,7 +2746,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 							return 0, moerr.NewParseError(builder.GetContext(), "recursive cte %s projection error", table)
 						}
 						for i := range n.ProjectList {
-							n.ProjectList[i], err = makePlan2CastExpr(builder.GetContext(), n.ProjectList[i], projects[i].GetTyp())
+							n.ProjectList[i], err = makePlan2CastExpr(builder.GetContext(), n.ProjectList[i], projects[i].GetTyp(), nil)
 							if err != nil {
 								return
 							}
@@ -2763,7 +2769,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 					var limitExpr *Expr
 					var offsetExpr *Expr
 					if s.Limit != nil {
-						limitBinder := NewLimitBinder(builder, ctx)
+						limitBinder := NewLimitBinder(builder, ctx, buf)
 						if s.Limit.Offset != nil {
 							offsetExpr, err = limitBinder.BindExpr(s.Limit.Offset, 0, true)
 							if err != nil {
@@ -2924,7 +2930,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 					SchemaName:      tree.Identifier(""),
 					ExplicitCatalog: false,
 					ExplicitSchema:  false,
-				})
+				}, nil)
 				return builder.buildTable(newTableName, ctx, preNodeId, leftCtx)
 			}
 		}
@@ -2979,60 +2985,62 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 			tableName := midNode.TableDef.Name
 			currentAccountID := builder.compCtx.GetAccountId()
 			acctName := builder.compCtx.GetUserName()
+			buf := builder.compCtx.GetBuffer()
 			if sub := builder.compCtx.GetQueryingSubscription(); sub != nil {
 				currentAccountID = uint32(sub.AccountId)
 				builder.qry.Nodes[nodeID].NotCacheable = true
 			}
+
 			if currentAccountID != catalog.System_Account {
 				// add account filter for system table scan
 				if dbName == catalog.MO_CATALOG && tableName == catalog.MO_DATABASE {
-					modatabaseFilter := util.BuildMoDataBaseFilter(uint64(currentAccountID))
-					ctx.binder = NewWhereBinder(builder, ctx)
-					accountFilterExprs, err := splitAndBindCondition(modatabaseFilter, NoAlias, ctx)
+					modatabaseFilter := util.BuildMoDataBaseFilter(uint64(currentAccountID), nil)
+					ctx.binder = NewWhereBinder(builder, ctx, buf)
+					accountFilterExprs, err := splitAndBindCondition(modatabaseFilter, NoAlias, ctx, nil)
 					if err != nil {
 						return 0, err
 					}
 					builder.qry.Nodes[nodeID].FilterList = accountFilterExprs
 				} else if dbName == catalog.MO_SYSTEM_METRICS && tableName == catalog.MO_METRIC {
-					motablesFilter := util.BuildSysMetricFilter(acctName)
-					ctx.binder = NewWhereBinder(builder, ctx)
-					accountFilterExprs, err := splitAndBindCondition(motablesFilter, NoAlias, ctx)
+					motablesFilter := util.BuildSysMetricFilter(acctName, nil)
+					ctx.binder = NewWhereBinder(builder, ctx, buf)
+					accountFilterExprs, err := splitAndBindCondition(motablesFilter, NoAlias, ctx, nil)
 					if err != nil {
 						return 0, err
 					}
 					builder.qry.Nodes[nodeID].FilterList = accountFilterExprs
 				} else if dbName == catalog.MO_SYSTEM && tableName == catalog.MO_STATEMENT {
-					motablesFilter := util.BuildSysStatementInfoFilter(acctName)
-					ctx.binder = NewWhereBinder(builder, ctx)
-					accountFilterExprs, err := splitAndBindCondition(motablesFilter, NoAlias, ctx)
+					motablesFilter := util.BuildSysStatementInfoFilter(acctName, nil)
+					ctx.binder = NewWhereBinder(builder, ctx, buf)
+					accountFilterExprs, err := splitAndBindCondition(motablesFilter, NoAlias, ctx, nil)
 					if err != nil {
 						return 0, err
 					}
 					builder.qry.Nodes[nodeID].FilterList = accountFilterExprs
 				} else if dbName == catalog.MO_CATALOG && tableName == catalog.MO_TABLES {
-					motablesFilter := util.BuildMoTablesFilter(uint64(currentAccountID))
-					ctx.binder = NewWhereBinder(builder, ctx)
-					accountFilterExprs, err := splitAndBindCondition(motablesFilter, NoAlias, ctx)
+					motablesFilter := util.BuildMoTablesFilter(uint64(currentAccountID), nil)
+					ctx.binder = NewWhereBinder(builder, ctx, buf)
+					accountFilterExprs, err := splitAndBindCondition(motablesFilter, NoAlias, ctx, nil)
 					if err != nil {
 						return 0, err
 					}
 					builder.qry.Nodes[nodeID].FilterList = accountFilterExprs
 				} else if dbName == catalog.MO_CATALOG && tableName == catalog.MO_COLUMNS {
-					moColumnsFilter := util.BuildMoColumnsFilter(uint64(currentAccountID))
-					ctx.binder = NewWhereBinder(builder, ctx)
-					accountFilterExprs, err := splitAndBindCondition(moColumnsFilter, NoAlias, ctx)
+					moColumnsFilter := util.BuildMoColumnsFilter(uint64(currentAccountID), nil)
+					ctx.binder = NewWhereBinder(builder, ctx, buf)
+					accountFilterExprs, err := splitAndBindCondition(moColumnsFilter, NoAlias, ctx, nil)
 					if err != nil {
 						return 0, err
 					}
 					builder.qry.Nodes[nodeID].FilterList = accountFilterExprs
 				} else if util.TableIsClusterTable(midNode.GetTableDef().GetTableType()) {
-					ctx.binder = NewWhereBinder(builder, ctx)
+					ctx.binder = NewWhereBinder(builder, ctx, buf)
 					left := &tree.UnresolvedName{
 						NumParts: 1,
 						Parts:    tree.NameParts{util.GetClusterTableAttributeName()},
 					}
 					currentAccountID := builder.compCtx.GetAccountId()
-					right := tree.NewNumVal(constant.MakeUint64(uint64(currentAccountID)), strconv.Itoa(int(currentAccountID)), false)
+					right := tree.NewNumVal(constant.MakeUint64(uint64(currentAccountID)), strconv.Itoa(int(currentAccountID)), false, nil)
 					right.ValType = tree.P_uint64
 					//account_id = the accountId of the non-sys account
 					accountFilter := &tree.ComparisonExpr{
@@ -3040,7 +3048,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 						Left:  left,
 						Right: right,
 					}
-					accountFilterExprs, err := splitAndBindCondition(accountFilter, NoAlias, ctx)
+					accountFilterExprs, err := splitAndBindCondition(accountFilter, NoAlias, ctx, nil)
 					if err != nil {
 						return 0, err
 					}
@@ -3182,6 +3190,7 @@ func (builder *QueryBuilder) addBinding(nodeID int32, alias tree.AliasClause, ct
 }
 
 func (builder *QueryBuilder) buildJoinTable(tbl *tree.JoinTableExpr, ctx *BindContext) (int32, error) {
+	buf := builder.compCtx.GetBuffer()
 	var joinType plan.Node_JoinType
 
 	switch tbl.JoinType {
@@ -3228,11 +3237,11 @@ func (builder *QueryBuilder) buildJoinTable(tbl *tree.JoinTableExpr, ctx *BindCo
 	}, ctx)
 	node := builder.qry.Nodes[nodeID]
 
-	ctx.binder = NewTableBinder(builder, ctx)
+	ctx.binder = NewTableBinder(builder, ctx, buf)
 
 	switch cond := tbl.Cond.(type) {
 	case *tree.OnJoinCond:
-		joinConds, err := splitAndBindCondition(cond.Expr, NoAlias, ctx)
+		joinConds, err := splitAndBindCondition(cond.Expr, NoAlias, ctx, nil)
 		if err != nil {
 			return 0, err
 		}
@@ -3296,9 +3305,9 @@ func (builder *QueryBuilder) buildTableFunction(tbl *tree.TableFunction, ctx *Bi
 			NodeType: plan.Node_VALUE_SCAN,
 		}
 		childId = builder.appendNode(scanNode, ctx)
-		ctx.binder = NewTableBinder(builder, ctx)
+		ctx.binder = NewTableBinder(builder, ctx, builder.compCtx.GetBuffer())
 	} else {
-		ctx.binder = NewTableBinder(builder, leftCtx)
+		ctx.binder = NewTableBinder(builder, leftCtx, builder.compCtx.GetBuffer())
 		childId = builder.copyNode(ctx, preNodeId)
 	}
 

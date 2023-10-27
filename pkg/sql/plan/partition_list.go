@@ -16,6 +16,8 @@ package plan
 
 import (
 	"context"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
@@ -24,6 +26,7 @@ import (
 )
 
 type listPartitionBuilder struct {
+	buf *buffer.Buffer
 }
 
 // buildListPartitiion handle List Partitioning and List columns partitioning
@@ -95,7 +98,7 @@ func (lpb *listPartitionBuilder) buildPartitionDefs(ctx context.Context, partiti
 			if len(valueList) == 0 {
 				return moerr.NewInvalidInput(ctx, "there is no value in value list")
 			}
-			binder := NewPartitionBinder(nil, nil)
+			binder := NewPartitionBinder(nil, nil, lpb.buf)
 			inValues := make([]*plan.Expr, len(valueList))
 
 			for j, value := range valueList {
@@ -141,7 +144,7 @@ func (lpb *listPartitionBuilder) buildEvalPartitionExpression(ctx context.Contex
 	// case when expr in (1, 5, 9, 13, 17) then 0 when expr in (2, 6, 10, 14, 18) then 1 else -1 end
 	if partitionType.ColumnList == nil {
 		listExpr := partitionType.Expr
-		partitionExprAst, err := buildListCaseWhenExpr(listExpr, partitionOp.Partitions)
+		partitionExprAst, err := buildListCaseWhenExpr(listExpr, partitionOp.Partitions, lpb.buf)
 		if err != nil {
 			return err
 		}
@@ -164,7 +167,7 @@ func (lpb *listPartitionBuilder) buildEvalPartitionExpression(ctx context.Contex
 		// when col1 = 1 and col2 = 0 or col1 = 2 and col2 = 0 or col1 = 2 and col2 = 1 then 2
 		// else -1 end
 		columnsExpr := partitionType.ColumnList
-		partitionExprAst, err := buildListColumnsCaseWhenExpr(columnsExpr, partitionOp.Partitions)
+		partitionExprAst, err := buildListColumnsCaseWhenExpr(columnsExpr, partitionOp.Partitions, lpb.buf)
 		if err != nil {
 			return err
 		}

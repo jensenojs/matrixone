@@ -15,6 +15,7 @@
 package plan
 
 import (
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -25,7 +26,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/rule"
 )
 
-func NewProjectionBinder(builder *QueryBuilder, ctx *BindContext, havingBinder *HavingBinder) *ProjectionBinder {
+func NewProjectionBinder(builder *QueryBuilder, ctx *BindContext, havingBinder *HavingBinder, buf *buffer.Buffer) *ProjectionBinder {
 	b := &ProjectionBinder{
 		havingBinder: havingBinder,
 	}
@@ -33,6 +34,7 @@ func NewProjectionBinder(builder *QueryBuilder, ctx *BindContext, havingBinder *
 	b.builder = builder
 	b.ctx = ctx
 	b.impl = b
+	b.buf = buf
 
 	return b
 }

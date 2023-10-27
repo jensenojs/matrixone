@@ -14,10 +14,19 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type ElseIfStmt struct {
 	statementImpl
 	Cond Expr
 	Body []Statement
+}
+
+func NewElseIfStmt(cond Expr, body []Statement, buf *buffer.Buffer) *ElseIfStmt {
+	a := buffer.Alloc[ElseIfStmt](buf)
+	a.Cond = cond
+	a.Body = body
+	return a
 }
 
 func (node *ElseIfStmt) Format(ctx *FmtCtx) {
@@ -40,6 +49,15 @@ type IfStmt struct {
 	Body  []Statement
 	Elifs []*ElseIfStmt
 	Else  []Statement
+}
+
+func NewIfStmt(cond Expr, body []Statement, elifs []*ElseIfStmt, elseBody []Statement, buf *buffer.Buffer) *IfStmt {
+	a := buffer.Alloc[IfStmt](buf)
+	a.Cond = cond
+	a.Body = body
+	a.Elifs = elifs
+	a.Else = elseBody
+	return a
 }
 
 func (node *IfStmt) Format(ctx *FmtCtx) {
@@ -78,6 +96,13 @@ type WhenStmt struct {
 	Body []Statement
 }
 
+func NewWhenStmt(cond Expr, body []Statement, buf *buffer.Buffer) *WhenStmt {
+	a := buffer.Alloc[WhenStmt](buf)
+	a.Cond = cond
+	a.Body = body
+	return a
+}
+
 func (node *WhenStmt) Format(ctx *FmtCtx) {
 	ctx.WriteString("when ")
 	node.Cond.Format(ctx)
@@ -97,6 +122,14 @@ type CaseStmt struct {
 	Expr  Expr
 	Whens []*WhenStmt
 	Else  []Statement
+}
+
+func NewCaseStmt(expr Expr, whens []*WhenStmt, elseBody []Statement, buf *buffer.Buffer) *CaseStmt {
+	a := buffer.Alloc[CaseStmt](buf)
+	a.Expr = expr
+	a.Whens = whens 
+	a.Else = elseBody 
+	return a
 }
 
 func (node *CaseStmt) Format(ctx *FmtCtx) {

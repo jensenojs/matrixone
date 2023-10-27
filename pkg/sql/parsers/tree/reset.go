@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type Reset struct {
 	Statement
 	Name Identifier
@@ -28,8 +30,8 @@ func (node *Reset) Format(ctx *FmtCtx) {
 func (node *Reset) GetStatementType() string { return "Reset" }
 func (node *Reset) GetQueryType() string     { return QueryTypeDCL }
 
-func NewReset(name Identifier) *Reset {
-	return &Reset{
-		Name: name,
-	}
+func NewReset(name Identifier, buf *buffer.Buffer) *Reset {
+	rs := buffer.Alloc[Reset](buf)
+	rs.Name = name
+	return rs
 }

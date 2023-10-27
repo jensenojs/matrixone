@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type CreateExtension struct {
 	statementImpl
 	Language string
@@ -21,9 +23,23 @@ type CreateExtension struct {
 	Filename Identifier
 }
 
+func NewCreateExtension(language string, name, filename Identifier, buf *buffer.Buffer) *CreateExtension {
+	c := buffer.Alloc[CreateExtension](buf)	
+	c.Language = language
+	c.Name = name
+	c.Filename = filename
+	return c
+}
+
 type LoadExtension struct {
 	statementImpl
 	Name Identifier
+}
+
+func NewLoadExtension(name Identifier, buf *buffer.Buffer) *LoadExtension {
+	l := buffer.Alloc[LoadExtension](buf)
+	l.Name = name
+	return l
 }
 
 func (node *CreateExtension) Format(ctx *FmtCtx) {

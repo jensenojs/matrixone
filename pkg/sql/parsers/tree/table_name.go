@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type TableName struct {
 	TableExpr
 	objName
@@ -57,11 +59,14 @@ func (node *TableNames) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewTableName(name Identifier, prefix ObjectNamePrefix) *TableName {
-	return &TableName{
-		objName: objName{
-			ObjectName:       name,
-			ObjectNamePrefix: prefix,
-		},
+func NewTableName(name Identifier, prefix ObjectNamePrefix, buf *buffer.Buffer) *TableName {
+	var tName *TableName
+	if buf != nil {
+		tName = buffer.Alloc[TableName](buf)
+	} else { 
+		tName = new(TableName)
 	}
+	tName.objName.ObjectName = name
+	tName.objName.ObjectNamePrefix = prefix
+	return tName
 }

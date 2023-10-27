@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type BackupStart struct {
 	statementImpl
 	Timestamp string
@@ -21,6 +23,15 @@ type BackupStart struct {
 	Dir       string
 	//s3 option
 	Option []string
+}
+
+func NewBackupStart(ts string, isS3 bool, dir string, option []string, buf *buffer.Buffer) *BackupStart {
+	b := buffer.Alloc[BackupStart](buf)
+	b.Timestamp = ts
+	b.IsS3 = isS3
+	b.Dir = dir
+	b.Option = option
+	return b
 }
 
 func (node *BackupStart) Format(ctx *FmtCtx) {

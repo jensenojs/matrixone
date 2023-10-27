@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type SecondaryRoleType int
 
 const (
@@ -28,6 +30,14 @@ type Use struct {
 	SecondaryRole     bool
 	SecondaryRoleType SecondaryRoleType
 	Role              *Role
+}
+
+func NewUse(secondaryRole bool, name *CStr, secondaryRoleTyp SecondaryRoleType, buf *buffer.Buffer) *Use {
+	us := buffer.Alloc[Use](buf)
+	us.SecondaryRole = secondaryRole
+	us.Name = name
+	us.SecondaryRoleType = secondaryRoleTyp
+	return us
 }
 
 func (node *Use) Format(ctx *FmtCtx) {

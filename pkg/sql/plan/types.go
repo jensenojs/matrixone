@@ -273,6 +273,7 @@ type baseBinder struct {
 	ctx       *BindContext
 	impl      Binder
 	boundCols []string
+	buf       *buffer.Buffer
 }
 
 type DefaultBinder struct {

@@ -14,7 +14,11 @@
 
 package tree
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
+)
 
 // the UNION statement
 type UnionClause struct {
@@ -24,6 +28,16 @@ type UnionClause struct {
 	Left, Right SelectStatement
 	All         bool
 	Distinct    bool
+}
+
+func NewUnionClause(t UnionType, l, r SelectStatement, a, d bool, buf *buffer.Buffer) *UnionClause {
+	uCl := buffer.Alloc[UnionClause](buf)
+	uCl.Type = t
+	uCl.Left = l
+	uCl.Right = r
+	uCl.All = a
+	uCl.Distinct = d
+	return uCl
 }
 
 func (node *UnionClause) Format(ctx *FmtCtx) {
@@ -44,6 +58,14 @@ type UnionTypeRecord struct {
 	Type     UnionType
 	All      bool
 	Distinct bool
+}
+
+func NewUnionTypeRecord(typ UnionType, all, dist bool, buf *buffer.Buffer) *UnionTypeRecord {
+	un := buffer.Alloc[UnionTypeRecord](buf)
+	un.Type = typ
+	un.All = all
+	un.Distinct = dist
+	return un
 }
 
 // UnionType set operations
@@ -68,14 +90,4 @@ func (i UnionType) String() string {
 		return fmt.Sprintf("UnionType(%d)", i)
 	}
 	return unionTypeName[i]
-}
-
-// func NewUnionClause(t UnionType,l,r *Select,a bool)*UnionClause{
-func NewUnionClause(t UnionType, l, r SelectStatement, a bool) *UnionClause {
-	return &UnionClause{
-		Type:  t,
-		Left:  l,
-		Right: r,
-		All:   a,
-	}
 }

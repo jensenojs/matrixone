@@ -14,10 +14,19 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type With struct {
 	statementImpl
 	IsRecursive bool
 	CTEs        []*CTE
+}
+
+func NewWith(isr bool, ctes []*CTE, buf *buffer.Buffer) *With {
+	w := buffer.Alloc[With](buf)
+	w.IsRecursive = isr
+	w.CTEs = ctes
+	return w
 }
 
 func (node *With) Format(ctx *FmtCtx) {
@@ -38,6 +47,13 @@ func (node *With) GetQueryType() string     { return QueryTypeDQL }
 type CTE struct {
 	Name *AliasClause
 	Stmt Statement
+}
+
+func NewCTE(name *AliasClause, stmt Statement, buf *buffer.Buffer) *CTE {
+	cte := buffer.Alloc[CTE](buf)	
+	cte.Name = name
+	cte.Stmt = stmt
+	return cte
 }
 
 func (node *CTE) Format(ctx *FmtCtx) {

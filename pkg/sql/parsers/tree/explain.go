@@ -17,6 +17,8 @@ package tree
 import (
 	"strconv"
 	"strings"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 )
 
 type Explain interface {
@@ -72,8 +74,11 @@ func (node *ExplainStmt) Format(ctx *FmtCtx) {
 func (node *ExplainStmt) GetStatementType() string { return "Explain" }
 func (node *ExplainStmt) GetQueryType() string     { return QueryTypeOth }
 
-func NewExplainStmt(stmt Statement, f string) *ExplainStmt {
-	return &ExplainStmt{explainImpl{Statement: stmt, Format: f}}
+func NewExplainStmt(stmt Statement, format string, buf *buffer.Buffer) *ExplainStmt {
+	e := buffer.Alloc[ExplainStmt](buf)
+	e.explainImpl.Statement = stmt
+	e.explainImpl.Format = format
+	return e
 }
 
 // EXPLAIN ANALYZE statement
@@ -118,8 +123,11 @@ func (node *ExplainAnalyze) Format(ctx *FmtCtx) {
 func (node *ExplainAnalyze) GetStatementType() string { return "Explain Analyze" }
 func (node *ExplainAnalyze) GetQueryType() string     { return QueryTypeOth }
 
-func NewExplainAnalyze(stmt Statement, f string) *ExplainAnalyze {
-	return &ExplainAnalyze{explainImpl{Statement: stmt, Format: f}}
+func NewExplainAnalyze(stmt Statement, format string, buf *buffer.Buffer) *ExplainAnalyze {
+	e := buffer.Alloc[ExplainAnalyze](buf)
+	e.explainImpl.Statement = stmt
+	e.explainImpl.Format = format
+	return e
 }
 
 // EXPLAIN FOR CONNECTION statement
@@ -138,11 +146,11 @@ func (node *ExplainFor) Format(ctx *FmtCtx) {
 func (node *ExplainFor) GetStatementType() string { return "Explain Format" }
 func (node *ExplainFor) GetQueryType() string     { return QueryTypeOth }
 
-func NewExplainFor(f string, id uint64) *ExplainFor {
-	return &ExplainFor{
-		explainImpl: explainImpl{Statement: nil, Format: f},
-		ID:          id,
-	}
+func NewExplainFor(format string, id uint64, buf *buffer.Buffer) *ExplainFor {
+	e := buffer.Alloc[ExplainFor](buf)
+	e.explainImpl.Format = format
+	e.ID = id
+	return e
 }
 
 type OptionElem struct {
@@ -150,17 +158,17 @@ type OptionElem struct {
 	Value string
 }
 
-func MakeOptionElem(name string, value string) OptionElem {
-	return OptionElem{
-		Name:  name,
-		Value: value,
-	}
+func MakeOptionElem(name string, value string, buf *buffer.Buffer) OptionElem {
+	o := buffer.Alloc[OptionElem](buf)
+	o.Name = name
+	o.Value = value
+	return *o
 }
 
-func MakeOptions(elem OptionElem) []OptionElem {
-	var options = make([]OptionElem, 1)
-	options[0] = elem
-	return options
+func MakeOptions(elem OptionElem, buf *buffer.Buffer) []OptionElem {
+	os := buffer.MakeSpecificSlice[OptionElem](buf, 0, 1)	
+	os = buffer.AppendSlice[OptionElem](buf, os, elem)
+	return os
 }
 
 func IsContainAnalyze(options []OptionElem) bool {

@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // Delete statement
 type Delete struct {
 	statementImpl
@@ -68,11 +70,9 @@ func (node *Delete) Format(ctx *FmtCtx) {
 func (node *Delete) GetStatementType() string { return "Delete" }
 func (node *Delete) GetQueryType() string     { return QueryTypeDML }
 
-func NewDelete(ts TableExprs, w *Where, o OrderBy, l *Limit) *Delete {
-	return &Delete{
-		Tables:  ts,
-		Where:   w,
-		OrderBy: o,
-		Limit:   l,
-	}
+func NewDelete(tbl TableExprs, w *Where, buf *buffer.Buffer) *Delete {
+	d := buffer.Alloc[Delete](buf)
+	d.Tables = tbl
+	d.Where = w
+	return d
 }

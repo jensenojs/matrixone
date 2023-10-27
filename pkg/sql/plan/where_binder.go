@@ -15,17 +15,19 @@
 package plan
 
 import (
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 )
 
-func NewWhereBinder(builder *QueryBuilder, ctx *BindContext) *WhereBinder {
+func NewWhereBinder(builder *QueryBuilder, ctx *BindContext, buf *buffer.Buffer) *WhereBinder {
 	b := &WhereBinder{}
 	b.sysCtx = builder.GetContext()
 	b.builder = builder
 	b.ctx = ctx
 	b.impl = b
+	b.buf = buf
 
 	return b
 }

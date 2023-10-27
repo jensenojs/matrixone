@@ -16,6 +16,8 @@ package tree
 
 import (
 	"fmt"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 )
 
 // AST for the expression
@@ -123,12 +125,17 @@ func (node *BinaryExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewBinaryExpr(op BinaryOp, left Expr, right Expr) *BinaryExpr {
-	return &BinaryExpr{
-		Op:    op,
-		Left:  left,
-		Right: right,
+func NewBinaryExpr(op BinaryOp, left Expr, right Expr, buf *buffer.Buffer) *BinaryExpr {
+	var b *BinaryExpr
+	if buf != nil {
+		b = buffer.Alloc[BinaryExpr](buf)
+	} else {
+		b = new(BinaryExpr)
 	}
+	b.Op = op
+	b.Left = left
+	b.Right = right
+	return b
 }
 
 // unary expression
@@ -200,11 +207,11 @@ func (e *UnaryExpr) String() string {
 	return unaryOpName[e.Op] + e.Expr.String()
 }
 
-func NewUnaryExpr(op UnaryOp, expr Expr) *UnaryExpr {
-	return &UnaryExpr{
-		Op:   op,
-		Expr: expr,
-	}
+func NewUnaryExpr(op UnaryOp, expr Expr, buf *buffer.Buffer) *UnaryExpr {
+	u := buffer.Alloc[UnaryExpr](buf)
+	u.Op = op
+	u.Expr = expr
+	return u
 }
 
 var unaryOpName = []string{
@@ -343,40 +350,46 @@ func (node *ComparisonExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewComparisonExpr(op ComparisonOp, l, r Expr) *ComparisonExpr {
-	return &ComparisonExpr{
-		Op:    op,
-		SubOp: ComparisonOp(0),
-		Left:  l,
-		Right: r,
+func NewComparisonExpr(op ComparisonOp, left Expr, right Expr, buf *buffer.Buffer) *ComparisonExpr {
+	var c *ComparisonExpr
+	if buf != nil {
+		c = buffer.Alloc[ComparisonExpr](buf)
+	} else {
+		c = new(ComparisonExpr)
 	}
+	c.Op = op
+	c.SubOp = ComparisonOp(0)
+	c.Left = left
+	c.Right = right
+	return c
 }
 
-func NewSubqueryComparisonExpr(op ComparisonOp, subOp ComparisonOp, l, r Expr) *ComparisonExpr {
-	return &ComparisonExpr{
-		Op:    op,
-		SubOp: subOp,
-		Left:  l,
-		Right: r,
-	}
+func NewSubqueryComparisonExpr(op ComparisonOp, subOp ComparisonOp, left Expr, right Expr, buf *buffer.Buffer) *ComparisonExpr {
+	c := buffer.Alloc[ComparisonExpr](buf)
+	c.Op = op
+	c.SubOp = subOp
+	c.Left = left
+	c.Right = right
+	return c
 }
 
-func NewComparisonExprWithSubop(op, subop ComparisonOp, l, r Expr) *ComparisonExpr {
-	return &ComparisonExpr{
-		Op:    op,
-		SubOp: subop,
-		Left:  l,
-		Right: r,
-	}
+func NewComparisonExprWithSubop(op ComparisonOp, subOp ComparisonOp, left Expr, right Expr, buf *buffer.Buffer) *ComparisonExpr {
+	c := buffer.Alloc[ComparisonExpr](buf)
+	c.Op = op
+	c.SubOp = subOp
+	c.Left = left
+	c.Right = right
+	return c
 }
 
-func NewComparisonExprWithEscape(op ComparisonOp, l, r, e Expr) *ComparisonExpr {
-	return &ComparisonExpr{
-		Op:     op,
-		Left:   l,
-		Right:  r,
-		Escape: e,
-	}
+func NewComparisonExprWithEscape(op ComparisonOp, l, r, e Expr, buf *buffer.Buffer) *ComparisonExpr {
+	c := buffer.Alloc[ComparisonExpr](buf)
+	c.Op = op
+	c.Left = l
+	c.Right = r
+	c.Escape = e
+	return c
+
 }
 
 // and expression
@@ -413,11 +426,16 @@ func (node *AndExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewAndExpr(l, r Expr) *AndExpr {
-	return &AndExpr{
-		Left:  l,
-		Right: r,
+func NewAndExpr(left Expr, right Expr, buf *buffer.Buffer) *AndExpr {
+	var a *AndExpr
+	if buf != nil {
+		a = buffer.Alloc[AndExpr](buf)
+	} else {
+		a = new(AndExpr)
 	}
+	a.Left = left
+	a.Right = right
+	return a
 }
 
 // xor expression
@@ -454,11 +472,11 @@ func (node *XorExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewXorExpr(l, r Expr) *XorExpr {
-	return &XorExpr{
-		Left:  l,
-		Right: r,
-	}
+func NewXorExpr(left Expr, right Expr, buf *buffer.Buffer) *XorExpr {
+	x := buffer.Alloc[XorExpr](buf)
+	x.Left = left
+	x.Right = right
+	return x
 }
 
 // or expression
@@ -495,11 +513,16 @@ func (node *OrExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewOrExpr(l, r Expr) *OrExpr {
-	return &OrExpr{
-		Left:  l,
-		Right: r,
+func NewOrExpr(left Expr, right Expr, buf *buffer.Buffer) *OrExpr {
+	var o *OrExpr
+	if buf != nil {
+		o = buffer.Alloc[OrExpr](buf)
+	} else {
+		o = new(OrExpr)
 	}
+	o.Left = left
+	o.Right = right
+	return o
 }
 
 // not expression
@@ -528,10 +551,10 @@ func (node *NotExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewNotExpr(e Expr) *NotExpr {
-	return &NotExpr{
-		Expr: e,
-	}
+func NewNotExpr(expr Expr, buf *buffer.Buffer) *NotExpr {
+	n := buffer.Alloc[NotExpr](buf)
+	n.Expr = expr
+	return n
 }
 
 // is null expression
@@ -560,10 +583,15 @@ func (node *IsNullExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewIsNullExpr(e Expr) *IsNullExpr {
-	return &IsNullExpr{
-		Expr: e,
+func NewIsNullExpr(expr Expr, buf *buffer.Buffer) *IsNullExpr {
+	var n *IsNullExpr
+	if buf != nil {
+		n = buffer.Alloc[IsNullExpr](buf)
+	} else {
+		n = new(IsNullExpr)
 	}
+	n.Expr = expr
+	return n
 }
 
 // is not null expression
@@ -592,10 +620,10 @@ func (node *IsNotNullExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewIsNotNullExpr(e Expr) *IsNotNullExpr {
-	return &IsNotNullExpr{
-		Expr: e,
-	}
+func NewIsNotNullExpr(expr Expr, buf *buffer.Buffer) *IsNotNullExpr {
+	n := buffer.Alloc[IsNotNullExpr](buf)
+	n.Expr = expr
+	return n
 }
 
 // is unknown expression
@@ -624,10 +652,10 @@ func (node *IsUnknownExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewIsUnknownExpr(e Expr) *IsUnknownExpr {
-	return &IsUnknownExpr{
-		Expr: e,
-	}
+func NewIsUnknownExpr(expr Expr, buf *buffer.Buffer) *IsUnknownExpr {
+	u := buffer.Alloc[IsUnknownExpr](buf)
+	u.Expr = expr
+	return u
 }
 
 // is not unknown expression
@@ -656,10 +684,10 @@ func (node *IsNotUnknownExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewIsNotUnknownExpr(e Expr) *IsNotUnknownExpr {
-	return &IsNotUnknownExpr{
-		Expr: e,
-	}
+func NewIsNotUnknownExpr(expr Expr, buf *buffer.Buffer) *IsNotUnknownExpr {
+	nu := buffer.Alloc[IsNotUnknownExpr](buf)
+	nu.Expr = expr
+	return nu
 }
 
 // is true expression
@@ -688,10 +716,10 @@ func (node *IsTrueExpr) Format(ctx *FmtCtx) {
 	ctx.WriteString(" is true")
 }
 
-func NewIsTrueExpr(e Expr) *IsTrueExpr {
-	return &IsTrueExpr{
-		Expr: e,
-	}
+func NewIsTrueExpr(e Expr, buf *buffer.Buffer) *IsTrueExpr {
+	i := buffer.Alloc[IsTrueExpr](buf)
+	i.Expr = e
+	return i
 }
 
 // is not true expression
@@ -720,10 +748,10 @@ func (node *IsNotTrueExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewIsNotTrueExpr(e Expr) *IsNotTrueExpr {
-	return &IsNotTrueExpr{
-		Expr: e,
-	}
+func NewIsNotTrueExpr(e Expr, buf *buffer.Buffer) *IsNotTrueExpr {
+	in := buffer.Alloc[IsNotTrueExpr](buf)
+	in.Expr = e
+	return in
 }
 
 // is false expression
@@ -752,10 +780,10 @@ func (node *IsFalseExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewIsFalseExpr(e Expr) *IsFalseExpr {
-	return &IsFalseExpr{
-		Expr: e,
-	}
+func NewIsFalseExpr(e Expr, buf *buffer.Buffer) *IsFalseExpr {
+	i := buffer.Alloc[IsFalseExpr](buf)
+	i.Expr = e
+	return i
 }
 
 // is not false expression
@@ -784,10 +812,10 @@ func (node *IsNotFalseExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewIsNotFalseExpr(e Expr) *IsNotFalseExpr {
-	return &IsNotFalseExpr{
-		Expr: e,
-	}
+func NewIsNotFalseExpr(e Expr, buf *buffer.Buffer) *IsNotFalseExpr {
+	inf := buffer.Alloc[IsNotFalseExpr](buf)
+	inf.Expr = e
+	return inf
 }
 
 // subquery interface
@@ -814,11 +842,16 @@ func (node *Subquery) Accept(v Visitor) (Expr, bool) {
 	panic("unimplement Subquery Accept")
 }
 
-func NewSubquery(s SelectStatement, e bool) *Subquery {
-	return &Subquery{
-		Select: s,
-		Exists: e,
+func NewSubquery(s SelectStatement, e bool, buf *buffer.Buffer) *Subquery {
+	var su *Subquery
+	if buf != nil {
+		su = buffer.Alloc[Subquery](buf)
+	} else {
+		su = new(Subquery)
 	}
+	su.Select = s
+	su.Exists = e
+	return su
 }
 
 // a list of expression.
@@ -871,10 +904,15 @@ func (node *ParenExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewParenExpr(e Expr) *ParenExpr {
-	return &ParenExpr{
-		Expr: e,
+func NewParenExpr(e Expr, buf *buffer.Buffer) *ParenExpr {
+	var p *ParenExpr
+	if buf != nil {
+		p = buffer.Alloc[ParenExpr](buf)
+	} else {
+		p = new(ParenExpr)
 	}
+	p.Expr = e
+	return p
 }
 
 type FuncType int
@@ -924,7 +962,12 @@ func (node *ResolvableFunctionReference) Format(ctx *FmtCtx) {
 	node.FunctionReference.(*UnresolvedName).Format(ctx)
 }
 
-func FuncName2ResolvableFunctionReference(funcName *UnresolvedName) ResolvableFunctionReference {
+func FuncName2ResolvableFunctionReference(funcName *UnresolvedName, buf *buffer.Buffer) ResolvableFunctionReference {
+	if buf != nil {
+		r := buffer.Alloc[ResolvableFunctionReference](buf)	
+		r.FunctionReference = funcName
+		return *r
+	}
 	return ResolvableFunctionReference{FunctionReference: funcName}
 }
 
@@ -941,6 +984,22 @@ type FuncExpr struct {
 	WindowSpec *WindowSpec
 
 	OrderBy OrderBy
+}
+
+func NewFuncExpr(fun ResolvableFunctionReference, expr Exprs, buf *buffer.Buffer) *FuncExpr {
+	fx := buffer.Alloc[FuncExpr](buf)
+	fx.Func = fun
+	fx.Exprs = expr
+	return fx
+}
+
+func NewFuncExprWithWinSpec(fun ResolvableFunctionReference, expr Exprs, typ FuncType, win *WindowSpec, buf *buffer.Buffer) *FuncExpr {
+	fx := buffer.Alloc[FuncExpr](buf)
+	fx.Func = fun
+	fx.Exprs = expr
+	fx.Type = typ
+	fx.WindowSpec = win
+	return fx
 }
 
 func (node *FuncExpr) Format(ctx *FmtCtx) {
@@ -1017,6 +1076,15 @@ type WindowSpec struct {
 	Frame       *FrameClause
 }
 
+func NewWindowSpec(pb Exprs, o OrderBy, f *FrameClause, ha bool, buf *buffer.Buffer) *WindowSpec {
+	wi := buffer.Alloc[WindowSpec](buf)
+	wi.PartitionBy = pb
+	wi.OrderBy = o
+	wi.Frame = f
+	wi.HasFrame = ha
+	return wi
+}
+
 func (node *WindowSpec) Format(ctx *FmtCtx) {
 	ctx.WriteString("over (")
 	flag := false
@@ -1059,6 +1127,15 @@ type FrameClause struct {
 	End    *FrameBound
 }
 
+func NewFrameClause(t FrameType, h bool, s, e *FrameBound, buf *buffer.Buffer) *FrameClause {
+	fr := buffer.Alloc[FrameClause](buf)
+	fr.Type = t
+	fr.HasEnd = h
+	fr.Start = s
+	fr.End = e
+	return fr
+}
+
 func (node *FrameClause) Format(ctx *FmtCtx) {
 	switch node.Type {
 	case Rows:
@@ -1091,6 +1168,14 @@ type FrameBound struct {
 	Type      BoundType
 	UnBounded bool
 	Expr      Expr
+}
+
+func NewFrameBound(t BoundType, u bool, e Expr, buf *buffer.Buffer) *FrameBound {
+	f := buffer.Alloc[FrameBound](buf)
+	f.Type = t
+	f.UnBounded = u
+	f.Expr = e
+	return f
 }
 
 func (node *FrameBound) Format(ctx *FmtCtx) {
@@ -1148,11 +1233,11 @@ func (node *CastExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewCastExpr(e Expr, t ResolvableTypeReference) *CastExpr {
-	return &CastExpr{
-		Expr: e,
-		Type: t,
-	}
+func NewCastExpr(e Expr, t ResolvableTypeReference, buf *buffer.Buffer) *CastExpr {
+	c := buffer.Alloc[CastExpr](buf)
+	c.Expr = e
+	c.Type = t
+	return c
 }
 
 type BitCastExpr struct {
@@ -1184,11 +1269,11 @@ func (node *BitCastExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewBitCastExpr(e Expr, t ResolvableTypeReference) *BitCastExpr {
-	return &BitCastExpr{
-		Expr: e,
-		Type: t,
-	}
+func NewBitCastExpr(e Expr, t ResolvableTypeReference, buf *buffer.Buffer) *BitCastExpr {
+	bc := buffer.Alloc[BitCastExpr](buf)
+	bc.Expr = e
+	bc.Type = t
+	return bc
 }
 
 // the parenthesized list of expressions.
@@ -1222,8 +1307,15 @@ func (node *Tuple) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewTuple(e Exprs) *Tuple {
-	return &Tuple{Exprs: e}
+func NewTuple(es Exprs, buf *buffer.Buffer) *Tuple {
+	var t *Tuple
+	if buf != nil {
+		t = buffer.Alloc[Tuple](buf)
+	} else {
+		t = new(Tuple)
+	}
+	t.Exprs = es
+	return t
 }
 
 // the BETWEEN or a NOT BETWEEN expression
@@ -1274,13 +1366,13 @@ func (node *RangeCond) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewRangeCond(n bool, l, f, t Expr) *RangeCond {
-	return &RangeCond{
-		Not:  n,
-		Left: l,
-		From: f,
-		To:   t,
-	}
+func NewRangeCond(n bool, l, f, t Expr, buf *buffer.Buffer) *RangeCond {
+	rc := buffer.Alloc[RangeCond](buf)
+	rc.Not = n
+	rc.Left = l
+	rc.From = f
+	rc.To = t
+	return rc
 }
 
 // Case-When expression.
@@ -1348,12 +1440,12 @@ func (node *CaseExpr) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewCaseExpr(e Expr, w []*When, el Expr) *CaseExpr {
-	return &CaseExpr{
-		Expr:  e,
-		Whens: w,
-		Else:  el,
-	}
+func NewCaseExpr(e Expr, whens []*When, elsep Expr, buf *buffer.Buffer) *CaseExpr {
+	c := buffer.Alloc[CaseExpr](buf)
+	c.Expr = e
+	c.Whens = whens
+	c.Else = elsep
+	return c
 }
 
 // When sub-expression.
@@ -1369,11 +1461,11 @@ func (node *When) Format(ctx *FmtCtx) {
 	node.Val.Format(ctx)
 }
 
-func NewWhen(c, v Expr) *When {
-	return &When{
-		Cond: c,
-		Val:  v,
-	}
+func NewWhen(c Expr, v Expr, buf *buffer.Buffer) *When {
+	w := buffer.Alloc[When](buf)
+	w.Cond = c
+	w.Val = v
+	return w
 }
 
 // IntervalType is the type for time and timestamp units.
@@ -1458,10 +1550,10 @@ func (node *IntervalExpr) Accept(v Visitor) (Expr, bool) {
 	panic("unimplement interval expr Accept")
 }
 
-func NewIntervalExpr(t IntervalType) *IntervalExpr {
-	return &IntervalExpr{
-		Type: t,
-	}
+func NewIntervalExpr(it IntervalType, buf *buffer.Buffer) *IntervalExpr {
+	i := buffer.Alloc[IntervalExpr](buf)
+	i.Type = it
+	return i
 }
 
 // the DEFAULT expression.
@@ -1492,10 +1584,9 @@ func (node *DefaultVal) Accept(v Visitor) (Expr, bool) {
 	return v.Exit(node)
 }
 
-func NewDefaultVal(e Expr) *DefaultVal {
-	return &DefaultVal{
-		Expr: e,
-	}
+func NewDefaultVal(buf *buffer.Buffer) *DefaultVal {
+	d := buffer.Alloc[DefaultVal](buf)
+	return d
 }
 
 type UpdateVal struct {
@@ -1550,13 +1641,12 @@ func (node *VarExpr) Accept(v Visitor) (Expr, bool) {
 	panic("unimplement VarExpr Accept")
 }
 
-func NewVarExpr(n string, s bool, g bool, e Expr) *VarExpr {
-	return &VarExpr{
-		Name:   n,
-		System: s,
-		Global: g,
-		Expr:   e,
-	}
+func NewVarExpr(n string, sys, glob bool, buf *buffer.Buffer) *VarExpr {
+	v := buffer.Alloc[VarExpr](buf)
+	v.Name = n
+	v.System = sys
+	v.Global = glob
+	return v
 }
 
 // select a from t1 where a > ?
@@ -1574,10 +1664,10 @@ func (node *ParamExpr) Accept(v Visitor) (Expr, bool) {
 	panic("unimplement ParamExpr Accept")
 }
 
-func NewParamExpr(offset int) *ParamExpr {
-	return &ParamExpr{
-		Offset: offset,
-	}
+func NewParamExpr(offset int, buf *buffer.Buffer) *ParamExpr {
+	p := buffer.Alloc[ParamExpr](buf)
+	p.Offset = offset
+	return p
 }
 
 type MaxValue struct {
@@ -1588,8 +1678,9 @@ func (node *MaxValue) Format(ctx *FmtCtx) {
 	ctx.WriteString("MAXVALUE")
 }
 
-func NewMaxValue() *MaxValue {
-	return &MaxValue{}
+func NewMaxValue(buf *buffer.Buffer) *MaxValue {
+	m := buffer.Alloc[MaxValue](buf)
+	return m
 }
 
 // Accept implements NodeChecker interface

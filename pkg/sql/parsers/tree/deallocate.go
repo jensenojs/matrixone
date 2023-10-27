@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type Deallocate struct {
 	Statement
 	IsDrop bool
@@ -33,9 +35,9 @@ func (node *Deallocate) Format(ctx *FmtCtx) {
 func (node *Deallocate) GetStatementType() string { return "Deallocate" }
 func (node *Deallocate) GetQueryType() string     { return QueryTypeOth }
 
-func NewDeallocate(name Identifier, isDrop bool) *Deallocate {
-	return &Deallocate{
-		IsDrop: isDrop,
-		Name:   name,
-	}
+func NewDeallocate(name Identifier, isDrop bool, buf *buffer.Buffer) *Deallocate {
+	d := buffer.Alloc[Deallocate](buf)
+	d.IsDrop = isDrop
+	d.Name = name
+	return d
 }

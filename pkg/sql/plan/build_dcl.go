@@ -154,7 +154,7 @@ func buildPrepare(stmt tree.Prepare, ctx CompilerContext) (*Plan, error) {
 
 func buildExecute(stmt *tree.Execute, ctx CompilerContext) (*Plan, error) {
 	builder := NewQueryBuilder(plan.Query_SELECT, ctx, false)
-	binder := NewWhereBinder(builder, &BindContext{})
+	binder := NewWhereBinder(builder, &BindContext{}, ctx.GetBuffer())
 
 	args := make([]*Expr, len(stmt.Variables))
 	for idx, variable := range stmt.Variables {
@@ -204,7 +204,7 @@ func buildSetVariables(stmt *tree.SetVar, ctx CompilerContext) (*Plan, error) {
 	items := make([]*plan.SetVariablesItem, len(stmt.Assignments))
 
 	builder := NewQueryBuilder(plan.Query_SELECT, ctx, false)
-	binder := NewWhereBinder(builder, &BindContext{})
+	binder := NewWhereBinder(builder, &BindContext{}, ctx.GetBuffer())
 
 	for idx, assignment := range stmt.Assignments {
 		item := &plan.SetVariablesItem{

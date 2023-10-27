@@ -17,6 +17,7 @@ package tree
 import (
 	"fmt"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 )
 
@@ -52,6 +53,16 @@ type RevokePrivilege struct {
 	ObjType    ObjectType
 	Level      *PrivilegeLevel
 	Roles      []*Role
+}
+
+func NewRevokePrivilege(ifs bool, prvi []*Privilege, ob ObjectType, le *PrivilegeLevel, rs []*Role, buf *buffer.Buffer) *RevokePrivilege {
+	re := buffer.Alloc[RevokePrivilege](buf)
+	re.IfExists = ifs
+	re.Privileges = prvi
+	re.ObjType = ob
+	re.Level = le
+	re.Roles = rs
+	return re
 }
 
 func (node *RevokePrivilege) Format(ctx *FmtCtx) {
@@ -92,8 +103,16 @@ func (node *RevokePrivilege) Format(ctx *FmtCtx) {
 func (node *RevokePrivilege) GetStatementType() string { return "Revoke Privilege" }
 func (node *RevokePrivilege) GetQueryType() string     { return QueryTypeDCL }
 
-func NewRevoke() *Revoke {
-	return &Revoke{}
+func NewRevoke(typ RevokeType, revokePrivilege *RevokePrivilege, revokeRole *RevokeRole, buf *buffer.Buffer) *Revoke {
+	r := buffer.Alloc[Revoke](buf)
+	r.Typ = typ
+	if revokePrivilege != nil {
+		r.RevokePrivilege = *revokePrivilege
+	}
+	if revokeRole != nil {
+		r.RevokeRole = *revokeRole
+	}
+	return r
 }
 
 type RevokeRole struct {
@@ -101,6 +120,14 @@ type RevokeRole struct {
 	IfExists bool
 	Roles    []*Role
 	Users    []*User
+}
+
+func NewRevokeRole(ifs bool, roles []*Role, users []*User, buf *buffer.Buffer) *RevokeRole {
+	re := buffer.Alloc[RevokeRole](buf)
+	re.IfExists = ifs
+	re.Roles = roles
+	re.Users = users
+	return re
 }
 
 func (node *RevokeRole) Format(ctx *FmtCtx) {
@@ -134,7 +161,7 @@ type PrivilegeLevel struct {
 	NodeFormatter
 	Level       PrivilegeLevelType
 	DbName      string
-	TabName     string
+	TblName     string
 	RoutineName string
 }
 
@@ -147,9 +174,9 @@ func (node *PrivilegeLevel) Format(ctx *FmtCtx) {
 	case PRIVILEGE_LEVEL_TYPE_DATABASE_STAR:
 		ctx.WriteString(fmt.Sprintf("%s.*", node.DbName))
 	case PRIVILEGE_LEVEL_TYPE_DATABASE_TABLE:
-		ctx.WriteString(fmt.Sprintf("%s.%s", node.DbName, node.TabName))
+		ctx.WriteString(fmt.Sprintf("%s.%s", node.DbName, node.TblName))
 	case PRIVILEGE_LEVEL_TYPE_TABLE:
-		ctx.WriteString(node.TabName)
+		ctx.WriteString(node.TblName)
 	}
 }
 
@@ -159,13 +186,12 @@ func (node *PrivilegeLevel) String() string {
 	return fmtCtx.String()
 }
 
-func NewPrivilegeLevel(l PrivilegeLevelType, d, t, r string) *PrivilegeLevel {
-	return &PrivilegeLevel{
-		Level:       l,
-		DbName:      d,
-		TabName:     t,
-		RoutineName: r,
-	}
+func NewPrivilegeLevel(level PrivilegeLevelType, dbName string, tblName string, buf *buffer.Buffer) *PrivilegeLevel {
+	pl := buffer.Alloc[PrivilegeLevel](buf)
+	pl.Level = level
+	pl.DbName = dbName
+	pl.TblName = tblName
+	return pl
 }
 
 type PrivilegeLevelType int
@@ -202,11 +228,11 @@ func (node *Privilege) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewPrivilege(t PrivilegeType, c []*UnresolvedName) *Privilege {
-	return &Privilege{
-		Type:       t,
-		ColumnList: c,
-	}
+func NewPrivilege(typ PrivilegeType, columnList []*UnresolvedName, buf *buffer.Buffer) *Privilege {
+	p := buffer.Alloc[Privilege](buf)
+	p.Type = typ
+	p.ColumnList = columnList
+	return p
 }
 
 type ObjectType int

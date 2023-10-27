@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type SetVar struct {
 	statementImpl
 	Assignments []*VarAssignmentExpr
@@ -40,10 +42,10 @@ func (node *SetVar) Accept(v Visitor) (Expr, bool) {
 func (node *SetVar) GetStatementType() string { return "Set Var" }
 func (node *SetVar) GetQueryType() string     { return QueryTypeOth }
 
-func NewSetVar(a []*VarAssignmentExpr) *SetVar {
-	return &SetVar{
-		Assignments: a,
-	}
+func NewSetVar(a []*VarAssignmentExpr, buf *buffer.Buffer) *SetVar {
+	sv := buffer.Alloc[SetVar](buf)
+	sv.Assignments = a
+	return sv
 }
 
 // for variable = expr
@@ -72,14 +74,14 @@ func (node *VarAssignmentExpr) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewVarAssignmentExpr(s bool, g bool, n string, v Expr, r Expr) *VarAssignmentExpr {
-	return &VarAssignmentExpr{
-		System:   s,
-		Global:   g,
-		Name:     n,
-		Value:    v,
-		Reserved: r,
-	}
+func NewVarAssignmentExpr(s bool, g bool, n string, v Expr, r Expr, buf *buffer.Buffer) *VarAssignmentExpr {
+	va := buffer.Alloc[VarAssignmentExpr](buf)
+	va.System = s
+	va.Global = g
+	va.Name = n
+	va.Value = v
+	va.Reserved = r
+	return va
 }
 
 type SetDefaultRoleType int
@@ -124,12 +126,12 @@ func (node *SetDefaultRole) Format(ctx *FmtCtx) {
 func (node *SetDefaultRole) GetStatementType() string { return "Set Role" }
 func (node *SetDefaultRole) GetQueryType() string     { return QueryTypeOth }
 
-func NewSetDefaultRole(t SetDefaultRoleType, r []*Role, u []*User) *SetDefaultRole {
-	return &SetDefaultRole{
-		Type:  t,
-		Roles: r,
-		Users: u,
-	}
+func NewSetDefaultRole(t SetDefaultRoleType, r []*Role, u []*User, buf *buffer.Buffer) *SetDefaultRole {
+	sdr := buffer.Alloc[SetDefaultRole](buf)
+	sdr.Type = t
+	sdr.Roles = r
+	sdr.Users = u
+	return sdr
 }
 
 type SetRoleType int
@@ -147,6 +149,14 @@ type SetRole struct {
 	SecondaryRole     bool
 	SecondaryRoleType SecondaryRoleType
 	Role              *Role
+}
+
+func NewSetRole(secondaryRole bool, secondaryRoleTyp SecondaryRoleType, role *Role, buf *buffer.Buffer) *SetRole {
+	sr := buffer.Alloc[SetRole](buf)
+	sr.SecondaryRole = secondaryRole
+	sr.SecondaryRoleType = secondaryRoleTyp
+	sr.Role = role
+	return sr
 }
 
 func (node *SetRole) Format(ctx *FmtCtx) {
@@ -185,12 +195,11 @@ func (node *SetPassword) Format(ctx *FmtCtx) {
 	ctx.WriteString(" = ")
 	ctx.WriteString(node.Password)
 }
-
-func NewSetPassword(u *User, p string) *SetPassword {
-	return &SetPassword{
-		User:     u,
-		Password: p,
-	}
+func NewSetPassword(u *User, p string, buf *buffer.Buffer) *SetPassword {
+	sp := buffer.Alloc[SetPassword](buf)
+	sp.User = u
+	sp.Password = p
+	return sp
 }
 
 func (node *SetPassword) GetStatementType() string { return "Set Password" }
@@ -250,6 +259,14 @@ type TransactionCharacteristic struct {
 	Access    AccessModeType
 }
 
+func NewTransactionCharacteristic(islevel bool, isolation IsolationLevelType, access AccessModeType, buf *buffer.Buffer) *TransactionCharacteristic {
+	t := buffer.Alloc[TransactionCharacteristic](buf)
+	t.IsLevel = islevel
+	t.Isolation = isolation
+	t.Access = access
+	return t
+}
+
 func (tc *TransactionCharacteristic) Format(ctx *FmtCtx) {
 	if tc.IsLevel {
 		ctx.WriteString(tc.Isolation.String())
@@ -262,6 +279,13 @@ type SetTransaction struct {
 	statementImpl
 	Global        bool
 	CharacterList []*TransactionCharacteristic
+}
+
+func NewSetTransaction(glo bool, charlist []*TransactionCharacteristic, buf *buffer.Buffer) *SetTransaction {
+	se := buffer.Alloc[SetTransaction](buf)
+	se.Global = glo
+	se.CharacterList = charlist
+	return se
 }
 
 func (node *SetTransaction) Format(ctx *FmtCtx) {

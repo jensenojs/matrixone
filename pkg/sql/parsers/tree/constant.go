@@ -17,6 +17,8 @@ package tree
 import (
 	"go/constant"
 	"strings"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 )
 
 // the AST for literals like string,numeric,bool and etc.
@@ -126,40 +128,59 @@ func (n *NumVal) Negative() bool {
 	return n.negative
 }
 
-func NewNumVal(value constant.Value, origString string, negative bool) *NumVal {
-	return &NumVal{
-		Value:      value,
-		origString: origString,
-		negative:   negative,
+func NewNumVal(value constant.Value, origString string, negative bool, buf *buffer.Buffer) *NumVal {
+	var n *NumVal
+	if buf != nil {
+		n = buffer.Alloc[NumVal](buf)
+	} else {
+		n = new(NumVal)
 	}
+	n.Value = value
+	n.negative = negative
+	n.origString = origString
+	return n
 }
 
-func NewNumValWithType(value constant.Value, origString string, negative bool, typ P_TYPE) *NumVal {
-	numVal := &NumVal{
-		Value:      value,
-		origString: origString,
-		negative:   negative,
-		ValType:    typ,
+func NewNumValWithType(value constant.Value, origString string, negative bool, typ P_TYPE, buf *buffer.Buffer) *NumVal {
+	var n *NumVal
+	if buf != nil {
+		n = buffer.Alloc[NumVal](buf)
+	} else {
+		n = new(NumVal)
 	}
-	return numVal
+	n.Value = value
+	n.negative = negative
+	n.origString = origString
+	n.ValType = typ
+	return n
 }
 
-func NewNumValWithResInt(value constant.Value, origString string, negative bool, resInt int64) *NumVal {
-	return &NumVal{
-		Value:      value,
-		origString: origString,
-		negative:   negative,
-		resInt:     resInt,
+func NewNumValWithResInt(value constant.Value, origString string, negative bool, resInt int64, buf *buffer.Buffer) *NumVal {
+	var n *NumVal
+	if buf != nil {
+		n = buffer.Alloc[NumVal](buf)
+	} else {
+		n = new(NumVal)
 	}
+	n.Value = value
+	n.negative = negative
+	n.origString = origString
+	n.resInt = resInt
+	return n
 }
 
-func NewNumValWithResFoalt(value constant.Value, origString string, negative bool, resFloat float64) *NumVal {
-	return &NumVal{
-		Value:      value,
-		origString: origString,
-		negative:   negative,
-		resFloat:   resFloat,
+func NewNumValWithResFoalt(value constant.Value, origString string, negative bool, resFloat float64, buf *buffer.Buffer) *NumVal {
+	var n *NumVal
+	if buf != nil {
+		n = buffer.Alloc[NumVal](buf)
+	} else {
+		n = new(NumVal)
 	}
+	n.Value = value
+	n.negative = negative
+	n.origString = origString
+	n.resFloat = resFloat
+	return n
 }
 
 // StrVal represents a constant string value.
@@ -177,6 +198,13 @@ func (node *StrVal) Accept(v Visitor) (Expr, bool) {
 	panic("unimplement StrVal Accept")
 }
 
-func NewStrVal(s string) *StrVal {
-	return &StrVal{str: s}
+func NewStrVal(str string, buf *buffer.Buffer) *StrVal {
+	var s *StrVal
+	if buf != nil {
+		s = buffer.Alloc[StrVal](buf)
+	} else {
+		s = new(StrVal)
+	}
+	s.str = str
+	return s
 }

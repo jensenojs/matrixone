@@ -24,6 +24,7 @@ import (
 	mokafka "github.com/matrixorigin/matrixone/pkg/stream/adapter/kafka"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/defines"
@@ -764,8 +765,8 @@ func buildCreateTable(stmt *tree.CreateTable, ctx CompilerContext) (*Plan, error
 		if err != nil {
 			return nil, err
 		}
-		partitionBinder := NewPartitionBinder(builder, bindContext)
-		err = buildPartitionByClause(ctx.GetContext(), partitionBinder, stmt, createTable.TableDef)
+		partitionBinder := NewPartitionBinder(builder, bindContext, ctx.GetBuffer())
+		err = buildPartitionByClause(ctx.GetContext(), partitionBinder, stmt, createTable.TableDef, ctx.GetBuffer())
 		if err != nil {
 			return nil, err
 		}
@@ -844,17 +845,17 @@ func addPartitionTableDef(ctx context.Context, mainTableName string, createTable
 
 // buildPartitionByClause build partition by clause info and semantic check.
 // Currently, sub partition and partition value verification are not supported
-func buildPartitionByClause(ctx context.Context, partitionBinder *PartitionBinder, stmt *tree.CreateTable, tableDef *TableDef) (err error) {
+func buildPartitionByClause(ctx context.Context, partitionBinder *PartitionBinder, stmt *tree.CreateTable, tableDef *TableDef, buf *buffer.Buffer) (err error) {
 	var builder partitionBuilder
 	switch stmt.PartitionOption.PartBy.PType.(type) {
 	case *tree.HashType:
-		builder = &hashPartitionBuilder{}
+		builder = &hashPartitionBuilder{buf: buf}
 	case *tree.KeyType:
-		builder = &keyPartitionBuilder{}
+		builder = &keyPartitionBuilder{buf: buf}
 	case *tree.RangeType:
-		builder = &rangePartitionBuilder{}
+		builder = &rangePartitionBuilder{buf: buf}
 	case *tree.ListType:
-		builder = &listPartitionBuilder{}
+		builder = &listPartitionBuilder{buf: buf}
 	}
 	return builder.build(ctx, partitionBinder, stmt, tableDef)
 }
@@ -931,7 +932,7 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 				primaryKeys = pks
 			}
 
-			defaultValue, err := buildDefaultExpr(def, colType, ctx.GetProcess())
+			defaultValue, err := buildDefaultExpr(def, colType, ctx.GetProcess(), ctx.GetBuffer())
 			if err != nil {
 				return err
 			}
@@ -939,7 +940,7 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 				return moerr.NewInvalidInput(ctx.GetContext(), "invalid default value for '%s'", def.Name.Parts[0])
 			}
 
-			onUpdateExpr, err := buildOnUpdate(def, colType, ctx.GetProcess())
+			onUpdateExpr, err := buildOnUpdate(def, colType, ctx.GetProcess(), ctx.GetBuffer())
 			if err != nil {
 				return err
 			}
@@ -2186,7 +2187,7 @@ func buildAlterTableInplace(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, 
 				primaryKeys = pks
 			}
 
-			defaultValue, err := buildDefaultExpr(opt.Column, colType, ctx.GetProcess())
+			defaultValue, err := buildDefaultExpr(opt.Column, colType, ctx.GetProcess(), ctx.GetBuffer())
 			if err != nil {
 				return nil, err
 			}
@@ -2194,7 +2195,7 @@ func buildAlterTableInplace(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, 
 				return nil, moerr.NewInvalidInput(ctx.GetContext(), "invalid default value for '%s'", opt.Column.Name.Parts[0])
 			}
 
-			onUpdateExpr, err := buildOnUpdate(opt.Column, colType, ctx.GetProcess())
+			onUpdateExpr, err := buildOnUpdate(opt.Column, colType, ctx.GetProcess(), ctx.GetBuffer())
 			if err != nil {
 				return nil, err
 			}

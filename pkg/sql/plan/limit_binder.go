@@ -15,18 +15,20 @@
 package plan
 
 import (
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 )
 
-func NewLimitBinder(builder *QueryBuilder, ctx *BindContext) *LimitBinder {
+func NewLimitBinder(builder *QueryBuilder, ctx *BindContext, buf *buffer.Buffer) *LimitBinder {
 	lb := &LimitBinder{}
 	lb.sysCtx = builder.GetContext()
 	lb.builder = builder
 	lb.ctx = ctx
 	lb.impl = lb
+	lb.buf = buf
 	return lb
 }
 

@@ -14,11 +14,21 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type RepeatStmt struct {
 	statementImpl
 	Name Identifier
 	Body []Statement
 	Cond Expr
+}
+
+func NewRepeatStmt(n Identifier, b []Statement, c Expr, buf *buffer.Buffer) *RepeatStmt {
+	r := buffer.Alloc[RepeatStmt](buf)
+	r.Name = n
+	r.Cond = c
+	r.Body = b
+	return r
 }
 
 func (node *RepeatStmt) Format(ctx *FmtCtx) {
@@ -51,6 +61,14 @@ type WhileStmt struct {
 	Body []Statement
 }
 
+func NewWhileStmt(n Identifier, c Expr, b []Statement, buf *buffer.Buffer) *WhileStmt {
+	l := buffer.Alloc[WhileStmt](buf)
+	l.Name = n
+	l.Cond = c
+	l.Body = b
+	return l
+}
+
 func (node *WhileStmt) Format(ctx *FmtCtx) {
 	if node.Name != "" {
 		ctx.WriteString(string(node.Name))
@@ -81,6 +99,13 @@ type LoopStmt struct {
 	Body []Statement
 }
 
+func NewLoopStmt(n Identifier, b []Statement, buf *buffer.Buffer) *LoopStmt {
+	l := buffer.Alloc[LoopStmt](buf)
+	l.Name = n
+	l.Body = b
+	return l
+}
+
 func (node *LoopStmt) Format(ctx *FmtCtx) {
 	if node.Name != "" {
 		ctx.WriteString(string(node.Name))
@@ -108,6 +133,12 @@ type IterateStmt struct {
 	Name Identifier
 }
 
+func NewIterateStmt(n Identifier, buf *buffer.Buffer) *IterateStmt {
+	l := buffer.Alloc[IterateStmt](buf)
+	l.Name = n
+	return l
+}
+
 func (node *IterateStmt) Format(ctx *FmtCtx) {
 	ctx.WriteString("iterate ")
 	ctx.WriteString(string(node.Name))
@@ -119,6 +150,12 @@ func (node *IterateStmt) GetQueryType() string     { return QueryTypeTCL }
 type LeaveStmt struct {
 	statementImpl
 	Name Identifier
+}
+
+func NewLeaveStmt(n Identifier, buf *buffer.Buffer) *LeaveStmt {
+	l := buffer.Alloc[LeaveStmt](buf)
+	l.Name = n
+	return l
 }
 
 func (node *LeaveStmt) Format(ctx *FmtCtx) {

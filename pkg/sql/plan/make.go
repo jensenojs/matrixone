@@ -19,6 +19,7 @@ import (
 	"go/constant"
 	"unicode/utf8"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 
@@ -255,7 +256,7 @@ func MakePlan2NullTextConstExprWithType(v string) *plan.Expr {
 	}
 }
 
-func makePlan2CastExpr(ctx context.Context, expr *Expr, targetType *Type) (*Expr, error) {
+func makePlan2CastExpr(ctx context.Context, expr *Expr, targetType *Type, buf *buffer.Buffer) (*Expr, error) {
 	var err error
 	if isSameColumnType(expr.Typ, targetType) {
 		return expr, nil
@@ -267,7 +268,7 @@ func makePlan2CastExpr(ctx context.Context, expr *Expr, targetType *Type) (*Expr
 	}
 
 	if targetType != nil && targetType.Id == int32(types.T_enum) {
-		expr, err = funcCastForEnumType(ctx, expr, targetType)
+		expr, err = funcCastForEnumType(ctx, expr, targetType, buf)
 		if err != nil {
 			return nil, err
 		}
@@ -297,19 +298,19 @@ func makePlan2CastExpr(ctx context.Context, expr *Expr, targetType *Type) (*Expr
 	}, nil
 }
 
-func funcCastForEnumType(ctx context.Context, expr *Expr, targetType *Type) (*Expr, error) {
+func funcCastForEnumType(ctx context.Context, expr *Expr, targetType *Type, buf *buffer.Buffer) (*Expr, error) {
 	var err error
 	if targetType != nil && targetType.Id != int32(types.T_enum) {
 		return expr, nil
 	}
 
 	astArgs := []tree.Expr{
-		tree.NewNumValWithType(constant.MakeString(targetType.Enumvalues), targetType.Enumvalues, false, tree.P_char),
+		tree.NewNumValWithType(constant.MakeString(targetType.Enumvalues), targetType.Enumvalues, false, tree.P_char, nil),
 	}
 
 	// bind ast function's args
 	args := make([]*Expr, len(astArgs)+1)
-	binder := NewDefaultBinder(ctx, nil, nil, targetType, nil)
+	binder := NewDefaultBinder(ctx, nil, nil, targetType, nil, buf)
 	for idx, arg := range astArgs {
 		if idx == len(args)-1 {
 			continue

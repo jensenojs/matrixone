@@ -947,7 +947,7 @@ func makeInsertPlan(
 				Expr: &plan.Expr_Col{
 					Col: &plan.ColRef{ColPos: 1, Name: tableDef.Cols[pkPos].Name},
 				},
-			}, makePlan2Type(&varcharType))
+			}, makePlan2Type(&varcharType), builder.compCtx.GetBuffer())
 			if err != nil {
 				return err
 			}
@@ -1235,7 +1235,7 @@ func makeInsertPlan(
 					Expr: &plan.Expr_Col{
 						Col: &plan.ColRef{ColPos: 1, Name: tableDef.Cols[pkPos].Name},
 					},
-				}, makePlan2Type(&varcharType))
+				}, makePlan2Type(&varcharType), builder.compCtx.GetBuffer())
 				if err != nil {
 					return err
 				}
@@ -1404,7 +1404,7 @@ func makeInsertPlan(
 					Expr: &plan.Expr_Col{
 						Col: &plan.ColRef{ColPos: 0, Name: tableDef.Cols[pkPos].Name},
 					},
-				}, makePlan2Type(&varcharType))
+				}, makePlan2Type(&varcharType), builder.compCtx.GetBuffer())
 				if err != nil {
 					return err
 				}

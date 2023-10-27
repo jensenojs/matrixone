@@ -15,18 +15,21 @@
 package plan
 
 import (
+	"strings"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
-	"strings"
 )
 
-func NewPartitionBinder(builder *QueryBuilder, ctx *BindContext) *PartitionBinder {
+func NewPartitionBinder(builder *QueryBuilder, ctx *BindContext, buf *buffer.Buffer) *PartitionBinder {
 	p := &PartitionBinder{}
 	p.sysCtx = builder.GetContext()
 	p.builder = builder
 	p.ctx = ctx
 	p.impl = p
+	p.buf = buf
 	return p
 }
 

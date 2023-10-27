@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // SelectLockType is the lock type for SelectStmt.
 type SelectLockType int
 
@@ -56,6 +58,12 @@ type SelectLockInfo struct {
 	LockType SelectLockType
 	WaitSec  uint64
 	Tables   []*TableName
+}
+
+func NewSelectLockInfo(ltyp SelectLockType, buf *buffer.Buffer) *SelectLockInfo {
+	s := buffer.Alloc[SelectLockInfo](buf)
+	s.LockType = ltyp
+	return s
 }
 
 func (node *SelectLockInfo) Format(ctx *FmtCtx) {

@@ -16,16 +16,19 @@ package plan
 
 import (
 	"context"
+	"strings"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
-	"strings"
 )
 
 // keyPartitionBuilder processes key partition
 type keyPartitionBuilder struct {
+	buf *buffer.Buffer
 }
 
 func (kpb *keyPartitionBuilder) build(ctx context.Context, partitionBinder *PartitionBinder, stmt *tree.CreateTable, tableDef *TableDef) error {
@@ -114,7 +117,7 @@ func (kpb *keyPartitionBuilder) buildEvalPartitionExpression(ctx context.Context
 		astExprs[i] = expr
 	}
 
-	partitionAst := genPartitionAst(astExprs, int64(partitionDef.PartitionNum))
+	partitionAst := genPartitionAst(astExprs, int64(partitionDef.PartitionNum), nil)
 	tempExpr, err := partitionBinder.baseBindExpr(partitionAst, 0, true)
 	if err != nil {
 		return err

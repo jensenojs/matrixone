@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -189,7 +190,7 @@ func getTypeFromAst(ctx context.Context, typ tree.ResolvableTypeReference) (*pla
 	return nil, moerr.NewInternalError(ctx, "unknown data type")
 }
 
-func buildDefaultExpr(col *tree.ColumnTableDef, typ *plan.Type, proc *process.Process) (*plan.Default, error) {
+func buildDefaultExpr(col *tree.ColumnTableDef, typ *plan.Type, proc *process.Process, buf *buffer.Buffer) (*plan.Default, error) {
 	nullAbility := true
 	var expr tree.Expr = nil
 	for _, attr := range col.Attributes {
@@ -223,7 +224,7 @@ func buildDefaultExpr(col *tree.ColumnTableDef, typ *plan.Type, proc *process.Pr
 		}, nil
 	}
 
-	binder := NewDefaultBinder(proc.Ctx, nil, nil, typ, nil)
+	binder := NewDefaultBinder(proc.Ctx, nil, nil, typ, nil, buf)
 	planExpr, err := binder.BindExpr(expr, 0, false)
 	if err != nil {
 		return nil, err
@@ -235,7 +236,7 @@ func buildDefaultExpr(col *tree.ColumnTableDef, typ *plan.Type, proc *process.Pr
 		}
 	}
 
-	defaultExpr, err := makePlan2CastExpr(proc.Ctx, planExpr, typ)
+	defaultExpr, err := makePlan2CastExpr(proc.Ctx, planExpr, typ, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +256,7 @@ func buildDefaultExpr(col *tree.ColumnTableDef, typ *plan.Type, proc *process.Pr
 	}, nil
 }
 
-func buildOnUpdate(col *tree.ColumnTableDef, typ *plan.Type, proc *process.Process) (*plan.OnUpdate, error) {
+func buildOnUpdate(col *tree.ColumnTableDef, typ *plan.Type, proc *process.Process, buf *buffer.Buffer) (*plan.OnUpdate, error) {
 	var expr tree.Expr = nil
 
 	for _, attr := range col.Attributes {
@@ -269,13 +270,13 @@ func buildOnUpdate(col *tree.ColumnTableDef, typ *plan.Type, proc *process.Proce
 		return nil, nil
 	}
 
-	binder := NewDefaultBinder(proc.Ctx, nil, nil, typ, nil)
+	binder := NewDefaultBinder(proc.Ctx, nil, nil, typ, nil, buf)
 	planExpr, err := binder.BindExpr(expr, 0, false)
 	if err != nil {
 		return nil, err
 	}
 
-	onUpdateExpr, err := makePlan2CastExpr(proc.Ctx, planExpr, typ)
+	onUpdateExpr, err := makePlan2CastExpr(proc.Ctx, planExpr, typ, buf)
 	if err != nil {
 		return nil, err
 	}

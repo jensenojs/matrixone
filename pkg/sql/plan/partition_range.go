@@ -16,6 +16,8 @@ package plan
 
 import (
 	"context"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
@@ -24,6 +26,7 @@ import (
 )
 
 type rangePartitionBuilder struct {
+	buf *buffer.Buffer
 }
 
 // buildRangePartition handle Range Partitioning and Range columns partitioning
@@ -89,7 +92,7 @@ func (rpb *rangePartitionBuilder) buildPartitionDefs(ctx context.Context, partit
 
 		if valuesLessThan, ok := partition.Values.(*tree.ValuesLessThan); ok {
 			planExprs := make([]*plan.Expr, len(valuesLessThan.ValueList))
-			binder := NewPartitionBinder(nil, nil)
+			binder := NewPartitionBinder(nil, nil, rpb.buf)
 
 			for j, valueExpr := range valuesLessThan.ValueList {
 				// value must be able to evaluate the expression's return value
@@ -142,7 +145,7 @@ func (rpb *rangePartitionBuilder) buildEvalPartitionExpression(ctx context.Conte
 	// case when expr < 6 then 0 when expr < 11 then 1 when true then 3 else -1 end
 	if partitionType.ColumnList == nil {
 		rangeExpr := partitionType.Expr
-		partitionExprAst, err := buildRangeCaseWhenExpr(rangeExpr, partitionOp.Partitions)
+		partitionExprAst, err := buildRangeCaseWhenExpr(rangeExpr, partitionOp.Partitions, rpb.buf)
 		if err != nil {
 			return err
 		}
@@ -162,7 +165,7 @@ func (rpb *rangePartitionBuilder) buildEvalPartitionExpression(ctx context.Conte
 		// For the Range Columns partition, convert the partition information into the expression, such as:
 		// (a, b, c) < (x0, x1, x2) -->  a < x0 || (a = x0 && (b < x1 || b = x1 && c < x2))
 		columnsExpr := partitionType.ColumnList
-		partitionExprAst, err := buildRangeColumnsCaseWhenExpr(columnsExpr, partitionOp.Partitions)
+		partitionExprAst, err := buildRangeColumnsCaseWhenExpr(columnsExpr, partitionOp.Partitions, rpb.buf)
 		if err != nil {
 			return err
 		}

@@ -862,12 +862,13 @@ func compareTwoRangeColumns(ctx context.Context, curr, prev *plan.PartitionItem,
 
 // evalPartitionBoolExpr Calculate the bool result of comparing the values of two range partition `less than value`
 func evalPartitionBoolExpr(ctx context.Context, lOriExpr *Expr, rOriExpr *Expr, colInfo *plan.ColDef, binder *PartitionBinder) (bool, error) {
-	lexpr, err := makePlan2CastExpr(ctx, lOriExpr, colInfo.Typ)
+
+	lexpr, err := makePlan2CastExpr(ctx, lOriExpr, colInfo.Typ, binder.buf)
 	if err != nil {
 		return false, err
 	}
 
-	rexpr, err := makePlan2CastExpr(ctx, rOriExpr, colInfo.Typ)
+	rexpr, err := makePlan2CastExpr(ctx, rOriExpr, colInfo.Typ, binder.buf)
 	if err != nil {
 		return false, err
 	}

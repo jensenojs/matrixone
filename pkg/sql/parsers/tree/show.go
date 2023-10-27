@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type Show interface {
 	Explain
 }
@@ -28,6 +30,12 @@ type ShowCreateTable struct {
 	Name *UnresolvedObjectName
 }
 
+func NewShowCreateTable(n *UnresolvedObjectName, buf *buffer.Buffer) *ShowCreateTable {
+	s := buffer.Alloc[ShowCreateTable](buf)
+	s.Name = n
+	return s
+}
+
 func (node *ShowCreateTable) Format(ctx *FmtCtx) {
 	ctx.WriteString("show create table ")
 	node.Name.ToTableName().Format(ctx)
@@ -36,8 +44,10 @@ func (node *ShowCreateTable) Format(ctx *FmtCtx) {
 func (node *ShowCreateTable) GetStatementType() string { return "Show Create Table" }
 func (node *ShowCreateTable) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowCreate(n *UnresolvedObjectName) *ShowCreateTable {
-	return &ShowCreateTable{Name: n}
+func NewShowCreate(n *UnresolvedObjectName, buf *buffer.Buffer) *ShowCreateTable {
+	sc := buffer.Alloc[ShowCreateTable](buf)
+	sc.Name = n
+	return sc
 }
 
 // SHOW CREATE VIEW statement
@@ -53,8 +63,15 @@ func (node *ShowCreateView) Format(ctx *FmtCtx) {
 func (node *ShowCreateView) GetStatementType() string { return "Show Create View" }
 func (node *ShowCreateView) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowCreateView(n *UnresolvedObjectName) *ShowCreateView {
-	return &ShowCreateView{Name: n}
+func NewShowCreateView(n *UnresolvedObjectName, buf *buffer.Buffer) *ShowCreateView {
+	var scv *ShowCreateView
+	if buf != nil {
+		scv = buffer.Alloc[ShowCreateView](buf)
+	} else {
+		scv = new(ShowCreateView)
+	}
+	scv.Name = n
+	return scv
 }
 
 // SHOW CREATE DATABASE statement
@@ -75,8 +92,11 @@ func (node *ShowCreateDatabase) Format(ctx *FmtCtx) {
 func (node *ShowCreateDatabase) GetStatementType() string { return "Show Create View" }
 func (node *ShowCreateDatabase) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowCreateDatabase(i bool, n string) *ShowCreateDatabase {
-	return &ShowCreateDatabase{IfNotExists: i, Name: n}
+func NewShowCreateDatabase(i bool, n string, buf *buffer.Buffer) *ShowCreateDatabase {
+	scd := buffer.Alloc[ShowCreateDatabase](buf)
+	scd.IfNotExists = i
+	scd.Name = n
+	return scd
 }
 
 // SHOW COLUMNS statement.
@@ -120,16 +140,22 @@ func (node *ShowColumns) Format(ctx *FmtCtx) {
 func (node *ShowColumns) GetStatementType() string { return "Show Columns" }
 func (node *ShowColumns) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowColumns(e bool, f bool, t *UnresolvedObjectName, d string, l *ComparisonExpr, w *Where, cn *UnresolvedName) *ShowColumns {
-	return &ShowColumns{
-		Ext:     e,
-		Full:    f,
-		Table:   t,
-		ColName: cn,
-		DBName:  d,
-		Like:    l,
-		Where:   w,
-	}
+func NewShowColumns1(t *UnresolvedObjectName, cn *UnresolvedName, buf *buffer.Buffer) *ShowColumns {
+	sc := buffer.Alloc[ShowColumns](buf)
+	sc.Table = t
+	sc.ColName = cn
+	return sc
+}
+
+func NewShowColumns2(e bool, f bool, t *UnresolvedObjectName, d string, l *ComparisonExpr, w *Where, buf *buffer.Buffer) *ShowColumns {
+	sc := buffer.Alloc[ShowColumns](buf)
+	sc.Ext = e
+	sc.Full = f
+	sc.Table = t
+	sc.DBName = d
+	sc.Like = l
+	sc.Where = w
+	return sc
 }
 
 // the SHOW DATABASES statement.
@@ -153,11 +179,11 @@ func (node *ShowDatabases) Format(ctx *FmtCtx) {
 func (node *ShowDatabases) GetStatementType() string { return "Show Databases" }
 func (node *ShowDatabases) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowDatabases(l *ComparisonExpr, w *Where) *ShowDatabases {
-	return &ShowDatabases{
-		Like:  l,
-		Where: w,
-	}
+func NewShowDatabases(l *ComparisonExpr, w *Where, buf *buffer.Buffer) *ShowDatabases {
+	sd := buffer.Alloc[ShowDatabases](buf)
+	sd.Like = l
+	sd.Where = w
+	return sd
 }
 
 type ShowType int
@@ -211,6 +237,13 @@ type ShowTarget struct {
 	Where  *Where
 }
 
+func NewShowTarget(n string, t ShowType, buf *buffer.Buffer) *ShowTarget {
+	sh := buffer.Alloc[ShowTarget](buf)
+	sh.Type = t
+	sh.DbName = n
+	return sh
+}
+
 func (node *ShowTarget) Format(ctx *FmtCtx) {
 	ctx.WriteString("show ")
 	if node.Global {
@@ -240,6 +273,14 @@ type ShowTableStatus struct {
 	Where  *Where
 }
 
+func NewShowTableStatus(dbName string, l *ComparisonExpr, w *Where, buf *buffer.Buffer) *ShowTableStatus {
+	st := buffer.Alloc[ShowTableStatus](buf)
+	st.DbName = dbName
+	st.Like = l
+	st.Where = w
+	return st
+}
+
 func (node *ShowTableStatus) Format(ctx *FmtCtx) {
 	ctx.WriteString("show table status")
 	if node.DbName != "" {
@@ -264,6 +305,15 @@ type ShowGrants struct {
 	Hostname      string
 	Roles         []*Role
 	ShowGrantType ShowGrantType
+}
+
+func NewShowGrants(u, h string, rs []*Role, s ShowGrantType, buf *buffer.Buffer) *ShowGrants {
+	sh := buffer.Alloc[ShowGrants](buf)
+	sh.Username = u
+	sh.Hostname = h
+	sh.ShowGrantType = s
+	sh.Roles = rs
+	return sh
 }
 
 type ShowGrantType int
@@ -309,6 +359,13 @@ type ShowSequences struct {
 	showImpl
 	DBName string
 	Where  *Where
+}
+
+func NewShowSequences(dbName string, where *Where, buf *buffer.Buffer) *ShowSequences {
+	sh := buffer.Alloc[ShowSequences](buf)
+	sh.DBName = dbName
+	sh.Where = where
+	return sh
 }
 
 func (node *ShowSequences) Format(ctx *FmtCtx) {
@@ -361,14 +418,14 @@ func (node *ShowTables) Format(ctx *FmtCtx) {
 func (node *ShowTables) GetStatementType() string { return "Show Tables" }
 func (node *ShowTables) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowTables(e bool, f bool, n string, l *ComparisonExpr, w *Where) *ShowTables {
-	return &ShowTables{
-		Ext:    e,
-		Full:   f,
-		DBName: n,
-		Like:   l,
-		Where:  w,
-	}
+func NewShowTables(o, f bool, n string, l *ComparisonExpr, w *Where, buf *buffer.Buffer) *ShowTables {
+	st := buffer.Alloc[ShowTables](buf)
+	st.Open = o
+	st.Full = f
+	st.DBName = n
+	st.Like = l
+	st.Where = w
+	return st
 }
 
 // SHOW PROCESSLIST
@@ -387,8 +444,10 @@ func (node *ShowProcessList) Format(ctx *FmtCtx) {
 func (node *ShowProcessList) GetStatementType() string { return "Show Processlist" }
 func (node *ShowProcessList) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowProcessList(f bool) *ShowProcessList {
-	return &ShowProcessList{Full: f}
+func NewShowProcessList(f bool, buf *buffer.Buffer) *ShowProcessList {
+	spl := buffer.Alloc[ShowProcessList](buf)
+	spl.Full = f
+	return spl
 }
 
 type ShowErrors struct {
@@ -401,8 +460,9 @@ func (node *ShowErrors) Format(ctx *FmtCtx) {
 func (node *ShowErrors) GetStatementType() string { return "Show Errors" }
 func (node *ShowErrors) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowErrors() *ShowErrors {
-	return &ShowErrors{}
+func NewShowErrors(buf *buffer.Buffer) *ShowErrors {
+	se := buffer.Alloc[ShowErrors](buf)
+	return se
 }
 
 type ShowWarnings struct {
@@ -415,8 +475,9 @@ func (node *ShowWarnings) Format(ctx *FmtCtx) {
 func (node *ShowWarnings) GetStatementType() string { return "Show Warnings" }
 func (node *ShowWarnings) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowWarnings() *ShowWarnings {
-	return &ShowWarnings{}
+func NewShowWarnings(buf *buffer.Buffer) *ShowWarnings {
+	sw := buffer.Alloc[ShowWarnings](buf)
+	return sw
 }
 
 // SHOW collation statement
@@ -424,6 +485,11 @@ type ShowCollation struct {
 	showImpl
 	Like  *ComparisonExpr
 	Where *Where
+}
+
+func NewShowCollation(buf *buffer.Buffer) *ShowCollation {
+	s := buffer.Alloc[ShowCollation](buf)
+	return s
 }
 
 func (node *ShowCollation) Format(ctx *FmtCtx) {
@@ -467,12 +533,12 @@ func (node *ShowVariables) Format(ctx *FmtCtx) {
 func (node *ShowVariables) GetStatementType() string { return "Show Variables" }
 func (node *ShowVariables) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowVariables(g bool, l *ComparisonExpr, w *Where) *ShowVariables {
-	return &ShowVariables{
-		Global: g,
-		Like:   l,
-		Where:  w,
-	}
+func NewShowVariables(g bool, l *ComparisonExpr, w *Where, buf *buffer.Buffer) *ShowVariables {
+	sv := buffer.Alloc[ShowVariables](buf)
+	sv.Global = g
+	sv.Like = l
+	sv.Where = w
+	return sv
 }
 
 // SHOW STATUS statement
@@ -501,12 +567,12 @@ func (node *ShowStatus) Format(ctx *FmtCtx) {
 func (node *ShowStatus) GetStatementType() string { return "Show Status" }
 func (node *ShowStatus) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowStatus(g bool, l *ComparisonExpr, w *Where) *ShowStatus {
-	return &ShowStatus{
-		Global: g,
-		Like:   l,
-		Where:  w,
-	}
+func NewShowStatus(g bool, l *ComparisonExpr, w *Where, buf *buffer.Buffer) *ShowStatus {
+	ss := buffer.Alloc[ShowStatus](buf)
+	ss.Global = g
+	ss.Like = l
+	ss.Where = w
+	return ss
 }
 
 // show index statement
@@ -527,11 +593,13 @@ func (node *ShowIndex) Format(ctx *FmtCtx) {
 func (node *ShowIndex) GetStatementType() string { return "Show Index" }
 func (node *ShowIndex) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowIndex(t TableName, w *Where) *ShowIndex {
-	return &ShowIndex{
-		TableName: t,
-		Where:     w,
+func NewShowIndex(t *TableName, w *Where, buf *buffer.Buffer) *ShowIndex {
+	si := buffer.Alloc[ShowIndex](buf)
+	if t != nil {
+		si.TableName = *t
 	}
+	si.Where = w
+	return si
 }
 
 // show Function or Procedure statement
@@ -564,12 +632,12 @@ func (node *ShowFunctionOrProcedureStatus) GetStatementType() string {
 }
 func (node *ShowFunctionOrProcedureStatus) GetQueryType() string { return QueryTypeOth }
 
-func NewShowFunctionOrProcedureStatus(l *ComparisonExpr, w *Where, i bool) *ShowFunctionOrProcedureStatus {
-	return &ShowFunctionOrProcedureStatus{
-		Like:       l,
-		Where:      w,
-		IsFunction: i,
-	}
+func NewShowFunctionOrProcedureStatus(l *ComparisonExpr, w *Where, i bool, buf *buffer.Buffer) *ShowFunctionOrProcedureStatus {
+	sfps := buffer.Alloc[ShowFunctionOrProcedureStatus](buf)
+	sfps.Like = l
+	sfps.Where = w
+	sfps.IsFunction = i
+	return sfps
 }
 
 // show node list
@@ -584,8 +652,9 @@ func (node *ShowNodeList) Format(ctx *FmtCtx) {
 func (node *ShowNodeList) GetStatementType() string { return "Show Node List" }
 func (node *ShowNodeList) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowNodeList() *ShowNodeList {
-	return &ShowNodeList{}
+func NewShowNodeList(buf *buffer.Buffer) *ShowNodeList {
+	snl := buffer.Alloc[ShowNodeList](buf)
+	return snl
 }
 
 // show locks
@@ -600,8 +669,9 @@ func (node *ShowLocks) Format(ctx *FmtCtx) {
 func (node *ShowLocks) GetStatementType() string { return "Show Locks" }
 func (node *ShowLocks) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowLocks() *ShowLocks {
-	return &ShowLocks{}
+func NewShowLocks(buf *buffer.Buffer) *ShowLocks {
+	sl := buffer.Alloc[ShowLocks](buf)
+	return sl
 }
 
 // show table number
@@ -620,10 +690,10 @@ func (node *ShowTableNumber) Format(ctx *FmtCtx) {
 func (node *ShowTableNumber) GetStatementType() string { return "Show Table Number" }
 func (node *ShowTableNumber) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowTableNumber(dbname string) *ShowTableNumber {
-	return &ShowTableNumber{
-		DbName: dbname,
-	}
+func NewShowTableNumber(dbname string, buf *buffer.Buffer) *ShowTableNumber {
+	stn := buffer.Alloc[ShowTableNumber](buf)
+	stn.DbName = dbname
+	return stn
 }
 
 // show column number
@@ -647,11 +717,11 @@ func (node *ShowColumnNumber) Format(ctx *FmtCtx) {
 func (node *ShowColumnNumber) GetStatementType() string { return "Show Column Number" }
 func (node *ShowColumnNumber) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowColumnNumber(table *UnresolvedObjectName, dbname string) *ShowColumnNumber {
-	return &ShowColumnNumber{
-		Table:  table,
-		DbName: dbname,
-	}
+func NewShowColumnNumber(table *UnresolvedObjectName, dbname string, buf *buffer.Buffer) *ShowColumnNumber {
+	scn := buffer.Alloc[ShowColumnNumber](buf)
+	scn.Table = table
+	scn.DbName = dbname
+	return scn
 }
 
 // show table values
@@ -675,16 +745,22 @@ func (node *ShowTableValues) Format(ctx *FmtCtx) {
 func (node *ShowTableValues) GetStatementType() string { return "Show Table Values" }
 func (node *ShowTableValues) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowTableValues(table *UnresolvedObjectName, dbname string) *ShowTableValues {
-	return &ShowTableValues{
-		Table:  table,
-		DbName: dbname,
-	}
+func NewShowTableValues(table *UnresolvedObjectName, dbname string, buf *buffer.Buffer) *ShowTableValues {
+	stv := buffer.Alloc[ShowTableValues](buf)
+	stv.Table = table
+	stv.DbName = dbname
+	return stv
 }
 
 type ShowAccounts struct {
 	showImpl
 	Like *ComparisonExpr
+}
+
+func NewShowAccounts(l *ComparisonExpr, buf *buffer.Buffer) *ShowAccounts {
+	s := buffer.Alloc[ShowAccounts](buf)
+	s.Like = l
+	return s
 }
 
 func (node *ShowAccounts) Format(ctx *FmtCtx) {
@@ -703,6 +779,12 @@ type ShowPublications struct {
 	Like *ComparisonExpr
 }
 
+func NewShowPublications(l *ComparisonExpr, buf *buffer.Buffer) *ShowPublications {
+	s := buffer.Alloc[ShowPublications](buf)
+	s.Like = l
+	return s
+}
+
 func (node *ShowPublications) Format(ctx *FmtCtx) {
 	ctx.WriteString("show publications")
 	if node.Like != nil {
@@ -719,6 +801,12 @@ type ShowSubscriptions struct {
 	Like *ComparisonExpr
 }
 
+func NewShowSubscriptions(l *ComparisonExpr, buf *buffer.Buffer) *ShowSubscriptions {
+	s := buffer.Alloc[ShowSubscriptions](buf)
+	s.Like = l
+	return s
+}
+
 func (node *ShowSubscriptions) Format(ctx *FmtCtx) {
 	ctx.WriteString("show subscriptions")
 	if node.Like != nil {
@@ -732,6 +820,12 @@ func (node *ShowSubscriptions) GetQueryType() string     { return QueryTypeOth }
 type ShowCreatePublications struct {
 	showImpl
 	Name string
+}
+
+func NewShowCreatePublications(n string, buf *buffer.Buffer) *ShowCreatePublications {
+	s := buffer.Alloc[ShowCreatePublications](buf)
+	s.Name = n
+	return s
 }
 
 func (node *ShowCreatePublications) Format(ctx *FmtCtx) {
@@ -761,11 +855,11 @@ func (node *ShowTableSize) Format(ctx *FmtCtx) {
 func (node *ShowTableSize) GetStatementType() string { return "Show Table Size" }
 func (node *ShowTableSize) GetQueryType() string     { return QueryTypeDQL }
 
-func NewShowTableSize(table *UnresolvedObjectName, dbname string) *ShowTableSize {
-	return &ShowTableSize{
-		Table:  table,
-		DbName: dbname,
-	}
+func NewShowTableSize(table *UnresolvedObjectName, dbname string, buf *buffer.Buffer) *ShowTableSize {
+	sts := buffer.Alloc[ShowTableSize](buf)
+	sts.Table = table
+	sts.DbName = dbname
+	return sts
 }
 
 // show Roles statement
@@ -773,6 +867,12 @@ func NewShowTableSize(table *UnresolvedObjectName, dbname string) *ShowTableSize
 type ShowRolesStmt struct {
 	showImpl
 	Like *ComparisonExpr
+}
+
+func NewShowRolesStmt(l *ComparisonExpr, buf *buffer.Buffer) *ShowRolesStmt {
+	s := buffer.Alloc[ShowRolesStmt](buf)
+	s.Like = l
+	return s
 }
 
 func (node *ShowRolesStmt) Format(ctx *FmtCtx) {
@@ -789,6 +889,11 @@ func (node *ShowRolesStmt) GetQueryType() string     { return QueryTypeOth }
 // ShowBackendServers indicates SHOW BACKEND SERVERS statement.
 type ShowBackendServers struct {
 	showImpl
+}
+
+func NewShowBackendServers(buf *buffer.Buffer) *ShowBackendServers {
+	s := buffer.Alloc[ShowBackendServers](buf)
+	return s
 }
 
 func (node *ShowBackendServers) Format(ctx *FmtCtx) {
@@ -808,8 +913,9 @@ func (node *ShowConnectors) Format(ctx *FmtCtx) {
 func (node *ShowConnectors) GetStatementType() string { return "Show Connectors" }
 func (node *ShowConnectors) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowConnectors(f bool) *ShowConnectors {
-	return &ShowConnectors{}
+func NewShowConnectors(buf *buffer.Buffer) *ShowConnectors {
+	sc := buffer.Alloc[ShowConnectors](buf)
+	return sc
 }
 
 type EmptyStmt struct {

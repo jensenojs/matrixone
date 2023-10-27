@@ -24,6 +24,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
@@ -267,7 +268,7 @@ func replaceColRefsForSet(expr *plan.Expr, projects []*plan.Expr) *plan.Expr {
 	return expr
 }
 
-func splitAndBindCondition(astExpr tree.Expr, expandAlias ExpandAliasMode, ctx *BindContext) ([]*plan.Expr, error) {
+func splitAndBindCondition(astExpr tree.Expr, expandAlias ExpandAliasMode, ctx *BindContext, buf *buffer.Buffer) ([]*plan.Expr, error) {
 	conds := splitAstConjunction(astExpr)
 	exprs := make([]*plan.Expr, len(conds))
 
@@ -284,7 +285,7 @@ func splitAndBindCondition(astExpr tree.Expr, expandAlias ExpandAliasMode, ctx *
 		// expr must be bool type, if not, try to do type convert
 		// but just ignore the subQuery. It will be solved at optimizer.
 		if expr.GetSub() == nil {
-			expr, err = makePlan2CastExpr(ctx.binder.GetContext(), expr, &plan.Type{Id: int32(types.T_bool)})
+			expr, err = makePlan2CastExpr(ctx.binder.GetContext(), expr, &plan.Type{Id: int32(types.T_bool)}, nil)
 			if err != nil {
 				return nil, err
 			}

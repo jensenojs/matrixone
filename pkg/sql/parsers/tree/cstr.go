@@ -16,6 +16,8 @@ package tree
 
 import (
 	"strings"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 )
 
 type CStr struct {
@@ -24,8 +26,14 @@ type CStr struct {
 	// quote bool
 }
 
-func NewCStr(str string, lower int64) *CStr {
-	cs := &CStr{o: str}
+func NewCStr(str string, lower int64, buf *buffer.Buffer) *CStr {
+	var cs *CStr
+	if buf != nil {
+		cs = buffer.Alloc[CStr](buf)
+	} else {
+		cs = new(CStr)
+	}
+	cs.o = str
 	if lower == 0 {
 		cs.c = cs.o
 		return cs

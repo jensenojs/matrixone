@@ -17,6 +17,7 @@ package plan
 import (
 	"go/constant"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
@@ -24,7 +25,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 )
 
-func NewHavingBinder(builder *QueryBuilder, ctx *BindContext) *HavingBinder {
+func NewHavingBinder(builder *QueryBuilder, ctx *BindContext, buf *buffer.Buffer) *HavingBinder {
 	b := &HavingBinder{
 		insideAgg: false,
 	}
@@ -32,6 +33,7 @@ func NewHavingBinder(builder *QueryBuilder, ctx *BindContext) *HavingBinder {
 	b.builder = builder
 	b.ctx = ctx
 	b.impl = b
+	b.buf = buf
 
 	return b
 }

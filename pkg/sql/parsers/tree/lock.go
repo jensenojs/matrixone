@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // TableLockType is the type of the table lock.
 type TableLockType int32
 
@@ -54,9 +56,22 @@ type TableLock struct {
 	LockType TableLockType
 }
 
+func NewTableLock(t TableName ,l TableLockType, buf *buffer.Buffer) *TableLock {
+	ta := buffer.Alloc[TableLock](buf)	
+	ta.Table = t
+	ta.LockType = l
+	return ta
+}
+
 type LockTableStmt struct {
 	statementImpl
 	TableLocks []TableLock
+}
+
+func NewLockTableStmt(tblocks []TableLock, buf *buffer.Buffer) *LockTableStmt {
+	lo := buffer.Alloc[LockTableStmt](buf)	
+	lo.TableLocks = tblocks
+	return lo
 }
 
 func (node *LockTableStmt) Format(ctx *FmtCtx) {
@@ -78,6 +93,11 @@ func (node *LockTableStmt) GetQueryType() string     { return QueryTypeOth }
 
 type UnLockTableStmt struct {
 	statementImpl
+}
+
+func NewUnLockTableStmt(buf *buffer.Buffer) *UnLockTableStmt {
+	u := buffer.Alloc[UnLockTableStmt](buf)
+	return u
 }
 
 func (node *UnLockTableStmt) Format(ctx *FmtCtx) {

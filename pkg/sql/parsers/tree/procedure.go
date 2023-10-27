@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type InOutArgType int
 
 const (
@@ -56,21 +58,19 @@ type ProcedureName struct {
 	Name objName
 }
 
-func NewProcedureName(name Identifier, prefix ObjectNamePrefix) *ProcedureName {
-	return &ProcedureName{
-		Name: objName{
-			ObjectName:       name,
-			ObjectNamePrefix: prefix,
-		},
-	}
+func NewProcedureName(name Identifier, prefix ObjectNamePrefix, buf *buffer.Buffer) *ProcedureName {
+	pn := buffer.Alloc[ProcedureName](buf)
+	pn.Name.ObjectName = name
+	pn.Name.ObjectNamePrefix = prefix
+	return pn
 }
 
-func NewProcedureArgDecl(f InOutArgType, n *UnresolvedName, t ResolvableTypeReference) *ProcedureArgDecl {
-	return &ProcedureArgDecl{
-		Name:      n,
-		Type:      t,
-		InOutType: f,
-	}
+func NewProcedureArgDecl(inOutType InOutArgType, name *UnresolvedName, typ ResolvableTypeReference, buf *buffer.Buffer) *ProcedureArgDecl {
+	pad := buffer.Alloc[ProcedureArgDecl](buf)
+	pad.Name = name
+	pad.Type = typ
+	pad.InOutType = inOutType
+	return pad
 }
 
 func (node *ProcedureArgDecl) Format(ctx *FmtCtx) {
@@ -122,10 +122,25 @@ type CreateProcedure struct {
 	Body string
 }
 
+func NewCreateProcedure(n *ProcedureName, args ProcedureArgs, body string, buf *buffer.Buffer) *CreateProcedure {
+	drop := buffer.Alloc[CreateProcedure](buf)	
+	drop.Name = n
+	drop.Args = args
+	drop.Body = body
+	return drop
+}
+
 type DropProcedure struct {
 	statementImpl
 	Name     *ProcedureName
 	IfExists bool
+}
+
+func NewDropProcedure(n *ProcedureName, ifs bool, buf *buffer.Buffer) *DropProcedure {
+	drop := buffer.Alloc[DropProcedure](buf)	
+	drop.Name = n
+	drop.IfExists = ifs
+	return drop
 }
 
 func (node *CreateProcedure) Format(ctx *FmtCtx) {
@@ -164,6 +179,13 @@ type CallStmt struct {
 	statementImpl
 	Name *ProcedureName
 	Args Exprs
+}
+
+func NewCallStmt(n *ProcedureName, a Exprs, buf *buffer.Buffer) *CallStmt {
+	c := buffer.Alloc[CallStmt](buf)
+	c.Name = n
+	c.Args = a
+	return c
 }
 
 func (node *CallStmt) Format(ctx *FmtCtx) {

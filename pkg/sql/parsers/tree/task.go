@@ -14,9 +14,17 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type PauseDaemonTask struct {
 	statementImpl
 	TaskID uint64
+}
+
+func NewPauseDaemonTask(t uint64, buf *buffer.Buffer) *PauseDaemonTask {
+	r := buffer.Alloc[PauseDaemonTask](buf)
+	r.TaskID = t
+	return r
 }
 
 func (node *PauseDaemonTask) Format(ctx *FmtCtx) {
@@ -33,6 +41,12 @@ type CancelDaemonTask struct {
 	TaskID uint64
 }
 
+func NewCancelDaemonTask(t uint64, buf *buffer.Buffer) *CancelDaemonTask {
+	r := buffer.Alloc[CancelDaemonTask](buf)
+	r.TaskID = t
+	return r
+}
+
 func (node *CancelDaemonTask) Format(ctx *FmtCtx) {
 	ctx.WriteString("cancel daemon task")
 	ctx.WriteByte(' ')
@@ -45,6 +59,12 @@ func (node *CancelDaemonTask) GetQueryType() string     { return QueryTypeDML }
 type ResumeDaemonTask struct {
 	statementImpl
 	TaskID uint64
+}
+
+func NewResumeDaemonTask(t uint64, buf *buffer.Buffer) *ResumeDaemonTask {
+	r := buffer.Alloc[ResumeDaemonTask](buf)
+	r.TaskID = t
+	return r
 }
 
 func (node *ResumeDaemonTask) Format(ctx *FmtCtx) {

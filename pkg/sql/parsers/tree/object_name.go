@@ -16,6 +16,8 @@ package tree
 
 import (
 	"context"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 )
 
@@ -42,6 +44,11 @@ type ObjectNamePrefix struct {
 	ExplicitCatalog bool
 	//true iff the schema was explicitly specified
 	ExplicitSchema bool
+}
+
+func NewObjectNamePrefix(buf *buffer.Buffer) *ObjectNamePrefix {
+	o := buffer.Alloc[ObjectNamePrefix](buf)
+	return o
 }
 
 // the unresolved qualified name for a database object (table, view, etc)
@@ -77,21 +84,31 @@ func (node *UnresolvedObjectName) ToTableName() TableName {
 	}
 }
 
-func NewUnresolvedObjectName(ctx context.Context, num int, parts [3]string) (*UnresolvedObjectName, error) {
+func NewUnresolvedObjectName(ctx context.Context, num int, parts [3]string, buf *buffer.Buffer) (*UnresolvedObjectName, error) {
 	if num < 1 || num > 3 {
 		return nil, moerr.NewInternalError(ctx, "invalid number of parts")
 	}
-	return &UnresolvedObjectName{
-		NumParts: num,
-		Parts:    parts,
-	}, nil
+	var u *UnresolvedObjectName
+	if buf != nil {
+		u = new(UnresolvedObjectName)
+	} else {
+		u = buffer.Alloc[UnresolvedObjectName](buf)
+	}
+	u.NumParts = num
+	u.Parts = parts
+	return u, nil
 }
 
-func SetUnresolvedObjectName(num int, parts [3]string) *UnresolvedObjectName {
-	return &UnresolvedObjectName{
-		NumParts: num,
-		Parts:    parts,
+func SetUnresolvedObjectName(num int, parts [3]string, buf *buffer.Buffer) *UnresolvedObjectName {
+	var u *UnresolvedObjectName
+	if buf != nil {
+		u = buffer.Alloc[UnresolvedObjectName](buf)
+	} else {
+		u = new(UnresolvedObjectName)
 	}
+	u.NumParts = num
+	u.Parts = parts
+	return u
 }
 
 func (node *UnresolvedObjectName) GetDBName() string {

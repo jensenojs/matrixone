@@ -16,6 +16,8 @@ package tree
 
 import (
 	"fmt"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 )
 
 type AlterUser struct {
@@ -56,13 +58,14 @@ func (node *AlterUser) Format(ctx *FmtCtx) {
 func (node *AlterUser) GetStatementType() string { return "Alter User" }
 func (node *AlterUser) GetQueryType() string     { return QueryTypeDCL }
 
-func NewAlterUser(ife bool, u []*User, r *Role, m UserMiscOption) *AlterUser {
-	return &AlterUser{
-		IfExists: ife,
-		Users:    u,
-		Role:     r,
-		MiscOpt:  m,
-	}
+func NewAlterUser(e bool, u []*User, r *Role, m UserMiscOption, c AccountCommentOrAttribute, buf *buffer.Buffer) *AlterUser {
+	a := buffer.Alloc[AlterUser](buf)
+	a.IfExists = e
+	a.Role = r
+	a.MiscOpt = m
+	a.CommentOrAttribute = c
+	a.Users = u
+	return a
 }
 
 type AlterAccountAuthOption struct {
@@ -70,6 +73,14 @@ type AlterAccountAuthOption struct {
 	Equal          string
 	AdminName      string
 	IdentifiedType AccountIdentified
+}
+
+func NewAlterAccountAuthOption(exist bool, equal, name string, buf *buffer.Buffer) *AlterAccountAuthOption {
+	a := buffer.Alloc[AlterAccountAuthOption](buf)
+	a.Exist = exist
+	a.Equal = equal
+	a.AdminName = name
+	return a
 }
 
 func (node *AlterAccountAuthOption) Format(ctx *FmtCtx) {
@@ -96,6 +107,16 @@ type AlterAccount struct {
 	Comment AccountComment
 }
 
+func NewAlterAccount(exist bool, name string, aopt AlterAccountAuthOption, sopt AccountStatus, c AccountComment, buf *buffer.Buffer) *AlterAccount {
+	a := buffer.Alloc[AlterAccount](buf)
+	a.IfExists = exist
+	a.Name = name
+	a.AuthOption = aopt
+	a.StatusOption = sopt
+	a.Comment = c
+	return a
+}
+
 func (ca *AlterAccount) Format(ctx *FmtCtx) {
 	ctx.WriteString("alter account ")
 	if ca.IfExists {
@@ -116,6 +137,15 @@ type AlterView struct {
 	Name     *TableName
 	ColNames IdentifierList
 	AsSource *Select
+}
+
+func NewAlterView(exist bool, name *TableName, colNames IdentifierList, asSource *Select, buf *buffer.Buffer) *AlterView {
+	a := buffer.Alloc[AlterView](buf)
+	a.IfExists = exist
+	a.Name = name
+	a.ColNames = colNames
+	a.AsSource = asSource
+	return a
 }
 
 func (node *AlterView) Format(ctx *FmtCtx) {
@@ -149,6 +179,15 @@ type AlterDataBaseConfig struct {
 	UpdateConfig   string
 }
 
+func NewAlterDataBaseConfig(accountName, dbName string, isAccountLevel bool, updateConfig string, buf *buffer.Buffer) *AlterDataBaseConfig {
+	a := buffer.Alloc[AlterDataBaseConfig](buf)
+	a.AccountName = accountName
+	a.DbName = dbName
+	a.IsAccountLevel = isAccountLevel
+	a.UpdateConfig = updateConfig
+	return a
+}
+
 func (node *AlterDataBaseConfig) Format(ctx *FmtCtx) {
 
 	if node.IsAccountLevel {
@@ -178,6 +217,13 @@ type AlterTable struct {
 	statementImpl
 	Table   *TableName
 	Options AlterTableOptions
+}
+
+func NewAlterTable(table *TableName, options AlterTableOptions, buf *buffer.Buffer) *AlterTable {
+	a := buffer.Alloc[AlterTable](buf)
+	a.Table = table
+	a.Options = options
+	return a
 }
 
 func (node *AlterTable) Format(ctx *FmtCtx) {
@@ -211,6 +257,13 @@ type AlterOptionAlterIndex struct {
 	Visibility VisibleType
 }
 
+func NewAlterOptionAlterIndex(name Identifier, visibility VisibleType, buf *buffer.Buffer) *AlterOptionAlterIndex {
+	a := buffer.Alloc[AlterOptionAlterIndex](buf)
+	a.Name = name
+	a.Visibility = visibility
+	return a
+}
+
 func (node *AlterOptionAlterIndex) Format(ctx *FmtCtx) {
 	ctx.WriteString("alter index ")
 	node.Name.Format(ctx)
@@ -228,6 +281,13 @@ type AlterOptionAlterCheck struct {
 	Enforce bool
 }
 
+func NewAlterOptionAlterCheck(t string, enforce bool, buf *buffer.Buffer) *AlterOptionAlterCheck {
+	a := buffer.Alloc[AlterOptionAlterCheck](buf)
+	a.Type = t
+	a.Enforce = enforce
+	return a
+}
+
 func (node *AlterOptionAlterCheck) Format(ctx *FmtCtx) {
 	ctx.WriteString("alter ")
 	ctx.WriteString(node.Type + " ")
@@ -241,6 +301,12 @@ func (node *AlterOptionAlterCheck) Format(ctx *FmtCtx) {
 type AlterOptionAdd struct {
 	alterOptionImpl
 	Def TableDef
+}
+
+func NewAlterOptionAdd(def TableDef, buf *buffer.Buffer) *AlterOptionAdd {
+	a := buffer.Alloc[AlterOptionAdd](buf)
+	a.Def = def
+	return a
 }
 
 func (node *AlterOptionAdd) Format(ctx *FmtCtx) {
@@ -262,6 +328,13 @@ type AlterOptionDrop struct {
 	alterOptionImpl
 	Typ  AlterTableDropType
 	Name Identifier
+}
+
+func NewAlterOptionDrop(typ AlterTableDropType, name Identifier, buf *buffer.Buffer) *AlterOptionDrop {
+	a := buffer.Alloc[AlterOptionDrop](buf)
+	a.Typ = typ
+	a.Name = name
+	return a
 }
 
 func (node *AlterOptionDrop) Format(ctx *FmtCtx) {
@@ -288,6 +361,12 @@ type AlterTableName struct {
 	Name *UnresolvedObjectName
 }
 
+func NewAlterTableName(name *UnresolvedObjectName, buf *buffer.Buffer) *AlterTableName {
+	a := buffer.Alloc[AlterTableName](buf)
+	a.Name = name
+	return a
+}
+
 func (node *AlterTableName) Format(ctx *FmtCtx) {
 	ctx.WriteString("rename to ")
 	node.Name.ToTableName().Format(ctx)
@@ -304,6 +383,13 @@ type AlterAddCol struct {
 	Position *ColumnPosition
 }
 
+func NewAlterAddCol(column *ColumnTableDef, position *ColumnPosition, buf *buffer.Buffer) *AlterAddCol {
+	a := buffer.Alloc[AlterAddCol](buf)
+	a.Column = column
+	a.Position = position
+	return a
+}
+
 func (node *AlterAddCol) Format(ctx *FmtCtx) {
 	ctx.WriteString("add column ")
 	node.Column.Format(ctx)
@@ -317,12 +403,30 @@ type AccountsSetOption struct {
 	DropAccounts IdentifierList
 }
 
+func NewAccountsSetOption(al bool, se, ad, dr IdentifierList, buf *buffer.Buffer) *AccountsSetOption {
+	a := buffer.Alloc[AccountsSetOption](buf)
+	a.All = al
+	a.SetAccounts = se
+	a.AddAccounts = ad
+	a.DropAccounts = dr
+	return a
+}
+
 type AlterPublication struct {
 	statementImpl
 	IfExists    bool
 	Name        Identifier
 	AccountsSet *AccountsSetOption
 	Comment     string
+}
+
+func NewAlterPublication(exist bool, name Identifier, accountsSet *AccountsSetOption, comment string, buf *buffer.Buffer) *AlterPublication {
+	a := buffer.Alloc[AlterPublication](buf)
+	a.IfExists = exist
+	a.Name = name
+	a.AccountsSet = accountsSet
+	a.Comment = comment
+	return a
 }
 
 func (node *AlterPublication) Format(ctx *FmtCtx) {
@@ -365,6 +469,14 @@ type AlterTableModifyColumnClause struct {
 	Position  *ColumnPosition
 }
 
+func NewAlterTableModifyColumnClause(typ AlterTableOptionType, newColumn *ColumnTableDef, position *ColumnPosition, buf *buffer.Buffer) *AlterTableModifyColumnClause {
+	a := buffer.Alloc[AlterTableModifyColumnClause](buf)
+	a.Typ = typ
+	a.NewColumn = newColumn
+	a.Position = position
+	return a
+}
+
 func (node *AlterTableModifyColumnClause) Format(ctx *FmtCtx) {
 	ctx.WriteString("modify column ")
 	node.NewColumn.Format(ctx)
@@ -377,6 +489,15 @@ type AlterTableChangeColumnClause struct {
 	OldColumnName *UnresolvedName
 	NewColumn     *ColumnTableDef
 	Position      *ColumnPosition
+}
+
+func NewAlterTableChangeColumnClause(typ AlterTableOptionType, oldColumnName *UnresolvedName, newColumn *ColumnTableDef, position *ColumnPosition, buf *buffer.Buffer) *AlterTableChangeColumnClause {
+	a := buffer.Alloc[AlterTableChangeColumnClause](buf)
+	a.Typ = typ
+	a.OldColumnName = oldColumnName
+	a.NewColumn = newColumn
+	a.Position = position
+	return a
 }
 
 func (node *AlterTableChangeColumnClause) Format(ctx *FmtCtx) {
@@ -394,6 +515,14 @@ type AlterTableAddColumnClause struct {
 	NewColumns []*ColumnTableDef
 	Position   *ColumnPosition
 	// when Position is not none, the len(NewColumns) must be one
+}
+
+func NewAlterTableAddColumnClause(typ AlterTableOptionType, newColumns []*ColumnTableDef, position *ColumnPosition, buf *buffer.Buffer) *AlterTableAddColumnClause {
+	a := buffer.Alloc[AlterTableAddColumnClause](buf)
+	a.Typ = typ
+	a.NewColumns = newColumns
+	a.Position = position
+	return a
 }
 
 func (node *AlterTableAddColumnClause) Format(ctx *FmtCtx) {
@@ -415,6 +544,14 @@ type AlterTableRenameColumnClause struct {
 	Typ           AlterTableOptionType
 	OldColumnName *UnresolvedName
 	NewColumnName *UnresolvedName
+}
+
+func NewAlterTableRenameColumnClause(typ AlterTableOptionType, oldColumnName *UnresolvedName, newColumnName *UnresolvedName, buf *buffer.Buffer) *AlterTableRenameColumnClause {
+	a := buffer.Alloc[AlterTableRenameColumnClause](buf)
+	a.Typ = typ
+	a.OldColumnName = oldColumnName
+	a.NewColumnName = newColumnName
+	return a
 }
 
 func (node *AlterTableRenameColumnClause) Format(ctx *FmtCtx) {
@@ -443,6 +580,16 @@ type AlterTableAlterColumnClause struct {
 	OptionType  AlterColumnOptionType
 }
 
+func NewAlterTableAlterColumnClause(typ AlterTableOptionType, columnName *UnresolvedName, defalutExpr *AttributeDefault, visibility VisibleType, optionType AlterColumnOptionType, buf *buffer.Buffer) *AlterTableAlterColumnClause {
+	a := buffer.Alloc[AlterTableAlterColumnClause](buf)
+	a.Typ = typ
+	a.ColumnName = columnName
+	a.DefalutExpr = defalutExpr
+	a.Visibility = visibility
+	a.OptionType = optionType
+	return a
+}
+
 func (node *AlterTableAlterColumnClause) Format(ctx *FmtCtx) {
 	ctx.WriteString("alter column ")
 	node.ColumnName.Format(ctx)
@@ -468,6 +615,13 @@ type AlterTableOrderByColumnClause struct {
 	AlterOrderByList []*AlterColumnOrder
 }
 
+func NewAlterTableOrderByColumnClause(typ AlterTableOptionType, alterOrderByList []*AlterColumnOrder, buf *buffer.Buffer) *AlterTableOrderByColumnClause {
+	a := buffer.Alloc[AlterTableOrderByColumnClause](buf)
+	a.Typ = typ
+	a.AlterOrderByList = alterOrderByList
+	return a
+}
+
 func (node *AlterTableOrderByColumnClause) Format(ctx *FmtCtx) {
 	prefix := "order by "
 	for _, columnOrder := range node.AlterOrderByList {
@@ -480,6 +634,13 @@ func (node *AlterTableOrderByColumnClause) Format(ctx *FmtCtx) {
 type AlterColumnOrder struct {
 	Column    *UnresolvedName
 	Direction Direction
+}
+
+func NewAlterColumnOrder(column *UnresolvedName, direction Direction, buf *buffer.Buffer) *AlterColumnOrder {
+	a := buffer.Alloc[AlterColumnOrder](buf)
+	a.Column = column
+	a.Direction = direction
+	return a
 }
 
 func (node *AlterColumnOrder) Format(ctx *FmtCtx) {
@@ -522,6 +683,13 @@ type ColumnPosition struct {
 	Typ ColumnPositionType
 	// RelativeColumn is the column the newly added column after if type is ColumnPositionAfter
 	RelativeColumn *UnresolvedName
+}
+
+func NewColumnPosition(typ ColumnPositionType, relativeColumn *UnresolvedName, buf *buffer.Buffer) *ColumnPosition {
+	a := buffer.Alloc[ColumnPosition](buf)
+	a.Typ = typ
+	a.RelativeColumn = relativeColumn
+	return a
 }
 
 func (node *ColumnPosition) Format(ctx *FmtCtx) {

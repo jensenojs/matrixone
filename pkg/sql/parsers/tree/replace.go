@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // the REPLACE statement.
 type Replace struct {
 	statementImpl
@@ -47,11 +49,9 @@ func (node *Replace) Format(ctx *FmtCtx) {
 func (node *Replace) GetStatementType() string { return "Replace" }
 func (node *Replace) GetQueryType() string     { return QueryTypeDML }
 
-func NewReplace(t TableExpr, c IdentifierList, r *Select, p IdentifierList) *Replace {
-	return &Replace{
-		Table:          t,
-		Columns:        c,
-		Rows:           r,
-		PartitionNames: p,
-	}
+func NewReplace(columns IdentifierList, rows *Select, buf *buffer.Buffer) *Replace {
+	r := buffer.Alloc[Replace](buf)
+	r.Columns = columns
+	r.Rows = rows
+	return r
 }

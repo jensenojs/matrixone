@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type FunctionArg interface {
 	NodeFormatter
 	Expr
@@ -78,10 +80,29 @@ type CreateFunction struct {
 	Language   string
 }
 
+func NewCreateFunction(n *FunctionName, args FunctionArgs, returnTyp *ReturnType, language , body string, buf *buffer.Buffer) *CreateFunction {
+	c := buffer.Alloc[CreateFunction](buf)	
+	c.Name = n
+	c.Args = args
+	c.ReturnType = returnTyp
+	c.Body = body
+	c.Language = language
+	return c
+}
+
+
+
 type DropFunction struct {
 	statementImpl
 	Name *FunctionName
 	Args FunctionArgs
+}
+
+func NewDropFunction(n *FunctionName, args FunctionArgs, buf *buffer.Buffer) *DropFunction {
+	drop := buffer.Alloc[DropFunction](buf)	
+	drop.Name = n
+	drop.Args = args
+	return drop
 }
 
 func (node *FunctionName) Format(ctx *FmtCtx) {
@@ -145,27 +166,25 @@ func (node *DropFunction) Format(ctx *FmtCtx) {
 	ctx.WriteString(")")
 }
 
-func NewFunctionArgDecl(n *UnresolvedName, t ResolvableTypeReference, d Expr) *FunctionArgDecl {
-	return &FunctionArgDecl{
-		Name:       n,
-		Type:       t,
-		DefaultVal: d,
-	}
+func NewFunctionArgDecl(name *UnresolvedName, typ ResolvableTypeReference, defaultVal Expr, buf *buffer.Buffer) *FunctionArgDecl {
+	fad := buffer.Alloc[FunctionArgDecl](buf)
+	fad.Name = name
+	fad.Type = typ
+	fad.DefaultVal = defaultVal
+	return fad
 }
 
-func NewFuncName(name Identifier, prefix ObjectNamePrefix) *FunctionName {
-	return &FunctionName{
-		Name: objName{
-			ObjectName:       name,
-			ObjectNamePrefix: prefix,
-		},
-	}
+func NewFuncName(name Identifier, prefix ObjectNamePrefix, buf *buffer.Buffer) *FunctionName {
+	fn := buffer.Alloc[FunctionName](buf)
+	fn.Name.ObjectName = name
+	fn.Name.ObjectNamePrefix = prefix
+	return fn
 }
 
-func NewReturnType(t ResolvableTypeReference) *ReturnType {
-	return &ReturnType{
-		Type: t,
-	}
+func NewReturnType(typ ResolvableTypeReference, buf *buffer.Buffer) *ReturnType {
+	rt := buffer.Alloc[ReturnType](buf)
+	rt.Type = typ
+	return rt
 }
 
 func (node *CreateFunction) GetStatementType() string { return "CreateFunction" }

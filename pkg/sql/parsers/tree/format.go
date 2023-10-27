@@ -30,6 +30,7 @@ type FmtCtx struct {
 	singleQuoteString bool
 }
 
+// failde to use buffer to manage it because of func String here
 func NewFmtCtx(dialectType dialect.DialectType, opts ...FmtCtxOption) *FmtCtx {
 	ctx := &FmtCtx{
 		Builder:     new(strings.Builder),

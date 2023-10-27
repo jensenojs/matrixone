@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // the INSERT statement.
 type Insert struct {
 	statementImpl
@@ -58,16 +60,21 @@ func (node *Insert) Format(ctx *FmtCtx) {
 func (node *Insert) GetStatementType() string { return "Insert" }
 func (node *Insert) GetQueryType() string     { return QueryTypeDML }
 
-func NewInsert(t TableExpr, c IdentifierList, r *Select, p IdentifierList) *Insert {
-	return &Insert{
-		Table:          t,
-		Columns:        c,
-		Rows:           r,
-		PartitionNames: p,
-	}
+func NewInsert(columns IdentifierList, rows *Select, buf *buffer.Buffer) *Insert {
+	i := buffer.Alloc[Insert](buf)
+	i.Columns = columns
+	i.Rows = rows
+	return i
 }
 
 type Assignment struct {
 	Column Identifier
 	Expr   Expr
+}
+
+func NewAssignment(column Identifier, expr Expr, buf *buffer.Buffer) *Assignment {
+	i := buffer.Alloc[Assignment](buf)
+	i.Column = column
+	i.Expr = expr
+	return i
 }

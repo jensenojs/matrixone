@@ -17,6 +17,8 @@ package tree
 import (
 	"fmt"
 	"strings"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 )
 
 type SelectStatement interface {
@@ -61,12 +63,14 @@ func (node *Select) Format(ctx *FmtCtx) {
 func (node *Select) GetStatementType() string { return "Select" }
 func (node *Select) GetQueryType() string     { return QueryTypeDQL }
 
-func NewSelect(s SelectStatement, o OrderBy, l *Limit) *Select {
-	return &Select{
-		Select:  s,
-		OrderBy: o,
-		Limit:   l,
-	}
+func NewSelect(s SelectStatement, o OrderBy, l *Limit, ep *ExportParam, sinfo *SelectLockInfo, buf *buffer.Buffer) *Select {
+	se := buffer.Alloc[Select](buf)
+	se.Select = s
+	se.OrderBy = o
+	se.Limit = l
+	se.Ep = ep
+	se.SelectLockInfo = sinfo
+	return se
 }
 
 // OrderBy represents an ORDER BY clause.
@@ -102,13 +106,13 @@ func (node *Order) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewOrder(e Expr, d Direction, np NullsPosition, o bool) *Order {
-	return &Order{
-		Expr:          e,
-		Direction:     d,
-		NullsPosition: np,
-		NullOrder:     o,
-	}
+func NewOrder(e Expr, d Direction, np NullsPosition, o bool, buf *buffer.Buffer) *Order {
+	or := buffer.Alloc[Order](buf)
+	or.Expr = e
+	or.Direction = d
+	or.NullsPosition = np
+	or.NullOrder = o
+	return or
 }
 
 // Direction for ordering results.
@@ -176,17 +180,23 @@ func (node *Limit) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewLimit(o, c Expr) *Limit {
-	return &Limit{
-		Offset: o,
-		Count:  c,
-	}
+func NewLimit(o, c Expr, buf *buffer.Buffer) *Limit {
+	l := buffer.Alloc[Limit](buf)
+	l.Offset = o
+	l.Count = c
+	return l
 }
 
 // the parenthesized SELECT/UNION/VALUES statement.
 type ParenSelect struct {
 	SelectStatement
 	Select *Select
+}
+
+func NewParenSelect(s *Select, buf *buffer.Buffer) *ParenSelect {
+	p := buffer.Alloc[ParenSelect](buf)
+	p.Select = s
+	return p
 }
 
 func (node *ParenSelect) Format(ctx *FmtCtx) {
@@ -205,6 +215,18 @@ type SelectClause struct {
 	GroupBy  GroupBy
 	Having   *Where
 	Option   string
+}
+
+func NewSelectClause(distinct bool, expr SelectExprs, from *From, where *Where, groupby GroupBy, having *Where, opt string, buf *buffer.Buffer) *SelectClause {
+	sec := buffer.Alloc[SelectClause](buf)
+	sec.Distinct = distinct
+	sec.Exprs = expr
+	sec.From = from
+	sec.Where = where
+	sec.GroupBy = groupby
+	sec.Having = having
+	sec.Option = opt
+	return sec
 }
 
 func (node *SelectClause) Format(ctx *FmtCtx) {
@@ -267,8 +289,11 @@ const (
 	AstHaving = "having"
 )
 
-func NewWhere(e Expr) *Where {
-	return &Where{Expr: e}
+func NewWhere(t string, e Expr, buf *buffer.Buffer) *Where {
+	w := buffer.Alloc[Where](buf)
+	w.Type = t
+	w.Expr = e
+	return w
 }
 
 // SELECT expressions.
@@ -301,6 +326,12 @@ func (node *SelectExpr) Format(ctx *FmtCtx) {
 // a GROUP BY clause.
 type GroupBy []Expr
 
+func NewGroupBy(es []Expr, buf *buffer.Buffer) GroupBy {
+	g := buffer.MakeSlice[Expr](buf)
+	g = es
+	return g
+}
+
 func (node *GroupBy) Format(ctx *FmtCtx) {
 	prefix := "group by "
 	for _, n := range *node {
@@ -309,6 +340,12 @@ func (node *GroupBy) Format(ctx *FmtCtx) {
 		prefix = ", "
 	}
 }
+
+// func NewGroupBy(es []Expr, buf *buffer.Buffer) *GroupBy {
+// 	g := buffer.Alloc[GroupBy](buf)
+		
+// 	return a
+// }
 
 const (
 	JOIN_TYPE_FULL          = "FULL"
@@ -359,13 +396,13 @@ func (node *JoinTableExpr) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewJoinTableExpr(jt string, l, r TableExpr, jc JoinCond) *JoinTableExpr {
-	return &JoinTableExpr{
-		JoinType: jt,
-		Left:     l,
-		Right:    r,
-		Cond:     jc,
-	}
+func NewJoinTableExpr(l TableExpr, jt string, r TableExpr, jc JoinCond, buf *buffer.Buffer) *JoinTableExpr {
+	jte := buffer.Alloc[JoinTableExpr](buf)
+	jte.JoinType = jt
+	jte.Left = l
+	jte.Right = r
+	jte.Cond = jc
+	return jte
 }
 
 // the join condition.
@@ -382,8 +419,9 @@ func (node *NaturalJoinCond) Format(ctx *FmtCtx) {
 	ctx.WriteString("natural")
 }
 
-func NewNaturalJoinCond() *NaturalJoinCond {
-	return &NaturalJoinCond{}
+func NewNaturalJoinCond(buf *buffer.Buffer) *NaturalJoinCond {
+	njc := buffer.Alloc[NaturalJoinCond](buf)
+	return njc
 }
 
 // the ON condition for join
@@ -397,8 +435,10 @@ func (node *OnJoinCond) Format(ctx *FmtCtx) {
 	node.Expr.Format(ctx)
 }
 
-func NewOnJoinCond(e Expr) *OnJoinCond {
-	return &OnJoinCond{Expr: e}
+func NewOnJoinCond(e Expr, buf *buffer.Buffer) *OnJoinCond {
+	ojc := buffer.Alloc[OnJoinCond](buf)
+	ojc.Expr = e
+	return ojc
 }
 
 // the USING condition
@@ -413,8 +453,10 @@ func (node *UsingJoinCond) Format(ctx *FmtCtx) {
 	ctx.WriteByte(')')
 }
 
-func NewUsingJoinCond(c IdentifierList) *UsingJoinCond {
-	return &UsingJoinCond{Cols: c}
+func NewUsingJoinCond(c IdentifierList, buf *buffer.Buffer) *UsingJoinCond {
+	ujc := buffer.Alloc[UsingJoinCond](buf)
+	ujc.Cols = c
+	return ujc
 }
 
 // the parenthesized TableExpr.
@@ -429,8 +471,10 @@ func (node *ParenTableExpr) Format(ctx *FmtCtx) {
 	ctx.WriteByte(')')
 }
 
-func NewParenTableExpr(e TableExpr) *ParenTableExpr {
-	return &ParenTableExpr{Expr: e}
+func NewParenTableExpr(e TableExpr, buf *buffer.Buffer) *ParenTableExpr {
+	pte := buffer.Alloc[ParenTableExpr](buf)
+	pte.Expr = e
+	return pte
 }
 
 // The alias, optionally with a column list:
@@ -439,6 +483,13 @@ type AliasClause struct {
 	NodeFormatter
 	Alias Identifier
 	Cols  IdentifierList
+}
+
+func NewAliasClause(alias Identifier, cols IdentifierList, buf *buffer.Buffer) *AliasClause {
+	a := buffer.Alloc[AliasClause](buf)
+	a.Alias = alias
+	a.Cols = cols
+	return a
 }
 
 func (node *AliasClause) Format(ctx *FmtCtx) {
@@ -476,11 +527,14 @@ func (node *AliasedTableExpr) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewAliasedTableExpr(e TableExpr, a AliasClause) *AliasedTableExpr {
-	return &AliasedTableExpr{
-		Expr: e,
-		As:   a,
+func NewAliasedTableExpr(e TableExpr, a *AliasClause, idxs []*IndexHint ,buf *buffer.Buffer) *AliasedTableExpr {
+	ate := buffer.Alloc[AliasedTableExpr](buf)
+	ate.Expr = e
+	if a != nil {
+		ate.As = *a
 	}
+	ate.IndexHints = idxs
+	return ate
 }
 
 // the statements as a data source includes the select statement.
@@ -489,10 +543,10 @@ type StatementSource struct {
 	Statement Statement
 }
 
-func NewStatementSource(s Statement) *StatementSource {
-	return &StatementSource{
-		Statement: s,
-	}
+func NewStatementSource(s Statement, buf *buffer.Buffer) *StatementSource {
+	ss := buffer.Alloc[StatementSource](buf)
+	ss.Statement = s
+	return ss
 }
 
 // the list of table expressions.
@@ -517,8 +571,10 @@ func (node *From) Format(ctx *FmtCtx) {
 	node.Tables.Format(ctx)
 }
 
-func NewFrom(t TableExprs) *From {
-	return &From{Tables: t}
+func NewFrom(t TableExprs, buf *buffer.Buffer) *From {
+	f := buffer.Alloc[From](buf)
+	f.Tables = t
+	return f
 }
 
 type IndexHintType int
@@ -543,6 +599,14 @@ type IndexHint struct {
 	IndexNames []string
 	HintType   IndexHintType
 	HintScope  IndexHintScope
+}
+
+func NewIndexHint(indexNames []string, hintType IndexHintType, hintScope IndexHintScope, buf *buffer.Buffer) *IndexHint {
+	i := buffer.Alloc[IndexHint](buf)
+	i.IndexNames = indexNames
+	i.HintType = hintType
+	i.HintScope = hintScope	
+	return i
 }
 
 func (node *IndexHint) Format(ctx *FmtCtx) {

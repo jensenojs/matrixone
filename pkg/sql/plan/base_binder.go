@@ -318,7 +318,7 @@ func (b *baseBinder) baseBindColRef(astExpr *tree.UnresolvedName, depth int32, i
 			return
 		}
 		astArgs := []tree.Expr{
-			tree.NewNumValWithType(constant.MakeString(typ.Enumvalues), typ.Enumvalues, false, tree.P_char),
+			tree.NewNumValWithType(constant.MakeString(typ.Enumvalues), typ.Enumvalues, false, tree.P_char, nil),
 		}
 
 		// bind ast function's args
@@ -455,7 +455,7 @@ func (b *baseBinder) bindCaseExpr(astExpr *tree.CaseExpr, depth int32, isRoot bo
 
 	for _, whenExpr := range astExpr.Whens {
 		if caseExist {
-			newCandExpr := tree.NewComparisonExpr(tree.EQUAL, astExpr.Expr, whenExpr.Cond)
+			newCandExpr := tree.NewComparisonExpr(tree.EQUAL, astExpr.Expr, whenExpr.Cond, nil)
 			args = append(args, newCandExpr)
 		} else {
 			args = append(args, whenExpr.Cond)
@@ -466,7 +466,7 @@ func (b *baseBinder) bindCaseExpr(astExpr *tree.CaseExpr, depth int32, isRoot bo
 	if astExpr.Else != nil {
 		args = append(args, astExpr.Else)
 	} else {
-		args = append(args, tree.NewNumValWithType(constant.MakeUnknown(), "", false, tree.P_null))
+		args = append(args, tree.NewNumValWithType(constant.MakeUnknown(), "", false, tree.P_null, nil))
 	}
 
 	return b.bindFuncExprImplByAstExpr("case", args, depth)
@@ -475,13 +475,13 @@ func (b *baseBinder) bindCaseExpr(astExpr *tree.CaseExpr, depth int32, isRoot bo
 func (b *baseBinder) bindRangeCond(astExpr *tree.RangeCond, depth int32, isRoot bool) (*Expr, error) {
 	if astExpr.Not {
 		// rewrite 'col not between 1, 20' to 'col < 1 or col > 20'
-		newLefExpr := tree.NewComparisonExpr(tree.LESS_THAN, astExpr.Left, astExpr.From)
-		newRightExpr := tree.NewComparisonExpr(tree.GREAT_THAN, astExpr.Left, astExpr.To)
+		newLefExpr := tree.NewComparisonExpr(tree.LESS_THAN, astExpr.Left, astExpr.From, nil)
+		newRightExpr := tree.NewComparisonExpr(tree.GREAT_THAN, astExpr.Left, astExpr.To, nil)
 		return b.bindFuncExprImplByAstExpr("or", []tree.Expr{newLefExpr, newRightExpr}, depth)
 	} else {
 		// rewrite 'col between 1, 20 ' to ' col >= 1 and col <= 2'
-		newLefExpr := tree.NewComparisonExpr(tree.GREAT_THAN_EQUAL, astExpr.Left, astExpr.From)
-		newRightExpr := tree.NewComparisonExpr(tree.LESS_THAN_EQUAL, astExpr.Left, astExpr.To)
+		newLefExpr := tree.NewComparisonExpr(tree.GREAT_THAN_EQUAL, astExpr.Left, astExpr.From, nil)
+		newRightExpr := tree.NewComparisonExpr(tree.LESS_THAN_EQUAL, astExpr.Left, astExpr.To, nil)
 		return b.bindFuncExprImplByAstExpr("and", []tree.Expr{newLefExpr, newRightExpr}, depth)
 	}
 }
@@ -760,14 +760,14 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 		op = "like"
 
 	case tree.NOT_LIKE:
-		newExpr := tree.NewComparisonExpr(tree.LIKE, astExpr.Left, astExpr.Right)
+		newExpr := tree.NewComparisonExpr(tree.LIKE, astExpr.Left, astExpr.Right, nil)
 		return b.bindFuncExprImplByAstExpr("not", []tree.Expr{newExpr}, depth)
 
 	case tree.ILIKE:
 		op = "ilike"
 
 	case tree.NOT_ILIKE:
-		newExpr := tree.NewComparisonExpr(tree.ILIKE, astExpr.Left, astExpr.Right)
+		newExpr := tree.NewComparisonExpr(tree.ILIKE, astExpr.Left, astExpr.Right, nil)
 		return b.bindFuncExprImplByAstExpr("not", []tree.Expr{newExpr}, depth)
 
 	case tree.IN:
@@ -935,8 +935,8 @@ func (b *baseBinder) bindFuncExprImplByAstExpr(name string, astArgs []tree.Expr,
 			return nil, moerr.NewInvalidArg(b.GetContext(), "nullif need two args", len(astArgs))
 		}
 		elseExpr := astArgs[0]
-		thenExpr := tree.NewNumValWithType(constant.MakeUnknown(), "", false, tree.P_char)
-		whenExpr := tree.NewComparisonExpr(tree.EQUAL, astArgs[0], astArgs[1])
+		thenExpr := tree.NewNumValWithType(constant.MakeUnknown(), "", false, tree.P_char, nil)
+		whenExpr := tree.NewComparisonExpr(tree.EQUAL, astArgs[0], astArgs[1], nil)
 		astArgs = []tree.Expr{whenExpr, thenExpr, elseExpr}
 		name = "case"
 
@@ -947,7 +947,7 @@ func (b *baseBinder) bindFuncExprImplByAstExpr(name string, astArgs []tree.Expr,
 		}
 		elseExpr := astArgs[0]
 		thenExpr := astArgs[1]
-		whenExpr := tree.NewIsNullExpr(astArgs[0])
+		whenExpr := tree.NewIsNullExpr(astArgs[0], nil)
 		astArgs = []tree.Expr{whenExpr, thenExpr, elseExpr}
 		name = "case"
 
@@ -974,7 +974,7 @@ func (b *baseBinder) bindFuncExprImplByAstExpr(name string, astArgs []tree.Expr,
 					// rewrite count(*) to starcount(col_name)
 					name = "starcount"
 
-					astArgs = []tree.Expr{tree.NewNumValWithType(constant.MakeInt64(1), "1", false, tree.P_int64)}
+					astArgs = []tree.Expr{tree.NewNumValWithType(constant.MakeInt64(1), "1", false, tree.P_int64, nil)}
 				}
 			}
 		}
@@ -989,7 +989,7 @@ func (b *baseBinder) bindFuncExprImplByAstExpr(name string, astArgs []tree.Expr,
 				if len(b.ctx.bindings) == 0 || len(b.ctx.bindings[0].cols) == 0 {
 					name = "count"
 				} else {
-					astArgs = []tree.Expr{tree.NewNumValWithType(constant.MakeInt64(1), "1", false, tree.P_int64)}
+					astArgs = []tree.Expr{tree.NewNumValWithType(constant.MakeInt64(1), "1", false, tree.P_int64, nil)}
 				}
 			} else {
 				name = "count"
@@ -1096,7 +1096,7 @@ func bindFuncExprImplUdf(b *baseBinder, name string, sql string, args []tree.Exp
 		if err != nil {
 			return nil, err
 		}
-		subquery := tree.NewSubquery(substmts[0], false)
+		subquery := tree.NewSubquery(substmts[0], false, nil)
 		expr, err = b.impl.BindSubquery(subquery, false)
 		if err != nil {
 			return nil, err

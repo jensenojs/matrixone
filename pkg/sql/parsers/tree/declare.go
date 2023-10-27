@@ -14,12 +14,22 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // Declare statement
 type Declare struct {
 	statementImpl
 	Variables  []string
 	ColumnType *T
 	DefaultVal Expr
+}
+
+func NewDeclare(vs []string, ct *T, dv Expr, buf *buffer.Buffer) *Declare {
+	d := buffer.Alloc[Declare](buf)
+	d.Variables = vs
+	d.ColumnType = ct
+	d.DefaultVal = dv
+	return d
 }
 
 func (node *Declare) Format(ctx *FmtCtx) {

@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
@@ -114,7 +115,7 @@ func buildLoad(stmt *tree.Load, ctx CompilerContext, isPrepareStmt bool) (*Plan,
 		return nil, err
 	}
 	if stmt.Param.Parallel && (getCompressType(stmt.Param, fileName) != tree.NOCOMPRESS || stmt.Local) {
-		projectNode.ProjectList = makeCastExpr(stmt, fileName, tableDef)
+		projectNode.ProjectList = makeCastExpr(stmt, fileName, tableDef, ctx.GetBuffer())
 	}
 	lastNodeId = builder.appendNode(projectNode, bindCtx)
 	builder.qry.LoadTag = true
@@ -327,7 +328,7 @@ func getCompressType(param *tree.ExternParam, filepath string) string {
 	}
 }
 
-func makeCastExpr(stmt *tree.Load, fileName string, tableDef *TableDef) []*plan.Expr {
+func makeCastExpr(stmt *tree.Load, fileName string, tableDef *TableDef, buf *buffer.Buffer) []*plan.Expr {
 	ret := make([]*plan.Expr, 0)
 	stringTyp := &plan.Type{
 		Id: int32(types.T_varchar),
@@ -344,7 +345,7 @@ func makeCastExpr(stmt *tree.Load, fileName string, tableDef *TableDef) []*plan.
 			},
 		}
 
-		expr, _ = makePlan2CastExpr(stmt.Param.Ctx, expr, typ)
+		expr, _ = makePlan2CastExpr(stmt.Param.Ctx, expr, typ, buf)
 		ret = append(ret, expr)
 	}
 	return ret

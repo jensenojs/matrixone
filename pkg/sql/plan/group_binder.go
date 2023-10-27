@@ -15,18 +15,20 @@
 package plan
 
 import (
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 )
 
-func NewGroupBinder(builder *QueryBuilder, ctx *BindContext) *GroupBinder {
+func NewGroupBinder(builder *QueryBuilder, ctx *BindContext, buf *buffer.Buffer) *GroupBinder {
 	b := &GroupBinder{}
 	b.sysCtx = builder.GetContext()
 	b.builder = builder
 	b.ctx = ctx
 	b.impl = b
+	b.buf = buf
 
 	return b
 }

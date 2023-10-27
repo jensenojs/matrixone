@@ -14,7 +14,11 @@
 
 package tree
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
+)
 
 type Statement interface {
 	fmt.Stringer
@@ -31,6 +35,12 @@ type StatementType interface {
 
 type statementImpl struct {
 	Statement
+}
+
+func NewStatement(s Statement, buf *buffer.Buffer) []Statement {
+	ss := buffer.MakeSlice[Statement](buf)
+	ss = buffer.AppendSlice[Statement](buf, ss, s)
+	return ss
 }
 
 const (

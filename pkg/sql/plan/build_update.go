@@ -140,6 +140,8 @@ func rewriteUpdateQueryLastNode(builder *QueryBuilder, planCtxs []*dmlPlanCtx, l
 }
 
 func selectUpdateTables(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Update, tableInfo *dmlTableInfo) (int32, []*dmlPlanCtx, error) {
+	buf := builder.compCtx.GetBuffer()
+
 	fromTables := &tree.From{
 		Tables: stmt.Tables,
 	}
@@ -158,7 +160,7 @@ func selectUpdateTables(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.
 		// append  table.* to project list
 		rowIdPos := -1
 		for idx, col := range tableDef.Cols {
-			e, _ := tree.NewUnresolvedName(builder.GetContext(), alias, col.Name)
+			e, _ := tree.NewUnresolvedName(builder.GetContext(), nil, alias, col.Name)
 			selectList = append(selectList, tree.SelectExpr{
 				Expr: e,
 			})
@@ -182,24 +184,24 @@ func selectUpdateTables(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.
 		for colName, updateKey := range updateKeys {
 			for _, coldef := range tableDef.Cols {
 				if coldef.Name == colName && coldef.Typ.Id == int32(types.T_enum) {
-					binder := NewDefaultBinder(builder.GetContext(), nil, nil, coldef.Typ, nil)
+					binder := NewDefaultBinder(builder.GetContext(), nil, nil, coldef.Typ, nil, buf)
 					updateKeyExpr, err := binder.BindExpr(updateKey, 0, false)
 					if err != nil {
 						return 0, nil, err
 					}
 					exprs := []tree.Expr{
-						tree.NewNumValWithType(constant.MakeString(coldef.Typ.Enumvalues), coldef.Typ.Enumvalues, false, tree.P_char),
+						tree.NewNumValWithType(constant.MakeString(coldef.Typ.Enumvalues), coldef.Typ.Enumvalues, false, tree.P_char, nil),
 						updateKey,
 					}
 					if updateKeyExpr.Typ.Id >= 20 && updateKeyExpr.Typ.Id <= 29 {
 						updateKey = &tree.FuncExpr{
-							Func:  tree.FuncName2ResolvableFunctionReference(tree.SetUnresolvedName(moEnumCastIndexValueToIndexFun)),
+							Func:  tree.FuncName2ResolvableFunctionReference(tree.SetUnresolvedName(buf, moEnumCastIndexValueToIndexFun), nil),
 							Type:  tree.FUNC_TYPE_DEFAULT,
 							Exprs: exprs,
 						}
 					} else {
 						updateKey = &tree.FuncExpr{
-							Func:  tree.FuncName2ResolvableFunctionReference(tree.SetUnresolvedName(moEnumCastValueToIndexFun)),
+							Func:  tree.FuncName2ResolvableFunctionReference(tree.SetUnresolvedName(buf, moEnumCastValueToIndexFun), nil),
 							Type:  tree.FUNC_TYPE_DEFAULT,
 							Exprs: exprs,
 						}

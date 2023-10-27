@@ -17,18 +17,21 @@ package plan
 import (
 	"context"
 
+	"strings"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
-	"strings"
 )
 
-func NewDefaultBinder(sysCtx context.Context, builder *QueryBuilder, ctx *BindContext, typ *Type, cols []string) *DefaultBinder {
+func NewDefaultBinder(sysCtx context.Context, builder *QueryBuilder, ctx *BindContext, typ *Type, cols []string, buf *buffer.Buffer) *DefaultBinder {
 	b := &DefaultBinder{typ: typ, cols: cols}
 	b.sysCtx = sysCtx
 	b.builder = builder
 	b.ctx = ctx
 	b.impl = b
+	b.buf = buf
 
 	return b
 }

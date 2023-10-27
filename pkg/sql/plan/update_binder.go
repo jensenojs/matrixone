@@ -19,18 +19,20 @@ import (
 
 	"strings"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 )
 
 // use for on duplicate key update clause:  eg: insert into t1 values(1,1),(2,2) on duplicate key update a = a + abs(b), b = values(b)-2
-func NewUpdateBinder(sysCtx context.Context, builder *QueryBuilder, ctx *BindContext, cols []*ColDef) *UpdateBinder {
+func NewUpdateBinder(sysCtx context.Context, builder *QueryBuilder, ctx *BindContext, cols []*ColDef, buf *buffer.Buffer) *UpdateBinder {
 	b := &UpdateBinder{cols: cols}
 	b.sysCtx = sysCtx
 	b.builder = builder
 	b.ctx = ctx
 	b.impl = b
+	b.buf = buf
 
 	return b
 }

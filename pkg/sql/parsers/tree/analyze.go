@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // Use statement
 type AnalyzeStmt struct {
 	statementImpl
@@ -32,6 +34,9 @@ func (node *AnalyzeStmt) Format(ctx *FmtCtx) {
 func (node *AnalyzeStmt) GetStatementType() string { return "Analyze Table" }
 func (node *AnalyzeStmt) GetQueryType() string     { return QueryTypeOth }
 
-func NewAnalyzeStmt(tbl *TableName, cols IdentifierList) *AnalyzeStmt {
-	return &AnalyzeStmt{Table: tbl, Cols: cols}
+func NewAnalyzeStmt(table *TableName, cols IdentifierList, buf *buffer.Buffer) *AnalyzeStmt {
+	a := buffer.Alloc[AnalyzeStmt](buf)
+	a.Table = table
+	a.Cols = cols
+	return a
 }

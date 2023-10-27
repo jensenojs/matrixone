@@ -14,10 +14,18 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // Do statement
 type Do struct {
 	statementImpl
 	Exprs []Expr
+}
+
+func NewDo(es []Expr, buf *buffer.Buffer) *Do {
+	d := buffer.Alloc[Do](buf)
+	d.Exprs = es
+	return d
 }
 
 func (node *Do) Format(ctx *FmtCtx) {

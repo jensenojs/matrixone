@@ -25,6 +25,9 @@ func New() *Buffer {
 }
 
 func (b *Buffer) Free() {
+	if b == (*Buffer)(nil) {
+		panic("free with nil buffer")
+	}
 	b.Lock()
 	defer b.Unlock()
 	for i := range b.chunks {
@@ -34,6 +37,9 @@ func (b *Buffer) Free() {
 }
 
 func Alloc[T any](b *Buffer) *T {
+	if b == (*Buffer)(nil) {
+		panic("allow with nil buffer")
+	}
 	var v T
 
 	data := b.alloc(int(unsafe.Sizeof(v)))
@@ -41,35 +47,67 @@ func Alloc[T any](b *Buffer) *T {
 }
 
 func Free[T any](b *Buffer, v *T) {
+	if b == (*Buffer)(nil) {
+		panic("free with nil buffer")
+	}
 	b.free(unsafe.Slice((*byte)(unsafe.Pointer(v)), unsafe.Sizeof(*v)))
 }
 
-func MakeSlice[T any](b *Buffer, len, cap int) []T {
+
+func MakeSlice[T any](b *Buffer) []T {
+	if b == (*Buffer)(nil) {
+		panic("makeslice with nil buffer")
+	}
+	return MakeSpecificSlice[T](b, 0, 4)
+}
+
+func MakeSpecificSlice[T any](b *Buffer, len, cap int) []T {
+	if b == (*Buffer)(nil) {
+		panic("make slice with nil buffer")
+	}
 	var v T
 
 	data := b.alloc(int(unsafe.Sizeof(v)) * cap)
 	return unsafe.Slice((*T)(unsafe.Pointer(unsafe.SliceData(data))), cap)[:len]
 }
 
-func AppendSlice[T any](b *Buffer, vs []T, v T) []T {
-	if len(vs) < cap(vs) {
-		vs = append(vs, v)
-		return vs
+func AppendSlice[T any](b *Buffer, slice []T, vs ... T) []T {
+	if b == (*Buffer)(nil) {
+		panic("append slice with nil buffer")
+	}
+	
+	var newCap int
+	if len(slice) + len(vs) <= cap(slice) {
+		for _, v := range vs {
+			slice = append(slice, v)
+		}	
+		return slice
+	} else {
+		newCap = cap(slice) * 2
+		if newCap < 4 {
+			newCap = 4
+		}
+		for len(slice) + len(vs) > newCap{
+			newCap = newCap * 2
+		}
 	}
 
-	nvs := cap(vs) * 2
-	if nvs < 4 {
-		nvs = 4
-	}
+	newSlice := MakeSpecificSlice[T](b, len(slice), newCap)
+	copy(newSlice, slice)
+	defer FreeSlice[T](b, slice)
+	
+	for _, v := range vs {
+		newSlice = append(newSlice, v)
+	}	
 
-	newSlice := MakeSlice[T](b, len(vs)+1, nvs)
-	copy(newSlice, vs)
-	newSlice[len(vs)] = v
-	FreeSlice[T](b, vs)
 	return newSlice
 }
 
 func FreeSlice[T any](b *Buffer, vs []T) {
+	if b == (*Buffer)(nil) {
+		panic("free slice with nil buffer")
+	}
+
 	var v T
 
 	b.free(unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(vs))),

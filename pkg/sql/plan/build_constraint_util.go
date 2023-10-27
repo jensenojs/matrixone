@@ -349,6 +349,8 @@ func getDmlTableInfo(ctx CompilerContext, tableExprs tree.TableExprs, with *tree
 }
 
 func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Insert, info *dmlSelectInfo) (bool, map[int]int, bool, error) {
+	buf := builder.compCtx.GetBuffer()
+	
 	var err error
 	var insertColumns []string
 	tableDef := info.tblInfo.tableDefs[0]
@@ -605,7 +607,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 				info.idx = info.idx + 1
 				idxs[i] = info.idx
 				if updateExpr, exists := updateCols[col.Name]; exists {
-					binder := NewUpdateBinder(builder.GetContext(), nil, nil, rightTableDef.Cols)
+					binder := NewUpdateBinder(builder.GetContext(), nil, nil, rightTableDef.Cols, builder.compCtx.GetBuffer())
 					if _, ok := updateExpr.(*tree.DefaultVal); ok {
 						defExpr, err = getDefaultExpr(builder.GetContext(), col)
 						if err != nil {
@@ -698,7 +700,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 				JoinType: plan.Node_LEFT,
 				OnList:   []*Expr{joinConds},
 			}, joinCtx)
-			bindCtx.binder = NewTableBinder(builder, bindCtx)
+			bindCtx.binder = NewTableBinder(builder, bindCtx, buf)
 			info.rootId = newRootId
 			info.onDuplicateIdx = idxs
 			info.onDuplicateExpr = updateExprs
@@ -721,26 +723,27 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 func deleteToSelect(builder *QueryBuilder, bindCtx *BindContext, node *tree.Delete, haveConstraint bool, tblInfo *dmlTableInfo) (int32, error) {
 	var selectList []tree.SelectExpr
 	fromTables := &tree.From{}
+	// buf := builder.compCtx.GetBuffer()
 
 	getResolveExpr := func(alias string) {
 		var ret *tree.UnresolvedName
 		if haveConstraint {
 			defIdx := tblInfo.alias[alias]
 			for _, col := range tblInfo.tableDefs[defIdx].Cols {
-				ret, _ = tree.NewUnresolvedName(builder.GetContext(), alias, col.Name)
+				ret, _ = tree.NewUnresolvedName(builder.GetContext(), nil, alias, col.Name)
 				selectList = append(selectList, tree.SelectExpr{
 					Expr: ret,
 				})
 			}
 		} else {
 			defIdx := tblInfo.alias[alias]
-			ret, _ = tree.NewUnresolvedName(builder.GetContext(), alias, catalog.Row_ID)
+			ret, _ = tree.NewUnresolvedName(builder.GetContext(), nil, alias, catalog.Row_ID)
 			selectList = append(selectList, tree.SelectExpr{
 				Expr: ret,
 			})
 			pkName := getTablePriKeyName(tblInfo.tableDefs[defIdx].Pkey)
 			if pkName != "" {
-				ret, _ = tree.NewUnresolvedName(builder.GetContext(), alias, pkName)
+				ret, _ = tree.NewUnresolvedName(builder.GetContext(), nil, alias, pkName)
 				selectList = append(selectList, tree.SelectExpr{
 					Expr: ret,
 				})
@@ -893,6 +896,7 @@ func buildValueScan(
 	var err error
 
 	proc := builder.compCtx.GetProcess()
+	buf := builder.compCtx.GetBuffer()
 	lastTag := builder.genNewTag()
 	colCount := len(updateColumns)
 	rowsetData := &plan.RowsetData{
@@ -944,7 +948,7 @@ func buildValueScan(
 				})
 			}
 		} else {
-			binder := NewDefaultBinder(builder.GetContext(), nil, nil, col.Typ, nil)
+			binder := NewDefaultBinder(builder.GetContext(), nil, nil, col.Typ, nil, buf)
 			for j, r := range slt.Rows {
 				if nv, ok := r[i].(*tree.NumVal); ok {
 					canInsert, err := util.SetInsertValue(proc, nv, vec)
@@ -988,7 +992,7 @@ func buildValueScan(
 						return err
 					}
 					if col.Typ != nil && col.Typ.Id == int32(types.T_enum) {
-						defExpr, err = funcCastForEnumType(builder.GetContext(), defExpr, col.GetTyp())
+						defExpr, err = funcCastForEnumType(builder.GetContext(), defExpr, col.GetTyp(), builder.compCtx.GetBuffer())
 						if err != nil {
 							bat.Clean(proc.Mp())
 							return err

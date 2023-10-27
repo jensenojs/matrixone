@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type CreateStream struct {
 	statementImpl
 	Replace     bool
@@ -24,6 +26,19 @@ type CreateStream struct {
 	ColNames    IdentifierList
 	AsSource    *Select
 	Options     []TableOption
+}
+
+func NewCreateStream(replace, source, ifNotExists bool, streamName *TableName, defs TableDefs, colNames IdentifierList, asSource *Select, options []TableOption, buf *buffer.Buffer) *CreateStream {
+	c := buffer.Alloc[CreateStream](buf)	
+	c.Replace = replace
+	c.Source = source
+	c.IfNotExists = ifNotExists
+	c.StreamName = streamName
+	c.Defs = defs
+	c.ColNames = colNames
+	c.AsSource = asSource
+	c.Options = options
+	return c
 }
 
 func (node *CreateStream) Format(ctx *FmtCtx) {
@@ -97,6 +112,13 @@ func (node *CreateStreamWithOption) Format(ctx *FmtCtx) {
 	node.Val.Format(ctx)
 }
 
+func NewCreateStreamWithOption(k Identifier, v Expr, buf *buffer.Buffer) *CreateStreamWithOption {
+	c := buffer.Alloc[CreateStreamWithOption](buf)
+	c.Key = k
+	c.Val = v
+	return c
+}
+
 type AttributeHeader struct {
 	columnAttributeImpl
 	Key string
@@ -108,10 +130,10 @@ func (node *AttributeHeader) Format(ctx *FmtCtx) {
 	ctx.WriteByte(')')
 }
 
-func NewAttributeHeader(key string) *AttributeHeader {
-	return &AttributeHeader{
-		Key: key,
-	}
+func NewAttributeHeader(key string, buf *buffer.Buffer) *AttributeHeader {
+	ah := buffer.Alloc[AttributeHeader](buf)
+	ah.Key = key
+	return ah
 }
 
 type AttributeHeaders struct {
@@ -122,6 +144,7 @@ func (node *AttributeHeaders) Format(ctx *FmtCtx) {
 	ctx.WriteString("headers")
 }
 
-func NewAttributeHeaders() *AttributeHeaders {
-	return &AttributeHeaders{}
+func NewAttributeHeaders(buf *buffer.Buffer) *AttributeHeaders {
+	aHeads := buffer.Alloc[AttributeHeaders](buf)
+	return aHeads
 }

@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // the read and write mode for a transaction.
 type ReadWriteMode int
 
@@ -37,10 +39,6 @@ func (node *TransactionModes) Format(ctx *FmtCtx) {
 	}
 }
 
-func MakeTransactionModes(rwm ReadWriteMode) TransactionModes {
-	return TransactionModes{RwMode: rwm}
-}
-
 // Begin statement
 type BeginTransaction struct {
 	statementImpl
@@ -58,8 +56,15 @@ func (node *BeginTransaction) Format(ctx *FmtCtx) {
 func (node *BeginTransaction) GetStatementType() string { return "Start Transaction" }
 func (node *BeginTransaction) GetQueryType() string     { return QueryTypeTCL }
 
-func NewBeginTransaction(m TransactionModes) *BeginTransaction {
-	return &BeginTransaction{Modes: m}
+func NewBeginTransaction( buf *buffer.Buffer) *BeginTransaction {
+	b := buffer.Alloc[BeginTransaction](buf)
+	return b
+}
+
+func NewBeginTransactionWithMode(m ReadWriteMode, buf *buffer.Buffer) *BeginTransaction {
+	b := buffer.Alloc[BeginTransaction](buf)
+	b.Modes.RwMode = m
+	return b
 }
 
 type CompletionType int
@@ -83,8 +88,10 @@ func (node *CommitTransaction) Format(ctx *FmtCtx) {
 func (node *CommitTransaction) GetStatementType() string { return "Commit" }
 func (node *CommitTransaction) GetQueryType() string     { return QueryTypeTCL }
 
-func NewCommitTransaction(t CompletionType) *CommitTransaction {
-	return &CommitTransaction{Type: t}
+func NewCommitTransaction(t CompletionType, buf *buffer.Buffer) *CommitTransaction {
+	c := buffer.Alloc[CommitTransaction](buf)
+	c.Type = t
+	return c
 }
 
 // Rollback statement
@@ -100,6 +107,8 @@ func (node *RollbackTransaction) Format(ctx *FmtCtx) {
 func (node *RollbackTransaction) GetStatementType() string { return "Rollback" }
 func (node *RollbackTransaction) GetQueryType() string     { return QueryTypeTCL }
 
-func NewRollbackTransaction(t CompletionType) *RollbackTransaction {
-	return &RollbackTransaction{Type: t}
+func NewRollbackTransaction(t CompletionType, buf *buffer.Buffer) *RollbackTransaction {
+	r := buffer.Alloc[RollbackTransaction](buf)
+	r.Type = t
+	return r
 }

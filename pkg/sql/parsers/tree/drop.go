@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // DROP Database statement
 type DropDatabase struct {
 	statementImpl
@@ -36,11 +38,11 @@ func (node *DropDatabase) Format(ctx *FmtCtx) {
 func (node *DropDatabase) GetStatementType() string { return "Drop Database" }
 func (node *DropDatabase) GetQueryType() string     { return QueryTypeDDL }
 
-func NewDropDatabase(n Identifier, i bool) *DropDatabase {
-	return &DropDatabase{
-		Name:     n,
-		IfExists: i,
-	}
+func NewDropDatabase(name Identifier, ifExists bool, buf *buffer.Buffer) *DropDatabase {
+	d := buffer.Alloc[DropDatabase](buf)
+	d.Name = name
+	d.IfExists = ifExists
+	return d
 }
 
 // DROP Table statement
@@ -62,11 +64,11 @@ func (node *DropTable) Format(ctx *FmtCtx) {
 func (node *DropTable) GetStatementType() string { return "Drop Table" }
 func (node *DropTable) GetQueryType() string     { return QueryTypeDDL }
 
-func NewDropTable(i bool, n TableNames) *DropTable {
-	return &DropTable{
-		IfExists: i,
-		Names:    n,
-	}
+func NewDropTable(ifExists bool, names TableNames, buf *buffer.Buffer) *DropTable {
+	d := buffer.Alloc[DropTable](buf)
+	d.IfExists = ifExists
+	d.Names = names
+	return d
 }
 
 // DropView DROP View statement
@@ -88,11 +90,11 @@ func (node *DropView) Format(ctx *FmtCtx) {
 func (node *DropView) GetStatementType() string { return "Drop View" }
 func (node *DropView) GetQueryType() string     { return QueryTypeDDL }
 
-func NewDropView(i bool, n TableNames) *DropView {
-	return &DropView{
-		IfExists: i,
-		Names:    n,
-	}
+func NewDropView(ifExists bool, names TableNames, buf *buffer.Buffer) *DropView {
+	d := buffer.Alloc[DropView](buf)
+	d.IfExists = ifExists
+	d.Names = names
+	return d
 }
 
 type DropIndex struct {
@@ -118,13 +120,12 @@ func (node *DropIndex) Format(ctx *FmtCtx) {
 func (node *DropIndex) GetStatementType() string { return "Drop Index" }
 func (node *DropIndex) GetQueryType() string     { return QueryTypeDDL }
 
-func NewDropIndex(i Identifier, t TableName, ife bool, m []MiscOption) *DropIndex {
-	return &DropIndex{
-		Name:       i,
-		TableName:  t,
-		IfExists:   ife,
-		MiscOption: m,
-	}
+func NewDropIndex(name Identifier, tableName TableName, ifExists bool, buf *buffer.Buffer) *DropIndex {
+	d := buffer.Alloc[DropIndex](buf)
+	d.Name = name
+	d.TableName = tableName
+	d.IfExists = ifExists
+	return d
 }
 
 type DropRole struct {
@@ -149,11 +150,11 @@ func (node *DropRole) Format(ctx *FmtCtx) {
 func (node *DropRole) GetStatementType() string { return "Drop Role" }
 func (node *DropRole) GetQueryType() string     { return QueryTypeDCL }
 
-func NewDropRole(ife bool, r []*Role) *DropRole {
-	return &DropRole{
-		IfExists: ife,
-		Roles:    r,
-	}
+func NewDropRole(ifExists bool, roles []*Role, buf *buffer.Buffer) *DropRole {
+	d := buffer.Alloc[DropRole](buf)
+	d.IfExists = ifExists
+	d.Roles = roles
+	return d
 }
 
 type DropUser struct {
@@ -178,17 +179,24 @@ func (node *DropUser) Format(ctx *FmtCtx) {
 func (node *DropUser) GetStatementType() string { return "Drop User" }
 func (node *DropUser) GetQueryType() string     { return QueryTypeDCL }
 
-func NewDropUser(ife bool, u []*User) *DropUser {
-	return &DropUser{
-		IfExists: ife,
-		Users:    u,
-	}
+func NewDropUser(ifExists bool, users []*User, buf *buffer.Buffer) *DropUser {
+	d := buffer.Alloc[DropUser](buf)
+	d.IfExists = ifExists
+	d.Users = users
+	return d
 }
 
 type DropAccount struct {
 	statementImpl
 	IfExists bool
 	Name     string
+}
+
+func NewDropAccount(i bool, n string, buf *buffer.Buffer) *DropAccount {
+	d := buffer.Alloc[DropAccount](buf)
+	d.IfExists = i
+	d.Name = n
+	return d
 }
 
 func (node *DropAccount) Format(ctx *FmtCtx) {
@@ -207,6 +215,13 @@ type DropPublication struct {
 	statementImpl
 	Name     Identifier
 	IfExists bool
+}
+
+func NewDropPublication(i bool, n Identifier, buf *buffer.Buffer) *DropPublication {
+	d := buffer.Alloc[DropPublication](buf)
+	d.IfExists = i
+	d.Name = n
+	return d
 }
 
 func (node *DropPublication) Format(ctx *FmtCtx) {

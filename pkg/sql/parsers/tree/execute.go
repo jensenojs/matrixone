@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type Execute struct {
 	Statement
 	Name      Identifier
@@ -37,15 +39,15 @@ func (node *Execute) Format(ctx *FmtCtx) {
 func (node *Execute) GetStatementType() string { return "Execute" }
 func (node *Execute) GetQueryType() string     { return QueryTypeOth }
 
-func NewExecute(name Identifier) *Execute {
-	return &Execute{
-		Name: name,
-	}
+func NewExecute(name Identifier, buf *buffer.Buffer) *Execute {
+	e := buffer.Alloc[Execute](buf)
+	e.Name = name
+	return e
 }
 
-func NewExecuteWithVariables(name Identifier, variables []*VarExpr) *Execute {
-	return &Execute{
-		Name:      name,
-		Variables: variables,
-	}
+func NewExecuteWithVariables(name Identifier, variables []*VarExpr, buf *buffer.Buffer) *Execute {
+	e := buffer.Alloc[Execute](buf)
+	e.Name = name
+	e.Variables = variables
+	return e
 }

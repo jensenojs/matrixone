@@ -16,6 +16,8 @@ package plan
 
 import (
 	"context"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
@@ -24,6 +26,7 @@ import (
 
 // hashPartitionBuilder processes Hash Partition
 type hashPartitionBuilder struct {
+	buf *buffer.Buffer
 }
 
 // buildHashPartition handle Hash Partitioning
@@ -92,7 +95,7 @@ func (hpb *hashPartitionBuilder) buildEvalPartitionExpression(ctx context.Contex
 	partitionType := partitionOp.PartBy.PType.(*tree.HashType)
 	// For the Hash partition, convert the partition information into the expression,such as: abs (hash_value (expr)) % partitionNum
 	hashExpr := partitionType.Expr
-	partitionAst := genPartitionAst(tree.Exprs{hashExpr}, int64(partitionDef.PartitionNum))
+	partitionAst := genPartitionAst(tree.Exprs{hashExpr}, int64(partitionDef.PartitionNum), nil)
 
 	tempExpr, err := partitionBinder.baseBindExpr(partitionAst, 0, true)
 	if err != nil {

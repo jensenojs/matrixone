@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/matrixorigin/matrixone/pkg/queryservice"
 	"math"
 	"math/bits"
 	"os"
@@ -30,6 +29,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/matrixorigin/matrixone/pkg/queryservice"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/clusterservice"
@@ -4811,13 +4812,13 @@ func checkPrivilegeObjectTypeAndPrivilegeLevel(ctx context.Context, ses *Session
 			}
 		case tree.PRIVILEGE_LEVEL_TYPE_DATABASE_TABLE:
 			privLevel = privilegeLevelDatabaseTable
-			objId, err = getDatabaseOrTableId(ctx, bh, false, pl.DbName, pl.TabName)
+			objId, err = getDatabaseOrTableId(ctx, bh, false, pl.DbName, pl.TblName)
 			if err != nil {
 				return 0, 0, err
 			}
 		case tree.PRIVILEGE_LEVEL_TYPE_TABLE:
 			privLevel = privilegeLevelTable
-			objId, err = getDatabaseOrTableId(ctx, bh, false, ses.GetDatabaseName(), pl.TabName)
+			objId, err = getDatabaseOrTableId(ctx, bh, false, ses.GetDatabaseName(), pl.TblName)
 			if err != nil {
 				return 0, 0, err
 			}
@@ -4836,7 +4837,7 @@ func checkPrivilegeObjectTypeAndPrivilegeLevel(ctx context.Context, ses *Session
 		case tree.PRIVILEGE_LEVEL_TYPE_TABLE:
 			//in the syntax, we can not distinguish the table name from the database name.
 			privLevel = privilegeLevelDatabase
-			dbName = pl.TabName
+			dbName = pl.TblName
 			objId, err = getDatabaseOrTableId(ctx, bh, true, dbName, "")
 			if err != nil {
 				return 0, 0, err
@@ -6909,9 +6910,9 @@ func formSqlFromGrantPrivilege(ctx context.Context, ses *Session, gp *tree.Grant
 		case tree.PRIVILEGE_LEVEL_TYPE_DATABASE_STAR:
 			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseStar(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.DbName)
 		case tree.PRIVILEGE_LEVEL_TYPE_DATABASE_TABLE:
-			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseTable(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.DbName, gp.Level.TabName)
+			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseTable(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.DbName, gp.Level.TblName)
 		case tree.PRIVILEGE_LEVEL_TYPE_TABLE:
-			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseTable(ctx, int64(tenant.GetDefaultRoleID()), privType, ses.GetDatabaseName(), gp.Level.TabName)
+			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseTable(ctx, int64(tenant.GetDefaultRoleID()), privType, ses.GetDatabaseName(), gp.Level.TblName)
 		default:
 			return "", moerr.NewInternalError(ctx, "in object type %v privilege level type %v is unsupported", gp.ObjType, gp.Level.Level)
 		}
@@ -6923,7 +6924,7 @@ func formSqlFromGrantPrivilege(ctx context.Context, ses *Session, gp *tree.Grant
 			sql = getSqlForCheckWithGrantOptionForDatabaseStarStar(int64(tenant.GetDefaultRoleID()), privType)
 		case tree.PRIVILEGE_LEVEL_TYPE_TABLE:
 			//in the syntax, we can not distinguish the table name from the database name.
-			sql, err = getSqlForCheckWithGrantOptionForDatabaseDB(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.TabName)
+			sql, err = getSqlForCheckWithGrantOptionForDatabaseDB(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.TblName)
 		case tree.PRIVILEGE_LEVEL_TYPE_DATABASE:
 			sql, err = getSqlForCheckWithGrantOptionForDatabaseDB(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.DbName)
 		default:

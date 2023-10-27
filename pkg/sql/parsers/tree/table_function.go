@@ -14,10 +14,18 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type TableFunction struct {
 	statementImpl
 	Func       *FuncExpr
 	SelectStmt *Select
+}
+
+func NewTableFunction(f *FuncExpr, buf *buffer.Buffer) *TableFunction {
+	t := buffer.Alloc[TableFunction](buf)
+	t.Func = f
+	return t
 }
 
 func (t *TableFunction) Format(ctx *FmtCtx) {

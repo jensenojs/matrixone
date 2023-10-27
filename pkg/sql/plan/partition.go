@@ -20,6 +20,7 @@ import (
 	"go/constant"
 	"strings"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
@@ -341,22 +342,22 @@ func getPrimaryKeyAndUniqueKey(defs tree.TableDefs) (primaryKeys []*tree.Unresol
 
 // This method is used to generate partition ast for key partition and hash partition
 // For example: abs (hash_value (col3))% 4
-func genPartitionAst(exprs tree.Exprs, partNum int64) tree.Expr {
-	hashFuncName := tree.SetUnresolvedName(strings.ToLower("hash_value"))
+func genPartitionAst(exprs tree.Exprs, partNum int64, buf *buffer.Buffer) tree.Expr {
+	hashFuncName := tree.SetUnresolvedName(buf, strings.ToLower("hash_value"))
 	hashfuncExpr := &tree.FuncExpr{
-		Func:  tree.FuncName2ResolvableFunctionReference(hashFuncName),
+		Func:  tree.FuncName2ResolvableFunctionReference(hashFuncName, nil),
 		Exprs: exprs,
 	}
 
-	absFuncName := tree.SetUnresolvedName(strings.ToLower("abs"))
+	absFuncName := tree.SetUnresolvedName(buf, strings.ToLower("abs"))
 	absFuncExpr := &tree.FuncExpr{
-		Func:  tree.FuncName2ResolvableFunctionReference(absFuncName),
+		Func:  tree.FuncName2ResolvableFunctionReference(absFuncName, nil),
 		Exprs: tree.Exprs{hashfuncExpr},
 	}
 
 	numstr := fmt.Sprintf("%v", partNum)
-	divExpr := tree.NewNumValWithType(constant.MakeInt64(partNum), numstr, false, tree.P_int64)
-	modOpExpr := tree.NewBinaryExpr(tree.MOD, absFuncExpr, divExpr)
+	divExpr := tree.NewNumValWithType(constant.MakeInt64(partNum), numstr, false, tree.P_int64, nil)
+	modOpExpr := tree.NewBinaryExpr(tree.MOD, absFuncExpr, divExpr, nil)
 	return modOpExpr
 }
 
@@ -372,7 +373,7 @@ func genPartitionAst(exprs tree.Exprs, partNum int64) tree.Expr {
 // when a = 1 and b = 0 or a = 2 and b = 0 then 2
 // else -1
 // end
-func buildListColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*tree.Partition) (*tree.CaseExpr, error) {
+func buildListColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*tree.Partition, buf *buffer.Buffer) (*tree.CaseExpr, error) {
 	whens := make([]*tree.When, len(defs))
 
 	for i, partition := range defs {
@@ -387,7 +388,7 @@ func buildListColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*tr
 				}
 
 				if len(columnsExpr) == 1 {
-					newExpr := tree.NewComparisonExpr(tree.EQUAL, columnsExpr[0], exprs[0])
+					newExpr := tree.NewComparisonExpr(tree.EQUAL, columnsExpr[0], exprs[0], nil)
 					elements[j] = newExpr
 					continue
 				}
@@ -398,12 +399,12 @@ func buildListColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*tr
 					first := true
 					for k, lexpr := range columnsExpr {
 						if first {
-							andExpr = tree.NewComparisonExpr(tree.EQUAL, lexpr, exprs[k])
+							andExpr = tree.NewComparisonExpr(tree.EQUAL, lexpr, exprs[k], nil)
 							first = false
 							continue
 						}
-						newExpr := tree.NewComparisonExpr(tree.EQUAL, lexpr, exprs[k])
-						andExpr = tree.NewAndExpr(andExpr, newExpr)
+						newExpr := tree.NewComparisonExpr(tree.EQUAL, lexpr, exprs[k], nil)
+						andExpr = tree.NewAndExpr(andExpr, newExpr, nil)
 					}
 					elements[j] = andExpr
 					continue
@@ -412,7 +413,7 @@ func buildListColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*tr
 				if len(columnsExpr) != 1 {
 					panic("the number of IN expression parameters does not match")
 				}
-				newExpr := tree.NewComparisonExpr(tree.EQUAL, columnsExpr[0], value)
+				newExpr := tree.NewComparisonExpr(tree.EQUAL, columnsExpr[0], value, nil)
 				elements[j] = newExpr
 				continue
 			}
@@ -426,23 +427,23 @@ func buildListColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*tr
 		if len(valuesIn.ValueList) > 1 {
 			for m := 1; m < len(elements); m++ {
 				if m == 1 {
-					conditionExpr = tree.NewOrExpr(elements[m-1], elements[m])
+					conditionExpr = tree.NewOrExpr(elements[m-1], elements[m], nil)
 				} else {
-					conditionExpr = tree.NewOrExpr(conditionExpr, elements[m])
+					conditionExpr = tree.NewOrExpr(conditionExpr, elements[m], nil)
 				}
 			}
 		}
 
 		when := &tree.When{
 			Cond: conditionExpr,
-			Val:  tree.NewNumValWithType(constant.MakeInt64(int64(i)), fmt.Sprintf("%v", i), false, tree.P_int64),
+			Val:  tree.NewNumValWithType(constant.MakeInt64(int64(i)), fmt.Sprintf("%v", i), false, tree.P_int64, nil),
 		}
 		whens[i] = when
 	}
 	caseWhenExpr := &tree.CaseExpr{
 		Expr:  nil,
 		Whens: whens,
-		Else:  tree.NewNumValWithType(constant.MakeInt64(int64(-1)), fmt.Sprintf("%v", -1), false, tree.P_int64),
+		Else:  tree.NewNumValWithType(constant.MakeInt64(int64(-1)), fmt.Sprintf("%v", -1), false, tree.P_int64, nil),
 	}
 	return caseWhenExpr, nil
 }
@@ -454,7 +455,7 @@ func buildListColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*tr
 // PARTITION p2 VALUES LESS THAN (MAXVALUE),
 // ); -->
 // case when (code + 5) < 6 then 0 when (code + 5) < 11 then 1 when true then 3 else -1 end
-func buildRangeCaseWhenExpr(pexpr tree.Expr, defs []*tree.Partition) (*tree.CaseExpr, error) {
+func buildRangeCaseWhenExpr(pexpr tree.Expr, defs []*tree.Partition, buf *buffer.Buffer) (*tree.CaseExpr, error) {
 	whens := make([]*tree.When, len(defs))
 	for i, partition := range defs {
 		valuesLessThan := partition.Values.(*tree.ValuesLessThan)
@@ -465,15 +466,15 @@ func buildRangeCaseWhenExpr(pexpr tree.Expr, defs []*tree.Partition) (*tree.Case
 
 		var conditionExpr tree.Expr
 		if _, ok := valueExpr.(*tree.MaxValue); ok {
-			conditionExpr = tree.NewNumValWithType(constant.MakeBool(true), "true", false, tree.P_bool)
+			conditionExpr = tree.NewNumValWithType(constant.MakeBool(true), "true", false, tree.P_bool, nil)
 		} else {
-			LessThanExpr := tree.NewComparisonExpr(tree.LESS_THAN, pexpr, valueExpr)
+			LessThanExpr := tree.NewComparisonExpr(tree.LESS_THAN, pexpr, valueExpr, nil)
 			conditionExpr = LessThanExpr
 		}
 
 		when := &tree.When{
 			Cond: conditionExpr,
-			Val:  tree.NewNumValWithType(constant.MakeInt64(int64(i)), fmt.Sprintf("%v", i), false, tree.P_int64),
+			Val:  tree.NewNumValWithType(constant.MakeInt64(int64(i)), fmt.Sprintf("%v", i), false, tree.P_int64, nil),
 		}
 		whens[i] = when
 	}
@@ -481,14 +482,14 @@ func buildRangeCaseWhenExpr(pexpr tree.Expr, defs []*tree.Partition) (*tree.Case
 	caseWhenExpr := &tree.CaseExpr{
 		Expr:  nil,
 		Whens: whens,
-		Else:  tree.NewNumValWithType(constant.MakeInt64(int64(-1)), fmt.Sprintf("%v", -1), false, tree.P_int64),
+		Else:  tree.NewNumValWithType(constant.MakeInt64(int64(-1)), fmt.Sprintf("%v", -1), false, tree.P_int64, nil),
 	}
 	return caseWhenExpr, nil
 }
 
 // This method is used to optimize the row constructor expression in range columns partition item into a common logical operation expression,
 // such as: (a, b, c) < (x0, x1, x2) ->  a < x0 || (a = x0 && (b < x1 || b = x1 && c < x2))
-func buildRangeColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*tree.Partition) (*tree.CaseExpr, error) {
+func buildRangeColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*tree.Partition, buf *buffer.Buffer) (*tree.CaseExpr, error) {
 	whens := make([]*tree.When, len(defs))
 	for i, partition := range defs {
 		valuesLessThan := partition.Values.(*tree.ValuesLessThan)
@@ -502,46 +503,46 @@ func buildRangeColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*t
 			valueExpr := valuesLessThan.ValueList[j]
 			if j == len(valuesLessThan.ValueList)-1 {
 				if _, ok := valueExpr.(*tree.MaxValue); ok {
-					trueExpr := tree.NewNumValWithType(constant.MakeBool(true), "true", false, tree.P_bool)
+					trueExpr := tree.NewNumValWithType(constant.MakeBool(true), "true", false, tree.P_bool, nil)
 					tempExpr = trueExpr
 				} else {
-					lessThanExpr := tree.NewComparisonExpr(tree.LESS_THAN, columnsExpr[j], valueExpr)
+					lessThanExpr := tree.NewComparisonExpr(tree.LESS_THAN, columnsExpr[j], valueExpr, nil)
 					tempExpr = lessThanExpr
 				}
 				continue
 			} else {
 				var firstExpr tree.Expr
 				if _, ok := valueExpr.(*tree.MaxValue); ok {
-					trueExpr := tree.NewNumValWithType(constant.MakeBool(true), "true", false, tree.P_bool)
+					trueExpr := tree.NewNumValWithType(constant.MakeBool(true), "true", false, tree.P_bool, nil)
 					firstExpr = trueExpr
 				} else {
-					lessThanExpr := tree.NewComparisonExpr(tree.LESS_THAN, columnsExpr[j], valueExpr)
+					lessThanExpr := tree.NewComparisonExpr(tree.LESS_THAN, columnsExpr[j], valueExpr, nil)
 					firstExpr = lessThanExpr
 				}
 
 				var middleExpr tree.Expr
 				if _, ok := valueExpr.(*tree.MaxValue); ok {
-					trueExpr := tree.NewNumValWithType(constant.MakeBool(true), "true", false, tree.P_bool)
+					trueExpr := tree.NewNumValWithType(constant.MakeBool(true), "true", false, tree.P_bool, nil)
 					middleExpr = trueExpr
 				} else {
-					equalExpr := tree.NewComparisonExpr(tree.EQUAL, columnsExpr[j], valueExpr)
+					equalExpr := tree.NewComparisonExpr(tree.EQUAL, columnsExpr[j], valueExpr, nil)
 					middleExpr = equalExpr
 				}
-				secondExpr := tree.NewAndExpr(middleExpr, tempExpr)
-				tempExpr = tree.NewOrExpr(firstExpr, secondExpr)
+				secondExpr := tree.NewAndExpr(middleExpr, tempExpr, nil)
+				tempExpr = tree.NewOrExpr(firstExpr, secondExpr, nil)
 			}
 		}
 
 		when := &tree.When{
 			Cond: tempExpr,
-			Val:  tree.NewNumValWithType(constant.MakeInt64(int64(i)), fmt.Sprintf("%v", i), false, tree.P_int64),
+			Val:  tree.NewNumValWithType(constant.MakeInt64(int64(i)), fmt.Sprintf("%v", i), false, tree.P_int64, nil),
 		}
 		whens[i] = when
 	}
 	caseWhenExpr := &tree.CaseExpr{
 		Expr:  nil,
 		Whens: whens,
-		Else:  tree.NewNumValWithType(constant.MakeInt64(int64(-1)), fmt.Sprintf("%v", -1), false, tree.P_int64),
+		Else:  tree.NewNumValWithType(constant.MakeInt64(int64(-1)), fmt.Sprintf("%v", -1), false, tree.P_int64, nil),
 	}
 	return caseWhenExpr, nil
 }
@@ -552,24 +553,24 @@ func buildRangeColumnsCaseWhenExpr(columnsExpr []*tree.UnresolvedName, defs []*t
 // PARTITION p1 VALUES IN (2, 6, 10, 14, 18)
 // );-->
 // case when expr in (1, 5, 9, 13, 17) then 0 when expr in (2, 6, 10, 14, 18) then 1 else -1 end
-func buildListCaseWhenExpr(listExpr tree.Expr, defs []*tree.Partition) (*tree.CaseExpr, error) {
+func buildListCaseWhenExpr(listExpr tree.Expr, defs []*tree.Partition, buf *buffer.Buffer) (*tree.CaseExpr, error) {
 	whens := make([]*tree.When, len(defs))
 	for i, partition := range defs {
 		valuesIn := partition.Values.(*tree.ValuesIn)
 
-		tuple := tree.NewTuple(valuesIn.ValueList)
-		inExpr := tree.NewComparisonExpr(tree.IN, listExpr, tuple)
+		tuple := tree.NewTuple(valuesIn.ValueList, nil)
+		inExpr := tree.NewComparisonExpr(tree.IN, listExpr, tuple, nil)
 
 		when := &tree.When{
 			Cond: inExpr,
-			Val:  tree.NewNumValWithType(constant.MakeInt64(int64(i)), fmt.Sprintf("%v", i), false, tree.P_int64),
+			Val:  tree.NewNumValWithType(constant.MakeInt64(int64(i)), fmt.Sprintf("%v", i), false, tree.P_int64, nil),
 		}
 		whens[i] = when
 	}
 	caseWhenExpr := &tree.CaseExpr{
 		Expr:  nil,
 		Whens: whens,
-		Else:  tree.NewNumValWithType(constant.MakeInt64(int64(-1)), fmt.Sprintf("%v", -1), false, tree.P_int64),
+		Else:  tree.NewNumValWithType(constant.MakeInt64(int64(-1)), fmt.Sprintf("%v", -1), false, tree.P_int64, nil),
 	}
 	return caseWhenExpr, nil
 }

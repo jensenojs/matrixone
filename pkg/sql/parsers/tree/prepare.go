@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type Prepare interface {
 	Statement
 }
@@ -54,16 +56,16 @@ func (node *PrepareStmt) GetQueryType() string       { return QueryTypeOth }
 func (node *PrepareString) GetStatementType() string { return "Prepare" }
 func (node *PrepareString) GetQueryType() string     { return QueryTypeOth }
 
-func NewPrepareStmt(name Identifier, statement Statement) *PrepareStmt {
-	return &PrepareStmt{
-		Name: name,
-		Stmt: statement,
-	}
+func NewPrepareStmt(name Identifier, stmt Statement, buf *buffer.Buffer) *PrepareStmt {
+	ps := buffer.Alloc[PrepareStmt](buf)
+	ps.Name = name
+	ps.Stmt = stmt
+	return ps
 }
 
-func NewPrepareString(name Identifier, sql string) *PrepareString {
-	return &PrepareString{
-		Name: name,
-		Sql:  sql,
-	}
+func NewPrepareString(name Identifier, sql string, buf *buffer.Buffer) *PrepareString {
+	ps := buffer.Alloc[PrepareString](buf)
+	ps.Name = name
+	ps.Sql = sql
+	return ps
 }

@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type GrantType int
 
 const (
@@ -44,8 +46,19 @@ func (node *Grant) Format(ctx *FmtCtx) {
 func (node *Grant) GetStatementType() string { return "Grant" }
 func (node *Grant) GetQueryType() string     { return QueryTypeDCL }
 
-func NewGrant() *Grant {
-	return &Grant{}
+func NewGrant(typ GrantType, grantPrivilege *GrantPrivilege, grantRole *GrantRole, grantProxy *GrantProxy, buf *buffer.Buffer) *Grant {
+	g := buffer.Alloc[Grant](buf)
+	g.Typ = typ
+	if grantPrivilege != nil {
+		g.GrantPrivilege = *grantPrivilege
+	}
+	if grantRole != nil {
+		g.GrantRole = *grantRole
+	}
+	if grantProxy != nil {
+		g.GrantProxy = *grantProxy
+	}
+	return g
 }
 
 type GrantPrivilege struct {
@@ -57,6 +70,16 @@ type GrantPrivilege struct {
 	Level       *PrivilegeLevel
 	Roles       []*Role
 	GrantOption bool
+}
+
+func NewGrantPrivilege(pr []*Privilege, ob ObjectType, le *PrivilegeLevel, ro []*Role, gr bool, buf *buffer.Buffer) *GrantPrivilege {
+	grant := buffer.Alloc[GrantPrivilege](buf)
+	grant.Privileges = pr
+	grant.ObjType = ob
+	grant.Level = le
+	grant.Roles = ro
+	grant.GrantOption = gr
+	return grant
 }
 
 func (node *GrantPrivilege) Format(ctx *FmtCtx) {
@@ -103,6 +126,14 @@ type GrantRole struct {
 	GrantOption bool
 }
 
+func NewGrantRole(roles []*Role, users []*User, grantoption bool, buf *buffer.Buffer) *GrantRole {
+	g := buffer.Alloc[GrantRole](buf)	
+	g.Roles = roles
+	g.Users = users
+	g.GrantOption = grantoption
+	return g
+}
+
 func (node *GrantRole) Format(ctx *FmtCtx) {
 	ctx.WriteString("grant")
 	if node.Roles != nil {
@@ -135,6 +166,14 @@ type GrantProxy struct {
 	ProxyUser   *User
 	Users       []*User
 	GrantOption bool
+}
+
+func NewGrantProxy(r *User, users []*User, grantoption bool, buf *buffer.Buffer) *GrantProxy{
+	g := buffer.Alloc[GrantProxy](buf)	
+	g.ProxyUser = r
+	g.Users = users
+	g.GrantOption = grantoption
+	return g
 }
 
 func (node *GrantProxy) Format(ctx *FmtCtx) {

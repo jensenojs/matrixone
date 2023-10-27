@@ -14,10 +14,19 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type DropConnector struct {
 	statementImpl
 	IfExists bool
 	Names    TableNames
+}
+
+func NewDropConnector(exist bool, names TableNames, buf *buffer.Buffer) *DropConnector {
+	d := buffer.Alloc[DropConnector](buf)
+	d.IfExists = exist
+	d.Names = names
+	return d
 }
 
 func (node *DropConnector) Format(ctx *FmtCtx) {
@@ -36,6 +45,20 @@ type CreateConnector struct {
 	statementImpl
 	TableName *TableName
 	Options   []*ConnectorOption
+}
+
+func NewCreateConnector(tableName *TableName, options []*ConnectorOption, buf *buffer.Buffer) *CreateConnector {
+	a := buffer.Alloc[CreateConnector](buf)
+	a.TableName = tableName
+	a.Options = options
+	return a
+}
+
+func NewConnectorOption(key Identifier, val Expr, buf *buffer.Buffer) *ConnectorOption {
+	a := buffer.Alloc[ConnectorOption](buf)
+	a.Key = key
+	a.Val = val
+	return a
 }
 
 func (node *CreateConnector) Format(ctx *FmtCtx) {

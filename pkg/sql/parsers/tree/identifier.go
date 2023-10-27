@@ -17,6 +17,7 @@ package tree
 import (
 	"context"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 )
 
@@ -97,42 +98,54 @@ func (node *UnresolvedName) GetNames() (string, string, string) {
 // the path in an UnresolvedName.
 type NameParts = [4]string
 
-func NewUnresolvedName(ctx context.Context, parts ...string) (*UnresolvedName, error) {
+func NewUnresolvedName(ctx context.Context, buf *buffer.Buffer, parts ...string) (*UnresolvedName, error) {
 	l := len(parts)
 	if l < 1 || l > 4 {
 		return nil, moerr.NewInternalError(ctx, "the count of name parts among [1,4]")
 	}
-	u := &UnresolvedName{
-		NumParts: len(parts),
-		Star:     false,
+	var u *UnresolvedName
+	if buf != nil {
+		u = buffer.Alloc[UnresolvedName](buf)
+	} else {
+		u = new(UnresolvedName)
 	}
+	u.NumParts = len(parts)
+	u.Star = false
 	for i := 0; i < len(parts); i++ {
 		u.Parts[i] = parts[l-1-i]
 	}
 	return u, nil
 }
 
-func SetUnresolvedName(parts ...string) *UnresolvedName {
+func SetUnresolvedName(buf *buffer.Buffer, parts ...string) *UnresolvedName {
 	l := len(parts)
-	u := &UnresolvedName{
-		NumParts: len(parts),
-		Star:     false,
+	var u *UnresolvedName
+	if buf != nil {
+		u = buffer.Alloc[UnresolvedName](buf)
+	} else {
+		u = new(UnresolvedName)
 	}
+	u.NumParts = len(parts)
+	u.Star = false
 	for i := 0; i < len(parts); i++ {
 		u.Parts[i] = parts[l-1-i]
 	}
 	return u
 }
 
-func NewUnresolvedNameWithStar(ctx context.Context, parts ...string) (*UnresolvedName, error) {
+func NewUnresolvedNameWithStar(ctx context.Context, buf *buffer.Buffer, parts ...string) (*UnresolvedName, error) {
 	l := len(parts)
 	if l < 1 || l > 3 {
 		return nil, moerr.NewInternalError(ctx, "the count of name parts among [1,3]")
 	}
-	u := &UnresolvedName{
-		NumParts: len(parts),
-		Star:     true,
+	var u *UnresolvedName
+	if buf != nil {
+		u = buffer.Alloc[UnresolvedName](buf)
+	} else {
+		u = new(UnresolvedName)
 	}
+	u.NumParts = len(parts)
+	u.Star = true
 	u.Parts[0] = ""
 	for i := 0; i < len(parts); i++ {
 		u.Parts[i] = parts[l-1-i]
@@ -140,12 +153,16 @@ func NewUnresolvedNameWithStar(ctx context.Context, parts ...string) (*Unresolve
 	return u, nil
 }
 
-func SetUnresolvedNameWithStar(parts ...string) *UnresolvedName {
+func SetUnresolvedNameWithStar(buf *buffer.Buffer, parts ...string) *UnresolvedName {
 	l := len(parts)
-	u := &UnresolvedName{
-		NumParts: len(parts),
-		Star:     true,
+	var u *UnresolvedName
+	if buf != nil {
+		u = buffer.Alloc[UnresolvedName](buf)
+	} else {
+		u = new(UnresolvedName)
 	}
+	u.NumParts = len(parts)
+	u.Star = true
 	for i := 0; i < len(parts); i++ {
 		u.Parts[i] = parts[l-1-i]
 	}

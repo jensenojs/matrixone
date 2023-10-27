@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
@@ -190,13 +191,13 @@ func (bc *BindContext) addUsingCol(col string, typ plan.Node_JoinType, left, rig
 	return expr, err
 }
 
-func (bc *BindContext) unfoldStar(ctx context.Context, table string, isSysAccount bool) ([]tree.SelectExpr, []string, error) {
+func (bc *BindContext) unfoldStar(ctx context.Context, buf *buffer.Buffer, table string, isSysAccount bool) ([]tree.SelectExpr, []string, error) {
 	if len(table) == 0 {
 		// unfold *
 		var exprs []tree.SelectExpr
 		var names []string
 
-		bc.doUnfoldStar(ctx, bc.bindingTree, make(map[string]any), &exprs, &names, isSysAccount)
+		bc.doUnfoldStar(ctx, buf, bc.bindingTree, make(map[string]any), &exprs, &names, isSysAccount)
 
 		return exprs, names, nil
 	} else {
@@ -220,7 +221,7 @@ func (bc *BindContext) unfoldStar(ctx context.Context, table string, isSysAccoun
 			if !isSysAccount && binding.isClusterTable && util.IsClusterTableAttribute(col) {
 				continue
 			}
-			expr, _ := tree.NewUnresolvedName(ctx, table, col)
+			expr, _ := tree.NewUnresolvedName(ctx, nil, table, col)
 			exprs = append(exprs, tree.SelectExpr{Expr: expr})
 			names = append(names, col)
 		}
@@ -229,7 +230,7 @@ func (bc *BindContext) unfoldStar(ctx context.Context, table string, isSysAccoun
 	}
 }
 
-func (bc *BindContext) doUnfoldStar(ctx context.Context, root *BindingTreeNode, visitedUsingCols map[string]any, exprs *[]tree.SelectExpr, names *[]string, isSysAccount bool) {
+func (bc *BindContext) doUnfoldStar(ctx context.Context, buf *buffer.Buffer, root *BindingTreeNode, visitedUsingCols map[string]any, exprs *[]tree.SelectExpr, names *[]string, isSysAccount bool) {
 	if root == nil {
 		return
 	}
@@ -246,7 +247,7 @@ func (bc *BindContext) doUnfoldStar(ctx context.Context, root *BindingTreeNode, 
 				continue
 			}
 			if _, ok := visitedUsingCols[col]; !ok {
-				expr, _ := tree.NewUnresolvedName(ctx, root.binding.table, col)
+				expr, _ := tree.NewUnresolvedName(ctx, nil, root.binding.table, col)
 				*exprs = append(*exprs, tree.SelectExpr{Expr: expr})
 				*names = append(*names, col)
 			}
@@ -269,14 +270,14 @@ func (bc *BindContext) doUnfoldStar(ctx context.Context, root *BindingTreeNode, 
 			handledUsingCols = append(handledUsingCols, using.col)
 			visitedUsingCols[using.col] = nil
 
-			expr, _ := tree.NewUnresolvedName(ctx, using.table, using.col)
+			expr, _ := tree.NewUnresolvedName(ctx, nil, using.table, using.col)
 			*exprs = append(*exprs, tree.SelectExpr{Expr: expr})
 			*names = append(*names, using.col)
 		}
 	}
 
-	bc.doUnfoldStar(ctx, root.left, visitedUsingCols, exprs, names, isSysAccount)
-	bc.doUnfoldStar(ctx, root.right, visitedUsingCols, exprs, names, isSysAccount)
+	bc.doUnfoldStar(ctx, buf, root.left, visitedUsingCols, exprs, names, isSysAccount)
+	bc.doUnfoldStar(ctx, buf, root.right, visitedUsingCols, exprs, names, isSysAccount)
 
 	for _, col := range handledUsingCols {
 		delete(visitedUsingCols, col)

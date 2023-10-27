@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // Begin statement
 type BeginCompound struct {
 	statementImpl
@@ -28,10 +30,20 @@ type CompoundStmt struct {
 	Stmts []Statement
 }
 
-func NewCompoundStmt(s []Statement) *CompoundStmt {
-	return &CompoundStmt{
-		Stmts: s,
-	}
+func NewCompoundStmt(s []Statement, buf *buffer.Buffer) *CompoundStmt {
+	c := buffer.Alloc[CompoundStmt](buf)
+	c.Stmts = s
+	return c
+}
+
+func NewBeginCompound(buf *buffer.Buffer) *BeginCompound {
+	b := buffer.Alloc[BeginCompound](buf)
+	return b
+}
+
+func NewEndCompound(buf *buffer.Buffer) *EndCompound {
+	e := buffer.Alloc[EndCompound](buf)
+	return e
 }
 
 func (node *CompoundStmt) Format(ctx *FmtCtx) {

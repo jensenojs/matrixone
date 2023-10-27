@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 )
 
 type CreateOption interface {
@@ -46,10 +48,11 @@ func (node *CreateOptionCharset) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Charset)
 }
 
-func NewCreateOptionCharset(c string) *CreateOptionCharset {
-	return &CreateOptionCharset{
-		Charset: c,
-	}
+func NewCreateOptionCharset(isf bool, charset string, buf *buffer.Buffer) *CreateOptionCharset {
+	c := buffer.Alloc[CreateOptionCharset](buf)
+	c.IsDefault = isf
+	c.Charset = charset
+	return c
 }
 
 type CreateOptionCollate struct {
@@ -66,10 +69,11 @@ func (node *CreateOptionCollate) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Collate)
 }
 
-func NewCreateOptionCollate(c string) *CreateOptionCollate {
-	return &CreateOptionCollate{
-		Collate: c,
-	}
+func NewCreateOptionCollate(isd bool, collate string, buf *buffer.Buffer) *CreateOptionCollate {
+	c := buffer.Alloc[CreateOptionCollate](buf)
+	c.IsDefault = isd
+	c.Collate = collate
+	return c
 }
 
 type CreateOptionEncryption struct {
@@ -82,10 +86,10 @@ func (node *CreateOptionEncryption) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Encrypt)
 }
 
-func NewCreateOptionEncryption(e string) *CreateOptionEncryption {
-	return &CreateOptionEncryption{
-		Encrypt: e,
-	}
+func NewCreateOptionEncryption(encrypt string, buf *buffer.Buffer) *CreateOptionEncryption {
+	c := buffer.Alloc[CreateOptionEncryption](buf)
+	c.Encrypt = encrypt
+	return c
 }
 
 type SubscriptionOption struct {
@@ -99,6 +103,13 @@ func (node *SubscriptionOption) Format(ctx *FmtCtx) {
 	node.From.Format(ctx)
 	ctx.WriteString(" publication ")
 	node.Publication.Format(ctx)
+}
+
+func NewSubscriptionOption(from Identifier, publication Identifier, buf *buffer.Buffer) *SubscriptionOption {
+	s := buffer.Alloc[SubscriptionOption](buf)
+	s.From = from
+	s.Publication = publication
+	return s
 }
 
 type CreateDatabase struct {
@@ -131,12 +142,13 @@ func (node *CreateDatabase) Format(ctx *FmtCtx) {
 func (node *CreateDatabase) GetStatementType() string { return "Create Database" }
 func (node *CreateDatabase) GetQueryType() string     { return QueryTypeDDL }
 
-func NewCreateDatabase(ine bool, name Identifier, opts []CreateOption) *CreateDatabase {
-	return &CreateDatabase{
-		IfNotExists:   ine,
-		Name:          name,
-		CreateOptions: opts,
-	}
+func NewCreateDatabase(ifNotExists bool, name Identifier, sub *SubscriptionOption, createOptions []CreateOption, buf *buffer.Buffer) *CreateDatabase {
+	c := buffer.Alloc[CreateDatabase](buf)
+	c.IfNotExists = ifNotExists
+	c.Name = name
+	c.SubscriptionOption = sub
+	c.CreateOptions = createOptions
+	return c
 }
 
 type CreateTable struct {
@@ -154,6 +166,20 @@ type CreateTable struct {
 	PartitionOption *PartitionOption
 	ClusterByOption *ClusterByOption
 	Param           *ExternParam
+}
+
+func NewCreateTable(temporary, isClusterTable, ifNotExists bool, table TableName, defs TableDefs, options []TableOption, partitionOption *PartitionOption, clusterByOption *ClusterByOption, param *ExternParam, buf *buffer.Buffer) *CreateTable {
+	c := buffer.Alloc[CreateTable](buf)
+	c.Temporary = temporary
+	c.IsClusterTable = isClusterTable
+	c.IfNotExists = ifNotExists
+	c.Table = table
+	c.Defs = defs
+	c.Options = options
+	c.PartitionOption = partitionOption
+	c.ClusterByOption = clusterByOption
+	c.Param = param
+	return c
 }
 
 func (node *CreateTable) Format(ctx *FmtCtx) {
@@ -307,12 +333,17 @@ func (node *ColumnTableDef) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewColumnTableDef(n *UnresolvedName, t ResolvableTypeReference, a []ColumnAttribute) *ColumnTableDef {
-	return &ColumnTableDef{
-		Name:       n,
-		Type:       t,
-		Attributes: a,
+func NewColumnTableDef(name *UnresolvedName, typ ResolvableTypeReference, attributes []ColumnAttribute, buf *buffer.Buffer) *ColumnTableDef {
+	var c *ColumnTableDef
+	if buf != nil {
+		c = buffer.Alloc[ColumnTableDef](buf)
+	} else {
+		c = new(ColumnTableDef)
 	}
+	c.Name = name
+	c.Type = typ
+	c.Attributes = attributes
+	return c
 }
 
 // column attribute
@@ -337,10 +368,10 @@ func (node *AttributeNull) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewAttributeNull(b bool) *AttributeNull {
-	return &AttributeNull{
-		Is: b,
-	}
+func NewAttributeNull(is bool, buf *buffer.Buffer) *AttributeNull {
+	a := buffer.Alloc[AttributeNull](buf)
+	a.Is = is
+	return a
 }
 
 type AttributeDefault struct {
@@ -353,10 +384,10 @@ func (node *AttributeDefault) Format(ctx *FmtCtx) {
 	node.Expr.Format(ctx)
 }
 
-func NewAttributeDefault(e Expr) *AttributeDefault {
-	return &AttributeDefault{
-		Expr: e,
-	}
+func NewAttributeDefault(expr Expr, buf *buffer.Buffer) *AttributeDefault {
+	a := buffer.Alloc[AttributeDefault](buf)
+	a.Expr = expr
+	return a
 }
 
 type AttributeAutoIncrement struct {
@@ -368,8 +399,9 @@ func (node *AttributeAutoIncrement) Format(ctx *FmtCtx) {
 	ctx.WriteString("auto_increment")
 }
 
-func NewAttributeAutoIncrement() *AttributeAutoIncrement {
-	return &AttributeAutoIncrement{}
+func NewAttributeAutoIncrement(buf *buffer.Buffer) *AttributeAutoIncrement {
+	a := buffer.Alloc[AttributeAutoIncrement](buf)
+	return a
 }
 
 type AttributeUniqueKey struct {
@@ -380,8 +412,9 @@ func (node *AttributeUniqueKey) Format(ctx *FmtCtx) {
 	ctx.WriteString("unique key")
 }
 
-func NewAttributeUniqueKey() *AttributeUniqueKey {
-	return &AttributeUniqueKey{}
+func NewAttributeUniqueKey(buf *buffer.Buffer) *AttributeUniqueKey {
+	a := buffer.Alloc[AttributeUniqueKey](buf)
+	return a
 }
 
 type AttributeUnique struct {
@@ -392,8 +425,9 @@ func (node *AttributeUnique) Format(ctx *FmtCtx) {
 	ctx.WriteString("unique")
 }
 
-func NewAttributeUnique() *AttributeUnique {
-	return &AttributeUnique{}
+func NewAttributeUnique(buf *buffer.Buffer) *AttributeUnique {
+	a := buffer.Alloc[AttributeUnique](buf)
+	return a
 }
 
 type AttributeKey struct {
@@ -404,8 +438,9 @@ func (node *AttributeKey) Format(ctx *FmtCtx) {
 	ctx.WriteString("key")
 }
 
-func NewAttributeKey() *AttributeKey {
-	return &AttributeKey{}
+func NewAttributeKey(buf *buffer.Buffer) *AttributeKey {
+	a := buffer.Alloc[AttributeKey](buf)
+	return a
 }
 
 type AttributePrimaryKey struct {
@@ -416,8 +451,9 @@ func (node *AttributePrimaryKey) Format(ctx *FmtCtx) {
 	ctx.WriteString("primary key")
 }
 
-func NewAttributePrimaryKey() *AttributePrimaryKey {
-	return &AttributePrimaryKey{}
+func NewAttributePrimaryKey(buf *buffer.Buffer) *AttributePrimaryKey {
+	a := buffer.Alloc[AttributePrimaryKey](buf)
+	return a
 }
 
 type AttributeComment struct {
@@ -430,10 +466,10 @@ func (node *AttributeComment) Format(ctx *FmtCtx) {
 	node.CMT.Format(ctx)
 }
 
-func NewAttributeComment(c Expr) *AttributeComment {
-	return &AttributeComment{
-		CMT: c,
-	}
+func NewAttributeComment(c Expr, buf *buffer.Buffer) *AttributeComment {
+	a := buffer.Alloc[AttributeComment](buf)
+	a.CMT = c
+	return a
 }
 
 type AttributeCollate struct {
@@ -446,10 +482,10 @@ func (node *AttributeCollate) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Collate)
 }
 
-func NewAttributeCollate(c string) *AttributeCollate {
-	return &AttributeCollate{
-		Collate: c,
-	}
+func NewAttributeCollate(c string, buf *buffer.Buffer) *AttributeCollate {
+	a := buffer.Alloc[AttributeCollate](buf)
+	a.Collate = c
+	return a
 }
 
 type AttributeColumnFormat struct {
@@ -462,10 +498,10 @@ func (node *AttributeColumnFormat) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.ColumnFormat)
 }
 
-func NewAttributeColumnFormat(f string) *AttributeColumnFormat {
-	return &AttributeColumnFormat{
-		ColumnFormat: f,
-	}
+func NewAttributeColumnFormat(f string, buf *buffer.Buffer) *AttributeColumnFormat {
+	a := buffer.Alloc[AttributeColumnFormat](buf)
+	a.ColumnFormat = f
+	return a
 }
 
 type AttributeStorage struct {
@@ -478,10 +514,10 @@ func (node *AttributeStorage) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Storage)
 }
 
-func NewAttributeStorage(s string) *AttributeStorage {
-	return &AttributeStorage{
-		Storage: s,
-	}
+func NewAttributeStorage(s string, buf *buffer.Buffer) *AttributeStorage {
+	a := buffer.Alloc[AttributeStorage](buf)
+	a.Storage = s
+	return a
 }
 
 type AttributeCheckConstraint struct {
@@ -509,12 +545,12 @@ func (node *AttributeCheckConstraint) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewAttributeCheck(e Expr, f bool, n string) *AttributeCheckConstraint {
-	return &AttributeCheckConstraint{
-		Name:     n,
-		Expr:     e,
-		Enforced: f,
-	}
+func NewAttributeCheck(e Expr, f bool, n string, buf *buffer.Buffer) *AttributeCheckConstraint {
+	a := buffer.Alloc[AttributeCheckConstraint](buf)
+	a.Name = n
+	a.Expr = e
+	a.Enforced = f
+	return a
 }
 
 type AttributeGeneratedAlways struct {
@@ -527,11 +563,11 @@ func (node *AttributeGeneratedAlways) Format(ctx *FmtCtx) {
 	node.Expr.Format(ctx)
 }
 
-func NewAttributeGeneratedAlways(e Expr, s bool) *AttributeGeneratedAlways {
-	return &AttributeGeneratedAlways{
-		Expr:   e,
-		Stored: s,
-	}
+func NewAttributeGeneratedAlways(e Expr, s bool, buf *buffer.Buffer) *AttributeGeneratedAlways {
+	a := buffer.Alloc[AttributeGeneratedAlways](buf)
+	a.Expr = e
+	a.Stored = s
+	return a
 }
 
 type AttributeLowCardinality struct {
@@ -542,8 +578,9 @@ func (node *AttributeLowCardinality) Format(ctx *FmtCtx) {
 	ctx.WriteString("low_cardinality")
 }
 
-func NewAttributeLowCardinality() *AttributeLowCardinality {
-	return &AttributeLowCardinality{}
+func NewAttributeLowCardinality(buf *buffer.Buffer) *AttributeLowCardinality {
+	a := buffer.Alloc[AttributeLowCardinality](buf)
+	return a
 }
 
 type KeyPart struct {
@@ -583,12 +620,13 @@ func (node *KeyPart) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewKeyPart(c *UnresolvedName, l int, e Expr) *KeyPart {
-	return &KeyPart{
-		ColName: c,
-		Length:  l,
-		Expr:    e,
-	}
+func NewKeyPart(c *UnresolvedName, l int, e Expr, d Direction, buf *buffer.Buffer) *KeyPart {
+	k := buffer.Alloc[KeyPart](buf)
+	k.ColName = c
+	k.Length = l
+	k.Expr = e
+	k.Direction = d
+	return k
 }
 
 // in reference definition
@@ -679,15 +717,15 @@ func (node *AttributeReference) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewAttributeReference(t *TableName, kps []*KeyPart, m MatchType,
-	od ReferenceOptionType, ou ReferenceOptionType) *AttributeReference {
-	return &AttributeReference{
-		TableName: t,
-		KeyParts:  kps,
-		Match:     m,
-		OnDelete:  od,
-		OnUpdate:  ou,
-	}
+func NewAttributeReference(t *TableName, kps []*KeyPart, ma MatchType,
+	od ReferenceOptionType, ou ReferenceOptionType, buf *buffer.Buffer) *AttributeReference {
+	a := buffer.Alloc[AttributeReference](buf)
+	a.TableName = t
+	a.KeyParts = kps
+	a.Match = ma
+	a.OnDelete = od
+	a.OnUpdate = ou
+	return a
 }
 
 type ReferenceOnRecord struct {
@@ -695,15 +733,22 @@ type ReferenceOnRecord struct {
 	OnUpdate ReferenceOptionType
 }
 
+func NewReferenceOnRecord(dup, up ReferenceOptionType, buf *buffer.Buffer) *ReferenceOnRecord {
+	re := buffer.Alloc[ReferenceOnRecord](buf)
+	re.OnDelete = dup
+	re.OnUpdate = up
+	return re
+}
+
 type AttributeAutoRandom struct {
 	columnAttributeImpl
 	BitLength int
 }
 
-func NewAttributeAutoRandom(b int) *AttributeAutoRandom {
-	return &AttributeAutoRandom{
-		BitLength: b,
-	}
+func NewAttributeAutoRandom(b int, buf *buffer.Buffer) *AttributeAutoRandom {
+	a := buffer.Alloc[AttributeAutoRandom](buf)
+	a.BitLength = b
+	return a
 }
 
 type AttributeOnUpdate struct {
@@ -716,10 +761,10 @@ func (node *AttributeOnUpdate) Format(ctx *FmtCtx) {
 	node.Expr.Format(ctx)
 }
 
-func NewAttributeOnUpdate(e Expr) *AttributeOnUpdate {
-	return &AttributeOnUpdate{
-		Expr: e,
-	}
+func NewAttributeOnUpdate(e Expr, buf *buffer.Buffer) *AttributeOnUpdate {
+	a := buffer.Alloc[AttributeOnUpdate](buf)
+	a.Expr = e
+	return a
 }
 
 type IndexType int
@@ -802,16 +847,18 @@ func (node *IndexOption) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewIndexOption(k uint64, i IndexType, p string, c string, v VisibleType, e string, se string) *IndexOption {
-	return &IndexOption{
-		KeyBlockSize:             k,
-		IType:                    i,
-		ParserName:               p,
-		Comment:                  c,
-		Visible:                  v,
-		EngineAttribute:          e,
-		SecondaryEngineAttribute: se,
-	}
+func NewIndexOption2(kb uint64, co, pa string, vi VisibleType, buf *buffer.Buffer) *IndexOption {
+	i := buffer.Alloc[IndexOption](buf)
+	i.KeyBlockSize = kb
+	i.Comment = co
+	i.ParserName = pa
+	i.Visible = vi
+	return i
+}
+
+func NewIndexOption( buf *buffer.Buffer) *IndexOption {
+	i := buffer.Alloc[IndexOption](buf)
+	return i
 }
 
 type PrimaryKeyIndex struct {
@@ -850,13 +897,13 @@ func (node *PrimaryKeyIndex) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewPrimaryKeyIndex(k []*KeyPart, n string, e bool, io *IndexOption) *PrimaryKeyIndex {
-	return &PrimaryKeyIndex{
-		KeyParts:    k,
-		Name:        n,
-		Empty:       e,
-		IndexOption: io,
-	}
+func NewPrimaryKeyIndex(keyParts []*KeyPart, name string, empty bool, indexOption *IndexOption, buf *buffer.Buffer) *PrimaryKeyIndex {
+	p := buffer.Alloc[PrimaryKeyIndex](buf)
+	p.KeyParts = keyParts
+	p.Name = name
+	p.Empty = empty
+	p.IndexOption = indexOption
+	return p
 }
 
 type Index struct {
@@ -896,13 +943,14 @@ func (node *Index) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewIndex(k []*KeyPart, n string, t IndexType, io *IndexOption) *Index {
-	return &Index{
-		KeyParts:    k,
-		Name:        n,
-		KeyType:     t,
-		IndexOption: io,
-	}
+func NewIndex(ifn bool, keyParts []*KeyPart, name string, keyType IndexType, indexOption *IndexOption, buf *buffer.Buffer) *Index {
+	i := buffer.Alloc[Index](buf)
+	i.IfNotExists = ifn
+	i.KeyParts = keyParts
+	i.Name = name
+	i.KeyType = keyType
+	i.IndexOption = indexOption
+	return i
 }
 
 type UniqueIndex struct {
@@ -949,13 +997,13 @@ func (node *UniqueIndex) GetIndexName() string {
 	}
 }
 
-func NewUniqueIndex(k []*KeyPart, n string, e bool, io *IndexOption) *UniqueIndex {
-	return &UniqueIndex{
-		KeyParts:    k,
-		Name:        n,
-		Empty:       e,
-		IndexOption: io,
-	}
+func NewUniqueIndex(keyParts []*KeyPart, name string, empty bool, indexOption *IndexOption, buf *buffer.Buffer) *UniqueIndex {
+	u := buffer.Alloc[UniqueIndex](buf)
+	u.KeyParts = keyParts
+	u.Name = name
+	u.Empty = empty
+	u.IndexOption = indexOption
+	return u
 }
 
 type ForeignKey struct {
@@ -998,14 +1046,14 @@ func (node *ForeignKey) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewForeignKey(ine bool, k []*KeyPart, n string, r *AttributeReference, e bool) *ForeignKey {
-	return &ForeignKey{
-		IfNotExists: ine,
-		KeyParts:    k,
-		Name:        n,
-		Refer:       r,
-		Empty:       e,
-	}
+func NewForeignKey(ifNotExists bool, keyParts []*KeyPart, name string, refer *AttributeReference, empty bool, buf *buffer.Buffer) *ForeignKey {
+	f := buffer.Alloc[ForeignKey](buf)
+	f.IfNotExists = ifNotExists
+	f.KeyParts = keyParts
+	f.Name = name
+	f.Refer = refer
+	f.Empty = empty
+	return f
 }
 
 type FullTextIndex struct {
@@ -1040,13 +1088,13 @@ func (node *FullTextIndex) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewFullTextIndex(k []*KeyPart, n string, e bool, io *IndexOption) *FullTextIndex {
-	return &FullTextIndex{
-		KeyParts:    k,
-		Name:        n,
-		Empty:       e,
-		IndexOption: io,
-	}
+func NewFullTextIndex(keyParts []*KeyPart, name string, empty bool, indexOption *IndexOption, buf *buffer.Buffer) *FullTextIndex {
+	f := buffer.Alloc[FullTextIndex](buf)
+	f.KeyParts = keyParts
+	f.Name = name
+	f.Empty = empty
+	f.IndexOption = indexOption
+	return f
 }
 
 type CheckIndex struct {
@@ -1064,11 +1112,11 @@ func (node *CheckIndex) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewCheckIndex(e Expr, en bool) *CheckIndex {
-	return &CheckIndex{
-		Expr:     e,
-		Enforced: en,
-	}
+func NewCheckIndex(expr Expr, enforced bool, buf *buffer.Buffer) *CheckIndex {
+	c := buffer.Alloc[CheckIndex](buf)
+	c.Expr = expr
+	c.Enforced = enforced
+	return c
 }
 
 type TableOption interface {
@@ -1097,9 +1145,22 @@ func (node *TableOptionProperties) Format(ctx *FmtCtx) {
 	}
 }
 
+func NewTableOptionProperties(preperties []Property, buf *buffer.Buffer) *TableOptionProperties {
+	t := buffer.Alloc[TableOptionProperties](buf)
+	t.Preperties = preperties
+	return t
+}
+
 type Property struct {
 	Key   string
 	Value string
+}
+
+func NewProperty(key string, value string, buf *buffer.Buffer) *Property {
+	p := buffer.Alloc[Property](buf)
+	p.Key = key
+	p.Value = value
+	return p
 }
 
 func (node *Property) Format(ctx *FmtCtx) {
@@ -1118,10 +1179,10 @@ func (node *TableOptionEngine) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Engine)
 }
 
-func NewTableOptionEngine(s string) *TableOptionEngine {
-	return &TableOptionEngine{
-		Engine: s,
-	}
+func NewTableOptionEngine(engine string, buf *buffer.Buffer) *TableOptionEngine {
+	t := buffer.Alloc[TableOptionEngine](buf)
+	t.Engine = engine
+	return t
 }
 
 type TableOptionEngineAttr struct {
@@ -1134,10 +1195,10 @@ func (node *TableOptionEngineAttr) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Engine)
 }
 
-func NewTableOptionEngineAttr(s string) *TableOptionEngineAttr {
-	return &TableOptionEngineAttr{
-		Engine: s,
-	}
+func NewTableOptionEngineAttr(engine string, buf *buffer.Buffer) *TableOptionEngineAttr {
+	t := buffer.Alloc[TableOptionEngineAttr](buf)
+	t.Engine = engine
+	return t
 }
 
 type TableOptionInsertMethod struct {
@@ -1150,10 +1211,10 @@ func (node *TableOptionInsertMethod) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Method)
 }
 
-func NewTableOptionInsertMethod(s string) *TableOptionInsertMethod {
-	return &TableOptionInsertMethod{
-		Method: s,
-	}
+func NewTableOptionInsertMethod(s string, buf *buffer.Buffer) *TableOptionInsertMethod {
+	t := buffer.Alloc[TableOptionInsertMethod](buf)
+	t.Method = s
+	return t
 }
 
 type TableOptionSecondaryEngine struct {
@@ -1166,18 +1227,19 @@ func (node *TableOptionSecondaryEngine) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Engine)
 }
 
-func NewTableOptionSecondaryEngine(s string) *TableOptionSecondaryEngine {
-	return &TableOptionSecondaryEngine{
-		Engine: s,
-	}
+func NewTableOptionSecondaryEngine(s string, buf *buffer.Buffer) *TableOptionSecondaryEngine {
+	t := buffer.Alloc[TableOptionSecondaryEngine](buf)
+	t.Engine = s
+	return t
 }
 
 type TableOptionSecondaryEngineNull struct {
 	tableOptionImpl
 }
 
-func NewTableOptionSecondaryEngineNull() *TableOptionSecondaryEngineNull {
-	return &TableOptionSecondaryEngineNull{}
+func NewTableOptionSecondaryEngineNull(buf *buffer.Buffer) *TableOptionSecondaryEngineNull {
+	t := buffer.Alloc[TableOptionSecondaryEngineNull](buf)
+	return t
 }
 
 type TableOptionCharset struct {
@@ -1190,8 +1252,10 @@ func (node *TableOptionCharset) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Charset)
 }
 
-func NewTableOptionCharset(s string) *TableOptionCharset {
-	return &TableOptionCharset{Charset: s}
+func NewTableOptionCharset(s string, buf *buffer.Buffer) *TableOptionCharset {
+	t := buffer.Alloc[TableOptionCharset](buf)
+	t.Charset = s
+	return t
 }
 
 type TableOptionCollate struct {
@@ -1204,10 +1268,10 @@ func (node *TableOptionCollate) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Collate)
 }
 
-func NewTableOptionCollate(s string) *TableOptionCollate {
-	return &TableOptionCollate{
-		Collate: s,
-	}
+func NewTableOptionCollate(s string, buf *buffer.Buffer) *TableOptionCollate {
+	t := buffer.Alloc[TableOptionCollate](buf)
+	t.Collate = s
+	return t
 }
 
 type TableOptionAUTOEXTEND_SIZE struct {
@@ -1220,10 +1284,10 @@ func (node *TableOptionAUTOEXTEND_SIZE) Format(ctx *FmtCtx) {
 	ctx.WriteString(strconv.FormatUint(node.Value, 10))
 }
 
-func NewTableOptionAUTOEXTEND_SIZE(v uint64) *TableOptionAUTOEXTEND_SIZE {
-	return &TableOptionAUTOEXTEND_SIZE{
-		Value: v,
-	}
+func NewTableOptionAUTOEXTEND_SIZE(value uint64, buf *buffer.Buffer) *TableOptionAUTOEXTEND_SIZE {
+	t := buffer.Alloc[TableOptionAUTOEXTEND_SIZE](buf)
+	t.Value = value
+	return t
 }
 
 type TableOptionAutoIncrement struct {
@@ -1236,10 +1300,10 @@ func (node *TableOptionAutoIncrement) Format(ctx *FmtCtx) {
 	ctx.WriteString(strconv.FormatUint(node.Value, 10))
 }
 
-func NewTableOptionAutoIncrement(v uint64) *TableOptionAutoIncrement {
-	return &TableOptionAutoIncrement{
-		Value: v,
-	}
+func NewTableOptionAutoIncrement(value uint64, buf *buffer.Buffer) *TableOptionAutoIncrement {
+	t := buffer.Alloc[TableOptionAutoIncrement](buf)
+	t.Value = value
+	return t
 }
 
 type TableOptionComment struct {
@@ -1252,10 +1316,10 @@ func (node *TableOptionComment) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Comment)
 }
 
-func NewTableOptionComment(c string) *TableOptionComment {
-	return &TableOptionComment{
-		Comment: c,
-	}
+func NewTableOptionComment(comment string, buf *buffer.Buffer) *TableOptionComment {
+	t := buffer.Alloc[TableOptionComment](buf)
+	t.Comment = comment
+	return t
 }
 
 type TableOptionAvgRowLength struct {
@@ -1268,10 +1332,10 @@ func (node *TableOptionAvgRowLength) Format(ctx *FmtCtx) {
 	ctx.WriteString(strconv.FormatUint(node.Length, 10))
 }
 
-func NewTableOptionAvgRowLength(l uint64) *TableOptionAvgRowLength {
-	return &TableOptionAvgRowLength{
-		Length: l,
-	}
+func NewTableOptionAvgRowLength(length uint64, buf *buffer.Buffer) *TableOptionAvgRowLength {
+	t := buffer.Alloc[TableOptionAvgRowLength](buf)
+	t.Length = length
+	return t
 }
 
 type TableOptionChecksum struct {
@@ -1284,10 +1348,10 @@ func (node *TableOptionChecksum) Format(ctx *FmtCtx) {
 	ctx.WriteString(strconv.FormatUint(node.Value, 10))
 }
 
-func NewTableOptionChecksum(v uint64) *TableOptionChecksum {
-	return &TableOptionChecksum{
-		Value: v,
-	}
+func NewTableOptionChecksum(value uint64, buf *buffer.Buffer) *TableOptionChecksum {
+	t := buffer.Alloc[TableOptionChecksum](buf)
+	t.Value = value
+	return t
 }
 
 type TableOptionCompression struct {
@@ -1300,10 +1364,10 @@ func (node *TableOptionCompression) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Compression)
 }
 
-func NewTableOptionCompression(c string) *TableOptionCompression {
-	return &TableOptionCompression{
-		Compression: c,
-	}
+func NewTableOptionCompression(compression string, buf *buffer.Buffer) *TableOptionCompression {
+	t := buffer.Alloc[TableOptionCompression](buf)
+	t.Compression = compression
+	return t
 }
 
 type TableOptionConnection struct {
@@ -1316,10 +1380,10 @@ func (node *TableOptionConnection) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Connection)
 }
 
-func NewTableOptionConnection(c string) *TableOptionConnection {
-	return &TableOptionConnection{
-		Connection: c,
-	}
+func NewTableOptionConnection(connection string, buf *buffer.Buffer) *TableOptionConnection {
+	t := buffer.Alloc[TableOptionConnection](buf)
+	t.Connection = connection
+	return t
 }
 
 type TableOptionPassword struct {
@@ -1332,10 +1396,10 @@ func (node *TableOptionPassword) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Password)
 }
 
-func NewTableOptionPassword(p string) *TableOptionPassword {
-	return &TableOptionPassword{
-		Password: p,
-	}
+func NewTableOptionPassword(password string, buf *buffer.Buffer) *TableOptionPassword {
+	t := buffer.Alloc[TableOptionPassword](buf)
+	t.Password = password
+	return t
 }
 
 type TableOptionKeyBlockSize struct {
@@ -1348,10 +1412,10 @@ func (node *TableOptionKeyBlockSize) Format(ctx *FmtCtx) {
 	ctx.WriteString(strconv.FormatUint(node.Value, 10))
 }
 
-func NewTableOptionKeyBlockSize(v uint64) *TableOptionKeyBlockSize {
-	return &TableOptionKeyBlockSize{
-		Value: v,
-	}
+func NewTableOptionKeyBlockSize(value uint64, buf *buffer.Buffer) *TableOptionKeyBlockSize {
+	t := buffer.Alloc[TableOptionKeyBlockSize](buf)
+	t.Value = value
+	return t
 }
 
 type TableOptionMaxRows struct {
@@ -1364,10 +1428,10 @@ func (node *TableOptionMaxRows) Format(ctx *FmtCtx) {
 	ctx.WriteString(strconv.FormatUint(node.Value, 10))
 }
 
-func NewTableOptionMaxRows(v uint64) *TableOptionMaxRows {
-	return &TableOptionMaxRows{
-		Value: v,
-	}
+func NewTableOptionMaxRows(value uint64, buf *buffer.Buffer) *TableOptionMaxRows {
+	t := buffer.Alloc[TableOptionMaxRows](buf)
+	t.Value = value
+	return t
 }
 
 type TableOptionMinRows struct {
@@ -1380,10 +1444,10 @@ func (node *TableOptionMinRows) Format(ctx *FmtCtx) {
 	ctx.WriteString(strconv.FormatUint(node.Value, 10))
 }
 
-func NewTableOptionMinRows(v uint64) *TableOptionMinRows {
-	return &TableOptionMinRows{
-		Value: v,
-	}
+func NewTableOptionMinRows(value uint64, buf *buffer.Buffer) *TableOptionMinRows {
+	t := buffer.Alloc[TableOptionMinRows](buf)
+	t.Value = value
+	return t
 }
 
 type TableOptionDelayKeyWrite struct {
@@ -1396,10 +1460,10 @@ func (node *TableOptionDelayKeyWrite) Format(ctx *FmtCtx) {
 	ctx.WriteString(strconv.FormatUint(node.Value, 10))
 }
 
-func NewTableOptionDelayKeyWrite(v uint64) *TableOptionDelayKeyWrite {
-	return &TableOptionDelayKeyWrite{
-		Value: v,
-	}
+func NewTableOptionDelayKeyWrite(value uint64, buf *buffer.Buffer) *TableOptionDelayKeyWrite {
+	t := buffer.Alloc[TableOptionDelayKeyWrite](buf)
+	t.Value = value
+	return t
 }
 
 type RowFormatType uint64
@@ -1442,10 +1506,10 @@ func (node *TableOptionRowFormat) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Value.ToString())
 }
 
-func NewTableOptionRowFormat(v RowFormatType) *TableOptionRowFormat {
-	return &TableOptionRowFormat{
-		Value: v,
-	}
+func NewTableOptionRowFormat(value RowFormatType, buf *buffer.Buffer) *TableOptionRowFormat {
+	t := buffer.Alloc[TableOptionRowFormat](buf)
+	t.Value = value
+	return t
 }
 
 type TableOptionStartTrans struct {
@@ -1457,10 +1521,10 @@ func (node *TableOptionStartTrans) Format(ctx *FmtCtx) {
 	ctx.WriteString("START TRANSACTION")
 }
 
-func NewTTableOptionStartTrans(v bool) *TableOptionStartTrans {
-	return &TableOptionStartTrans{
-		Value: v,
-	}
+func NewTableOptionStartTrans(value bool, buf *buffer.Buffer) *TableOptionStartTrans {
+	t := buffer.Alloc[TableOptionStartTrans](buf)
+	t.Value = value
+	return t
 }
 
 type TableOptionSecondaryEngineAttr struct {
@@ -1473,10 +1537,10 @@ func (node *TableOptionSecondaryEngineAttr) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Attr)
 }
 
-func NewTTableOptionSecondaryEngineAttr(v string) *TableOptionSecondaryEngineAttr {
-	return &TableOptionSecondaryEngineAttr{
-		Attr: v,
-	}
+func NewTableOptionSecondaryEngineAttr(attr string, buf *buffer.Buffer) *TableOptionSecondaryEngineAttr {
+	t := buffer.Alloc[TableOptionSecondaryEngineAttr](buf)
+	t.Attr = attr
+	return t
 }
 
 type TableOptionStatsPersistent struct {
@@ -1494,8 +1558,11 @@ func (node *TableOptionStatsPersistent) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewTableOptionStatsPersistent() *TableOptionStatsPersistent {
-	return &TableOptionStatsPersistent{}
+func NewTableOptionStatsPersistent(value uint64, default_ bool, buf *buffer.Buffer) *TableOptionStatsPersistent {
+	t := buffer.Alloc[TableOptionStatsPersistent](buf)
+	t.Value = value
+	t.Default = default_
+	return t
 }
 
 type TableOptionStatsAutoRecalc struct {
@@ -1513,11 +1580,11 @@ func (node *TableOptionStatsAutoRecalc) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewTableOptionStatsAutoRecalc(v uint64, d bool) *TableOptionStatsAutoRecalc {
-	return &TableOptionStatsAutoRecalc{
-		Value:   v,
-		Default: d,
-	}
+func NewTableOptionStatsAutoRecalc(value uint64, default_ bool, buf *buffer.Buffer) *TableOptionStatsAutoRecalc {
+	t := buffer.Alloc[TableOptionStatsAutoRecalc](buf)
+	t.Value = value
+	t.Default = default_
+	return t
 }
 
 type TableOptionPackKeys struct {
@@ -1535,8 +1602,11 @@ func (node *TableOptionPackKeys) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewTableOptionPackKeys(value int64) *TableOptionPackKeys {
-	return &TableOptionPackKeys{Value: value}
+func NewTableOptionPackKeys(value int64, defalut_ bool, buf *buffer.Buffer) *TableOptionPackKeys {
+	t := buffer.Alloc[TableOptionPackKeys](buf)
+	t.Value = value
+	t.Default = defalut_
+	return t
 }
 
 type TableOptionTablespace struct {
@@ -1551,8 +1621,11 @@ func (node *TableOptionTablespace) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.StorageOpt)
 }
 
-func NewTableOptionTablespace(n string, s string) *TableOptionTablespace {
-	return &TableOptionTablespace{Name: n, StorageOpt: s}
+func NewTableOptionTablespace(name string, storageOpt string, buf *buffer.Buffer) *TableOptionTablespace {
+	t := buffer.Alloc[TableOptionTablespace](buf)
+	t.Name = name
+	t.StorageOpt = storageOpt
+	return t
 }
 
 type TableOptionDataDirectory struct {
@@ -1565,8 +1638,10 @@ func (node *TableOptionDataDirectory) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Dir)
 }
 
-func NewTableOptionDataDirectory(d string) *TableOptionDataDirectory {
-	return &TableOptionDataDirectory{Dir: d}
+func NewTableOptionDataDirectory(dir string, buf *buffer.Buffer) *TableOptionDataDirectory {
+	t := buffer.Alloc[TableOptionDataDirectory](buf)
+	t.Dir = dir
+	return t
 }
 
 type TableOptionIndexDirectory struct {
@@ -1579,10 +1654,10 @@ func (node *TableOptionIndexDirectory) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Dir)
 }
 
-func NewTableOptionIndexDirectory(d string) *TableOptionIndexDirectory {
-	return &TableOptionIndexDirectory{
-		Dir: d,
-	}
+func NewTableOptionIndexDirectory(d string, buf *buffer.Buffer) *TableOptionIndexDirectory {
+	t := buffer.Alloc[TableOptionIndexDirectory](buf)
+	t.Dir = d
+	return t
 }
 
 type TableOptionStorageMedia struct {
@@ -1595,8 +1670,10 @@ func (node *TableOptionStorageMedia) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Media)
 }
 
-func NewTableOptionStorageMedia(m string) *TableOptionStorageMedia {
-	return &TableOptionStorageMedia{Media: m}
+func NewTableOptionStorageMedia(media string, buf *buffer.Buffer) *TableOptionStorageMedia {
+	a := buffer.Alloc[TableOptionStorageMedia](buf)
+	a.Media = media
+	return a
 }
 
 type TableOptionStatsSamplePages struct {
@@ -1614,11 +1691,11 @@ func (node *TableOptionStatsSamplePages) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewTableOptionStatsSamplePages(v uint64, d bool) *TableOptionStatsSamplePages {
-	return &TableOptionStatsSamplePages{
-		Value:   v,
-		Default: d,
-	}
+func NewTableOptionStatsSamplePages(value uint64, default_ bool, buf *buffer.Buffer) *TableOptionStatsSamplePages {
+	a := buffer.Alloc[TableOptionStatsSamplePages](buf)
+	a.Value = value
+	a.Default = default_
+	return a
 }
 
 type TableOptionUnion struct {
@@ -1632,8 +1709,10 @@ func (node *TableOptionUnion) Format(ctx *FmtCtx) {
 	ctx.WriteByte(')')
 }
 
-func NewTableOptionUnion(n TableNames) *TableOptionUnion {
-	return &TableOptionUnion{Names: n}
+func NewTableOptionUnion(names TableNames, buf *buffer.Buffer) *TableOptionUnion {
+	a := buffer.Alloc[TableOptionUnion](buf)
+	a.Names = names
+	return a
 }
 
 type TableOptionEncryption struct {
@@ -1646,8 +1725,10 @@ func (node *TableOptionEncryption) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.Encryption)
 }
 
-func NewTableOptionEncryption(e string) *TableOptionEncryption {
-	return &TableOptionEncryption{Encryption: e}
+func NewTableOptionEncryption(encryption string, buf *buffer.Buffer) *TableOptionEncryption {
+	a := buffer.Alloc[TableOptionEncryption](buf)
+	a.Encryption = encryption
+	return a
 }
 
 type PartitionType interface {
@@ -1676,11 +1757,11 @@ func (node *HashType) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewHashType(l bool, e Expr) *HashType {
-	return &HashType{
-		Linear: l,
-		Expr:   e,
-	}
+func NewHashType(linear bool, expr Expr, buf *buffer.Buffer) *HashType {
+	h := buffer.Alloc[HashType](buf)
+	h.Linear = linear
+	h.Expr = expr
+	return h
 }
 
 type KeyType struct {
@@ -1710,11 +1791,12 @@ func (node *KeyType) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewKeyType(l bool, c []*UnresolvedName) *KeyType {
-	return &KeyType{
-		Linear:     l,
-		ColumnList: c,
-	}
+func NewKeyType(linear bool, columnList []*UnresolvedName, a int64, buf *buffer.Buffer) *KeyType {
+	k := buffer.Alloc[KeyType](buf)
+	k.Linear = linear
+	k.ColumnList = columnList
+	k.Algorithm = a
+	return k
 }
 
 type RangeType struct {
@@ -1741,11 +1823,11 @@ func (node *RangeType) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewRangeType(e Expr, c []*UnresolvedName) *RangeType {
-	return &RangeType{
-		Expr:       e,
-		ColumnList: c,
-	}
+func NewRangeType(expr Expr, columnList []*UnresolvedName, buf *buffer.Buffer) *RangeType {
+	r := buffer.Alloc[RangeType](buf)
+	r.Expr = expr
+	r.ColumnList = columnList
+	return r
 }
 
 type ListType struct {
@@ -1772,11 +1854,11 @@ func (node *ListType) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewListType(e Expr, c []*UnresolvedName) *ListType {
-	return &ListType{
-		Expr:       e,
-		ColumnList: c,
-	}
+func NewListType(expr Expr, columnList []*UnresolvedName, buf *buffer.Buffer) *ListType {
+	l := buffer.Alloc[ListType](buf)
+	l.Expr = expr
+	l.ColumnList = columnList
+	return l
 }
 
 type PartitionBy struct {
@@ -1797,11 +1879,18 @@ func (node *PartitionBy) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewPartitionBy(pt PartitionType, n uint64) *PartitionBy {
-	return &PartitionBy{
-		PType: pt,
-		Num:   n,
-	}
+func NewPartitionBy(pType PartitionType, buf *buffer.Buffer) *PartitionBy {
+	p := buffer.Alloc[PartitionBy](buf)
+	p.PType = pType
+	return p
+}
+
+func NewPartitionBy2(is bool, pType PartitionType, nu uint64, buf *buffer.Buffer) *PartitionBy {
+	p := buffer.Alloc[PartitionBy](buf)
+	p.IsSubPartition = is
+	p.PType = pType
+	p.Num = nu
+	return p
 }
 
 //type SubpartitionBy struct {
@@ -1828,10 +1917,10 @@ func (node *ValuesLessThan) Format(ctx *FmtCtx) {
 	ctx.WriteByte(')')
 }
 
-func NewValuesLessThan(vl Exprs) *ValuesLessThan {
-	return &ValuesLessThan{
-		ValueList: vl,
-	}
+func NewValuesLessThan(valueList Exprs, buf *buffer.Buffer) *ValuesLessThan {
+	v := buffer.Alloc[ValuesLessThan](buf)
+	v.ValueList = valueList
+	return v
 }
 
 type ValuesIn struct {
@@ -1845,10 +1934,10 @@ func (node *ValuesIn) Format(ctx *FmtCtx) {
 	ctx.WriteByte(')')
 }
 
-func NewValuesIn(vl Exprs) *ValuesIn {
-	return &ValuesIn{
-		ValueList: vl,
-	}
+func NewValuesIn(valueList Exprs, buf *buffer.Buffer) *ValuesIn {
+	v := buffer.Alloc[ValuesIn](buf)
+	v.ValueList = valueList
+	return v
 }
 
 type Partition struct {
@@ -1884,13 +1973,13 @@ func (node *Partition) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewPartition(n Identifier, v Values, o []TableOption, s []*SubPartition) *Partition {
-	return &Partition{
-		Name:    n,
-		Values:  v,
-		Options: o,
-		Subs:    s,
-	}
+func NewPartition(name Identifier, values Values, options []TableOption, subs []*SubPartition, buf *buffer.Buffer) *Partition {
+	p := buffer.Alloc[Partition](buf)
+	p.Name = name
+	p.Values = values
+	p.Options = options
+	p.Subs = subs
+	return p
 }
 
 type SubPartition struct {
@@ -1912,15 +2001,21 @@ func (node *SubPartition) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewSubPartition(n Identifier, o []TableOption) *SubPartition {
-	return &SubPartition{
-		Name:    n,
-		Options: o,
-	}
+func NewSubPartition(name Identifier, options []TableOption, buf *buffer.Buffer) *SubPartition {
+	s := buffer.Alloc[SubPartition](buf)
+	s.Name = name
+	s.Options = options
+	return s
 }
 
 type ClusterByOption struct {
 	ColumnList []*UnresolvedName
+}
+
+func NewClusterByOption(columnList []*UnresolvedName, buf *buffer.Buffer) *ClusterByOption {
+	c := buffer.Alloc[ClusterByOption](buf)
+	c.ColumnList = columnList
+	return c
 }
 
 type PartitionOption struct {
@@ -1947,12 +2042,12 @@ func (node *PartitionOption) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewPartitionOption(pb *PartitionBy, spb *PartitionBy, parts []*Partition) *PartitionOption {
-	return &PartitionOption{
-		PartBy:     *pb,
-		SubPartBy:  spb,
-		Partitions: parts,
-	}
+func NewPartitionOption(partBy PartitionBy, subPartBy *PartitionBy, partitions []*Partition, buf *buffer.Buffer) *PartitionOption {
+	p := buffer.Alloc[PartitionOption](buf)
+	p.PartBy = partBy
+	p.SubPartBy = subPartBy
+	p.Partitions = partitions
+	return p
 }
 
 type IndexCategory int
@@ -2027,16 +2122,15 @@ func (node *CreateIndex) Format(ctx *FmtCtx) {
 func (node *CreateIndex) GetStatementType() string { return "Create Index" }
 func (node *CreateIndex) GetQueryType() string     { return QueryTypeDDL }
 
-func NewCreateIndex(n Identifier, t TableName, ife bool, it IndexCategory, k []*KeyPart, i *IndexOption, m []MiscOption) *CreateIndex {
-	return &CreateIndex{
-		Name:        n,
-		Table:       t,
-		IfNotExists: ife,
-		IndexCat:    it,
-		KeyParts:    k,
-		IndexOption: i,
-		MiscOption:  m,
-	}
+func NewCreateIndex(name Identifier, table TableName, indexCat IndexCategory, keyParts []*KeyPart, indexOption *IndexOption, miscOption []MiscOption, buf *buffer.Buffer) *CreateIndex {
+	t := buffer.Alloc[CreateIndex](buf)
+	t.Name = name
+	t.Table = table
+	t.IndexCat = indexCat
+	t.KeyParts = keyParts
+	t.IndexOption = indexOption
+	t.MiscOption = miscOption
+	return t
 }
 
 type MiscOption interface {
@@ -2097,11 +2191,11 @@ func (node *CreateRole) Format(ctx *FmtCtx) {
 func (node *CreateRole) GetStatementType() string { return "Create Role" }
 func (node *CreateRole) GetQueryType() string     { return QueryTypeDCL }
 
-func NewCreateRole(ife bool, r []*Role) *CreateRole {
-	return &CreateRole{
-		IfNotExists: ife,
-		Roles:       r,
-	}
+func NewCreateRole(ifNotExists bool, roles []*Role, buf *buffer.Buffer) *CreateRole {
+	c := buffer.Alloc[CreateRole](buf)
+	c.IfNotExists = ifNotExists
+	c.Roles = roles
+	return c
 }
 
 type Role struct {
@@ -2113,10 +2207,10 @@ func (node *Role) Format(ctx *FmtCtx) {
 	ctx.WriteString(node.UserName)
 }
 
-func NewRole(u string) *Role {
-	return &Role{
-		UserName: u,
-	}
+func NewRole(userName string, buf *buffer.Buffer) *Role {
+	r := buffer.Alloc[Role](buf)
+	r.UserName = userName
+	return r
 }
 
 type User struct {
@@ -2137,16 +2231,24 @@ func (node *User) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewUser(u, h string) *User {
-	return &User{
-		Username: u,
-		Hostname: h,
-	}
+func NewUser(username string, hostname string, authOption *AccountIdentified, buf *buffer.Buffer) *User {
+	u := buffer.Alloc[User](buf)
+	u.Username = username
+	u.Hostname = hostname
+	u.AuthOption = authOption
+	return u
 }
 
 type UsernameRecord struct {
 	Username string
 	Hostname string
+}
+
+func NewUsernameRecord(u, h string, buf *buffer.Buffer) *UsernameRecord {
+	us := buffer.Alloc[UsernameRecord](buf)
+	us.Username = u
+	us.Hostname = h
+	return us
 }
 
 type AuthRecord struct {
@@ -2288,12 +2390,22 @@ type UserMiscOptionPasswordExpireNone struct {
 	userMiscOptionImpl
 }
 
+func NewUserMiscOptionPasswordExpireNone(buf *buffer.Buffer) *UserMiscOptionPasswordExpireNone {
+	us := buffer.Alloc[UserMiscOptionPasswordExpireNone](buf)
+	return us
+}
+
 func (node *UserMiscOptionPasswordExpireNone) Format(ctx *FmtCtx) {
 	ctx.WriteString("password expire")
 }
 
 type UserMiscOptionPasswordExpireDefault struct {
 	userMiscOptionImpl
+}
+
+func NewUserMiscOptionPasswordExpireDefault(buf *buffer.Buffer) *UserMiscOptionPasswordExpireDefault {
+	us := buffer.Alloc[UserMiscOptionPasswordExpireDefault](buf)
+	return us
 }
 
 func (node *UserMiscOptionPasswordExpireDefault) Format(ctx *FmtCtx) {
@@ -2304,6 +2416,11 @@ type UserMiscOptionPasswordExpireNever struct {
 	userMiscOptionImpl
 }
 
+func NewUserMiscOptionPasswordExpireNever(buf *buffer.Buffer) *UserMiscOptionPasswordExpireNever {
+	us := buffer.Alloc[UserMiscOptionPasswordExpireNever](buf)
+	return us
+}
+
 func (node *UserMiscOptionPasswordExpireNever) Format(ctx *FmtCtx) {
 	ctx.WriteString("password expire never")
 }
@@ -2311,6 +2428,11 @@ func (node *UserMiscOptionPasswordExpireNever) Format(ctx *FmtCtx) {
 type UserMiscOptionPasswordExpireInterval struct {
 	userMiscOptionImpl
 	Value int64
+}
+
+func NewUserMiscOptionPasswordExpireInterval(v int64, buf *buffer.Buffer) *UserMiscOptionPasswordExpireInterval {
+	us := buffer.Alloc[UserMiscOptionPasswordExpireInterval](buf)
+	return us
 }
 
 func (node *UserMiscOptionPasswordExpireInterval) Format(ctx *FmtCtx) {
@@ -2323,6 +2445,11 @@ type UserMiscOptionPasswordHistoryDefault struct {
 	userMiscOptionImpl
 }
 
+func NewUserMiscOptionPasswordHistoryDefault(buf *buffer.Buffer) *UserMiscOptionPasswordHistoryDefault {
+	us := buffer.Alloc[UserMiscOptionPasswordHistoryDefault](buf)
+	return us
+}
+
 func (node *UserMiscOptionPasswordHistoryDefault) Format(ctx *FmtCtx) {
 	ctx.WriteString("password history default")
 }
@@ -2332,12 +2459,23 @@ type UserMiscOptionPasswordHistoryCount struct {
 	Value int64
 }
 
+func NewUserMiscOptionPasswordHistoryCount(v int64, buf *buffer.Buffer) *UserMiscOptionPasswordHistoryCount {
+	us := buffer.Alloc[UserMiscOptionPasswordHistoryCount](buf)
+	us.Value = v
+	return us
+}
+
 func (node *UserMiscOptionPasswordHistoryCount) Format(ctx *FmtCtx) {
 	ctx.WriteString(fmt.Sprintf("password history %d", node.Value))
 }
 
 type UserMiscOptionPasswordReuseIntervalDefault struct {
 	userMiscOptionImpl
+}
+
+func NewUserMiscOptionPasswordReuseIntervalDefault(buf *buffer.Buffer) *UserMiscOptionPasswordReuseIntervalDefault {
+	us := buffer.Alloc[UserMiscOptionPasswordReuseIntervalDefault](buf)
+	return us
 }
 
 func (node *UserMiscOptionPasswordReuseIntervalDefault) Format(ctx *FmtCtx) {
@@ -2349,12 +2487,23 @@ type UserMiscOptionPasswordReuseIntervalCount struct {
 	Value int64
 }
 
+func NewUserMiscOptionPasswordReuseIntervalCount(v int64, buf *buffer.Buffer) *UserMiscOptionPasswordReuseIntervalCount {
+	us := buffer.Alloc[UserMiscOptionPasswordReuseIntervalCount](buf)
+	us.Value = v
+	return us
+}
+
 func (node *UserMiscOptionPasswordReuseIntervalCount) Format(ctx *FmtCtx) {
 	ctx.WriteString(fmt.Sprintf("password reuse interval %d day", node.Value))
 }
 
 type UserMiscOptionPasswordRequireCurrentNone struct {
 	userMiscOptionImpl
+}
+
+func NewUserMiscOptionPasswordRequireCurrentNone(buf *buffer.Buffer) *UserMiscOptionPasswordRequireCurrentNone {
+	us := buffer.Alloc[UserMiscOptionPasswordRequireCurrentNone](buf)
+	return us
 }
 
 func (node *UserMiscOptionPasswordRequireCurrentNone) Format(ctx *FmtCtx) {
@@ -2365,12 +2514,22 @@ type UserMiscOptionPasswordRequireCurrentDefault struct {
 	userMiscOptionImpl
 }
 
+func NewUserMiscOptionPasswordRequireCurrentDefault(buf *buffer.Buffer) *UserMiscOptionPasswordRequireCurrentDefault {
+	us := buffer.Alloc[UserMiscOptionPasswordRequireCurrentDefault](buf)
+	return us
+}
+
 func (node *UserMiscOptionPasswordRequireCurrentDefault) Format(ctx *FmtCtx) {
 	ctx.WriteString("password require current default")
 }
 
 type UserMiscOptionPasswordRequireCurrentOptional struct {
 	userMiscOptionImpl
+}
+
+func NewUserMiscOptionPasswordRequireCurrentOptional(buf *buffer.Buffer) *UserMiscOptionPasswordRequireCurrentOptional {
+	us := buffer.Alloc[UserMiscOptionPasswordRequireCurrentOptional](buf)
+	return us
 }
 
 func (node *UserMiscOptionPasswordRequireCurrentOptional) Format(ctx *FmtCtx) {
@@ -2382,6 +2541,12 @@ type UserMiscOptionFailedLoginAttempts struct {
 	Value int64
 }
 
+func NewUserMiscOptionFailedLoginAttempts(v int64, buf *buffer.Buffer) *UserMiscOptionFailedLoginAttempts {
+	us := buffer.Alloc[UserMiscOptionFailedLoginAttempts](buf)
+	us.Value = v
+	return us
+}
+
 func (node *UserMiscOptionFailedLoginAttempts) Format(ctx *FmtCtx) {
 	ctx.WriteString(fmt.Sprintf("failed_login_attempts %d", node.Value))
 }
@@ -2389,6 +2554,12 @@ func (node *UserMiscOptionFailedLoginAttempts) Format(ctx *FmtCtx) {
 type UserMiscOptionPasswordLockTimeCount struct {
 	userMiscOptionImpl
 	Value int64
+}
+
+func NewUserMiscOptionPasswordLockTimeCount(v int64, buf *buffer.Buffer) *UserMiscOptionPasswordLockTimeCount {
+	us := buffer.Alloc[UserMiscOptionPasswordLockTimeCount](buf)
+	us.Value = v
+	return us
 }
 
 func (node *UserMiscOptionPasswordLockTimeCount) Format(ctx *FmtCtx) {
@@ -2399,6 +2570,11 @@ type UserMiscOptionPasswordLockTimeUnbounded struct {
 	userMiscOptionImpl
 }
 
+func NewUserMiscOptionPasswordLockTimeUnbounded(buf *buffer.Buffer) *UserMiscOptionPasswordLockTimeUnbounded {
+	us := buffer.Alloc[UserMiscOptionPasswordLockTimeUnbounded](buf)
+	return us
+}
+
 func (node *UserMiscOptionPasswordLockTimeUnbounded) Format(ctx *FmtCtx) {
 	ctx.WriteString("password_lock_time unbounded")
 }
@@ -2407,12 +2583,22 @@ type UserMiscOptionAccountLock struct {
 	userMiscOptionImpl
 }
 
+func NewUserMiscOptionAccountLock(buf *buffer.Buffer) *UserMiscOptionAccountLock {
+	us := buffer.Alloc[UserMiscOptionAccountLock](buf)
+	return us
+}
+
 func (node *UserMiscOptionAccountLock) Format(ctx *FmtCtx) {
 	ctx.WriteString("lock")
 }
 
 type UserMiscOptionAccountUnlock struct {
 	userMiscOptionImpl
+}
+
+func NewUserMiscOptionAccountUnlock(buf *buffer.Buffer) *UserMiscOptionAccountUnlock {
+	us := buffer.Alloc[UserMiscOptionAccountUnlock](buf)
+	return us
 }
 
 func (node *UserMiscOptionAccountUnlock) Format(ctx *FmtCtx) {
@@ -2460,13 +2646,14 @@ func (node *CreateUser) Format(ctx *FmtCtx) {
 func (node *CreateUser) GetStatementType() string { return "Create User" }
 func (node *CreateUser) GetQueryType() string     { return QueryTypeDCL }
 
-func NewCreateUser(ife bool, u []*User, r *Role, misc UserMiscOption) *CreateUser {
-	return &CreateUser{
-		IfNotExists: ife,
-		Users:       u,
-		Role:        r,
-		MiscOpt:     misc,
-	}
+func NewCreateUser(ife bool, u []*User, r *Role, misc UserMiscOption, co AccountCommentOrAttribute, buf *buffer.Buffer) *CreateUser {
+	c := buffer.Alloc[CreateUser](buf)
+	c.IfNotExists = ife
+	c.Users = u
+	c.Role = r
+	c.MiscOpt = misc
+	c.CommentOrAttribute = co
+	return c
 }
 
 type CreateAccount struct {
@@ -2494,10 +2681,28 @@ func (ca *CreateAccount) Format(ctx *FmtCtx) {
 func (ca *CreateAccount) GetStatementType() string { return "Create Account" }
 func (ca *CreateAccount) GetQueryType() string     { return QueryTypeDCL }
 
+func NewCreateAccount(ifNotExists bool, name string, authOption AccountAuthOption, statusOption AccountStatus, comment AccountComment, buf *buffer.Buffer) *CreateAccount {
+	c := buffer.Alloc[CreateAccount](buf)
+	c.IfNotExists = ifNotExists
+	c.Name = name
+	c.AuthOption = authOption
+	c.StatusOption = statusOption
+	c.Comment = comment
+	return c
+}
+
 type AccountAuthOption struct {
 	Equal          string
 	AdminName      string
 	IdentifiedType AccountIdentified
+}
+
+func NewAccountAuthOption(equal string, adminName string, identifiedType AccountIdentified, buf *buffer.Buffer) *AccountAuthOption {
+	a := buffer.Alloc[AccountAuthOption](buf)
+	a.Equal = equal
+	a.AdminName = adminName
+	a.IdentifiedType = identifiedType
+	return a
 }
 
 func (node *AccountAuthOption) Format(ctx *FmtCtx) {
@@ -2523,6 +2728,13 @@ const (
 type AccountIdentified struct {
 	Typ AccountIdentifiedOption
 	Str string
+}
+
+func NewAccountIdentified(typ AccountIdentifiedOption, str string, buf *buffer.Buffer) *AccountIdentified {
+	a := buffer.Alloc[AccountIdentified](buf)
+	a.Typ = typ
+	a.Str = str
+	return a
 }
 
 func (node *AccountIdentified) Format(ctx *FmtCtx) {
@@ -2562,6 +2774,13 @@ type AccountStatus struct {
 	Option AccountStatusOption
 }
 
+func NewAccountStatus(e bool, o AccountStatusOption, buf *buffer.Buffer) *AccountStatus {
+	a := buffer.Alloc[AccountStatus](buf)	
+	a.Exist = e
+	a.Option = o
+	return a
+}
+
 func (node *AccountStatus) Format(ctx *FmtCtx) {
 	if node.Exist {
 		switch node.Option {
@@ -2580,6 +2799,13 @@ type AccountComment struct {
 	Comment string
 }
 
+func NewAccountComment (e bool, c string, buf *buffer.Buffer) *AccountComment {
+	a := buffer.Alloc[AccountComment ](buf)	
+	a.Exist = e
+	a.Comment = c
+	return a
+}
+
 func (node *AccountComment) Format(ctx *FmtCtx) {
 	if node.Exist {
 		ctx.WriteString(" comment ")
@@ -2591,6 +2817,14 @@ type AccountCommentOrAttribute struct {
 	Exist     bool
 	IsComment bool
 	Str       string
+}
+
+func NewAccountCommentOrAttribute(e, i bool, s string, buf *buffer.Buffer) AccountCommentOrAttribute {
+	a := buffer.Alloc[AccountCommentOrAttribute](buf)
+	a.Exist = e
+	a.IsComment = i
+	a.Str = s
+	return *a
 }
 
 func (node *AccountCommentOrAttribute) Format(ctx *FmtCtx) {
@@ -2611,6 +2845,16 @@ type CreatePublication struct {
 	Database    Identifier
 	AccountsSet *AccountsSetOption
 	Comment     string
+}
+
+func NewCreatePublication(ifNotExists bool, name Identifier, database Identifier, accountsSet *AccountsSetOption, comment string, buf *buffer.Buffer) *CreatePublication {
+	c := buffer.Alloc[CreatePublication](buf)
+	c.IfNotExists = ifNotExists
+	c.Name = name
+	c.Database = database
+	c.AccountsSet = accountsSet
+	c.Comment = comment
+	return c
 }
 
 func (node *CreatePublication) Format(ctx *FmtCtx) {
@@ -2649,10 +2893,10 @@ func (node *AttributeVisable) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewAttributeVisable(b bool) *AttributeVisable {
-	return &AttributeVisable{
-		Is: b,
-	}
+func NewAttributeVisable(is bool, buf *buffer.Buffer) *AttributeVisable {
+	a := buffer.Alloc[AttributeVisable](buf)
+	a.Is = is
+	return a
 }
 
 func (node *CreatePublication) GetStatementType() string { return "Create Publication" }

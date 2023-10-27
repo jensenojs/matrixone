@@ -31,6 +31,7 @@ import (
 func (builder *QueryBuilder) buildResultScan(tbl *tree.TableFunction, ctx *BindContext) (int32, error) {
 	var err error
 	val, err := builder.compCtx.ResolveVariable("save_query_result", true, true)
+	buf := builder.compCtx.GetBuffer()
 	if err == nil {
 		if v, _ := val.(int8); v == 0 {
 			return 0, moerr.NewNoConfig(builder.GetContext(), "save query result")
@@ -40,7 +41,7 @@ func (builder *QueryBuilder) buildResultScan(tbl *tree.TableFunction, ctx *BindC
 	} else {
 		return 0, err
 	}
-	ctx.binder = NewTableBinder(builder, ctx)
+	ctx.binder = NewTableBinder(builder, ctx, buf)
 	exprs := make([]*plan.Expr, 0, len(tbl.Func.Exprs))
 	for _, v := range tbl.Func.Exprs {
 		curExpr, err := ctx.binder.BindExpr(v, 0, false)

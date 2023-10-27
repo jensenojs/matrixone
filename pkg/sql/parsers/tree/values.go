@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 // the VALUES clause
 type ValuesClause struct {
 	SelectStatement
@@ -36,10 +38,11 @@ func (node *ValuesClause) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewValuesClause(r []Exprs) *ValuesClause {
-	return &ValuesClause{
-		Rows: r,
-	}
+func NewValuesClause(r []Exprs, b bool, buf *buffer.Buffer) *ValuesClause {
+	valuesClause := buffer.Alloc[ValuesClause](buf)
+	valuesClause.Rows = r
+	valuesClause.RowWord = b
+	return valuesClause
 }
 
 // ValuesStatement the VALUES Statement
@@ -49,6 +52,14 @@ type ValuesStatement struct {
 	Rows    []Exprs
 	OrderBy OrderBy
 	Limit   *Limit
+}
+
+func NewValuesStatement(rows []Exprs, orderby OrderBy, limit *Limit, buf *buffer.Buffer) *ValuesStatement {
+	v := buffer.Alloc[ValuesStatement](buf)
+	v.Rows = rows
+	v.OrderBy = orderby
+	v.Limit = limit
+	return v
 }
 
 func (node *ValuesStatement) Format(ctx *FmtCtx) {

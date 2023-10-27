@@ -14,6 +14,8 @@
 
 package tree
 
+import "github.com/matrixorigin/matrixone/pkg/common/buffer"
+
 type CreateView struct {
 	statementImpl
 	Replace     bool
@@ -21,6 +23,16 @@ type CreateView struct {
 	ColNames    IdentifierList
 	AsSource    *Select
 	IfNotExists bool
+}
+
+func NewCreateView(replace bool, name *TableName, colnames IdentifierList, asSource *Select, ifn bool, buf *buffer.Buffer) *CreateView {
+	c := buffer.Alloc[CreateView](buf)
+	c.Replace = replace
+	c.Name = name
+	c.ColNames = colnames
+	c.AsSource = asSource
+	c.IfNotExists = ifn
+	return c
 }
 
 func (node *CreateView) Format(ctx *FmtCtx) {

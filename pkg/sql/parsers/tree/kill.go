@@ -14,7 +14,11 @@
 
 package tree
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
+)
 
 type KillType int
 
@@ -39,6 +43,13 @@ type KillOption struct {
 	Typ   KillType
 }
 
+func NewKillOption(e bool, t KillType, buf *buffer.Buffer) KillOption {
+	ko := buffer.Alloc[KillOption](buf)
+	ko.Exist = e
+	ko.Typ = t
+	return *ko
+}
+
 func (ko KillOption) Format(ctx *FmtCtx) {
 	if ko.Exist {
 		ctx.WriteString(ko.Typ.String())
@@ -48,6 +59,13 @@ func (ko KillOption) Format(ctx *FmtCtx) {
 type StatementOption struct {
 	Exist       bool
 	StatementId string
+}
+
+func NewStatementOption(e bool, i string, buf *buffer.Buffer) StatementOption {
+	s := buffer.Alloc[StatementOption](buf)
+	s.Exist = e
+	s.StatementId = i
+	return *s
 }
 
 func (so StatementOption) Format(ctx *FmtCtx) {
@@ -61,6 +79,14 @@ type Kill struct {
 	Option       KillOption
 	ConnectionId uint64
 	StmtOption   StatementOption
+}
+
+func NewKill(opt KillOption, con uint64, stmtopt StatementOption, buf *buffer.Buffer) *Kill {
+	k := buffer.Alloc[Kill](buf)
+	k.Option = opt
+	k.ConnectionId = con
+	k.StmtOption = stmtopt
+	return k
 }
 
 func (k *Kill) Format(ctx *FmtCtx) {

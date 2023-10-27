@@ -71,6 +71,7 @@ func NewLexer(dialectType dialect.DialectType, sql string, lower int64, buf *buf
 	// lexer := buffer.Alloc[Lexer](buf)
 	lexer := new(Lexer)
 	lexer.scanner = NewScanner(dialectType, sql, buf)
+	lexer.stmts = buffer.MakeSlice[tree.Statement](buf)
 	lexer.paramIndex = 0
 	lexer.lower = lower
 	lexer.buf = buf
@@ -115,8 +116,7 @@ func (l *Lexer) Error(err string) {
 }
 
 func (l *Lexer) AppendStmt(stmt tree.Statement) {
-	l.stmts = append(l.stmts, stmt)
-	// l.stmts = buffer.AppendSlice[tree.Statement](l.buf, l.stmts, stmt)
+	l.stmts = buffer.AppendSlice[tree.Statement](l.buf, l.stmts, stmt)
 }
 
 func (l *Lexer) toInt(lval *yySymType, str string) int {

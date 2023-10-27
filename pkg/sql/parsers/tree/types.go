@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/defines"
 )
 
@@ -203,9 +204,38 @@ type T struct {
 	InternalType InternalType
 }
 
+func NewSQLType(family Family, familystring string, width int32, local string, oid uint32, buf *buffer.Buffer) *T {
+	t := buffer.Alloc[T](buf)
+	t.InternalType.Family = family
+	t.InternalType.FamilyString = familystring
+	t.InternalType.Width = width
+	t.InternalType.Locale = &local
+	t.InternalType.Oid = oid
+	return t
+}
+
+func NewSQLTypeWithDisplayScale(family Family, familystring string, width int32, local string, oid uint32, displaywith, scale int32, buf *buffer.Buffer) *T {
+	t := buffer.Alloc[T](buf)
+	t.InternalType.Family = family
+	t.InternalType.FamilyString = familystring
+	t.InternalType.Width = width
+	t.InternalType.Locale = &local
+	t.InternalType.Oid = oid
+	t.InternalType.DisplayWith = displaywith
+	t.InternalType.Scale = scale
+	return t
+}
+
 type LengthScaleOpt struct {
 	DisplayWith int32
 	Scale       int32
+}
+
+func NewLengthScaleOpt(d, s int32, buf *buffer.Buffer) *LengthScaleOpt {
+	l := buffer.Alloc[LengthScaleOpt](buf)	
+	l.DisplayWith = d
+	l.Scale = s
+	return l
 }
 
 const (
