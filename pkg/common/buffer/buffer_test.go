@@ -39,7 +39,7 @@ func TestBuffer(t *testing.T) {
 		Free(buf, n)
 	}
 	for i := 0; i < Loop; i++ {
-		ss := MakeSpecificSlice[*plan.Node](buf, 0, Query)
+		ss := MakeSlice[*plan.Node](buf, 0, Query)
 		FreeSlice(buf, ss)
 	}
 	buf.Free()
@@ -47,7 +47,7 @@ func TestBuffer(t *testing.T) {
 
 func TestAppendSlice(t *testing.T) {
 	buf := New()
-	ss := MakeSpecificSlice[int](buf, 0, 1)
+	ss := MakeSlice[int](buf, 0, 1)
 
 	for i := 1; i <= Loop; i++ {
 		ss = AppendSlice[int](buf, ss, i)
@@ -93,7 +93,7 @@ func TestAppendSlice(t *testing.T) {
 	}
 
 	FreeSlice[int](buf, ss)
-	ss = MakeSpecificSlice[int](buf, 0, 1)
+	ss = MakeSlice[int](buf, 0, 1)
 
 	for i := 1; i <= Loop; i = i + 2 {
 		

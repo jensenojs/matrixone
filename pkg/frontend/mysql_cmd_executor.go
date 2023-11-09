@@ -3603,6 +3603,7 @@ func (mce *MysqlCmdExecutor) doComQuery(requestCtx context.Context, input *UserI
 
 	defer func() {
 		ses.SetMysqlResultSet(nil)
+		ses.GetBuffer().Free()
 	}()
 
 	canCache := true
@@ -3770,6 +3771,11 @@ func (mce *MysqlCmdExecutor) doComQueryInProgress(requestCtx context.Context, in
 		logStatementStringStatus(requestCtx, ses, input.getSql(), fail, retErr)
 		return retErr
 	}
+	
+	defer func() {
+		ses.SetMysqlResultSet(nil)
+		ses.GetBuffer().Free()
+	}()
 
 	singleStatement := len(stmtExecs) == 1
 	sqlRecord := parsers.HandleSqlForRecord(input.getSql(), ses.GetBuffer())

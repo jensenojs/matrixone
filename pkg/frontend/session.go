@@ -1175,6 +1175,11 @@ func (ses *Session) SetPrepareStmt(name string, prepareStmt *PrepareStmt) error 
 		prepareStmt.proc = ses.proc
 		prepareStmt.exprList = exprList
 	}
+
+	// var prepareStmtWithGoMem tree.Statement
+	// reflect.ValueOf(&prepareStmtWithGoMem).Elem().Set(reflect.ValueOf(&(prepareStmt.PrepareStmt)).Elem())
+	// prepareStmt.PrepareStmt = prepareStmtWithGoMem
+
 	ses.prepareStmts[name] = prepareStmt
 
 	return nil

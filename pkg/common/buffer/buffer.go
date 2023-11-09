@@ -53,52 +53,60 @@ func Free[T any](b *Buffer, v *T) {
 	b.free(unsafe.Slice((*byte)(unsafe.Pointer(v)), unsafe.Sizeof(*v)))
 }
 
-
-func MakeSlice[T any](b *Buffer) []T {
-	if b == (*Buffer)(nil) {
-		panic("makeslice with nil buffer")
-	}
-	return MakeSpecificSlice[T](b, 0, 4)
-}
-
-func MakeSpecificSlice[T any](b *Buffer, len, cap int) []T {
+func MakeSlice[T any](b *Buffer, len_and_cap ...int) []T {
 	if b == (*Buffer)(nil) {
 		panic("make slice with nil buffer")
 	}
-	var v T
 
-	data := b.alloc(int(unsafe.Sizeof(v)) * cap)
-	return unsafe.Slice((*T)(unsafe.Pointer(unsafe.SliceData(data))), cap)[:len]
+	var l int
+	var c int
+	if len_and_cap == nil {
+		l = 0
+		c = 4
+	} else {
+		if len(len_and_cap) != 2 {
+			panic("slice should set len and cap at the same time")
+		}
+		l = len_and_cap[0]
+		c = len_and_cap[1]
+		if c < l || c < 0 {
+			panic("illegal slice len or illegal cap")
+		}
+	}
+
+	var v T
+	data := b.alloc(int(unsafe.Sizeof(v)) * c)
+	return unsafe.Slice((*T)(unsafe.Pointer(unsafe.SliceData(data))), c)[:l]
 }
 
-func AppendSlice[T any](b *Buffer, slice []T, vs ... T) []T {
+func AppendSlice[T any](b *Buffer, slice []T, vs ...T) []T {
 	if b == (*Buffer)(nil) {
 		panic("append slice with nil buffer")
 	}
-	
+
 	var newCap int
-	if len(slice) + len(vs) <= cap(slice) {
+	if len(slice)+len(vs) <= cap(slice) {
 		for _, v := range vs {
 			slice = append(slice, v)
-		}	
+		}
 		return slice
 	} else {
 		newCap = cap(slice) * 2
 		if newCap < 4 {
 			newCap = 4
 		}
-		for len(slice) + len(vs) > newCap{
+		for len(slice)+len(vs) > newCap {
 			newCap = newCap * 2
 		}
 	}
 
-	newSlice := MakeSpecificSlice[T](b, len(slice), newCap)
+	newSlice := MakeSlice[T](b, len(slice), newCap)
 	copy(newSlice, slice)
 	defer FreeSlice[T](b, slice)
-	
+
 	for _, v := range vs {
 		newSlice = append(newSlice, v)
-	}	
+	}
 
 	return newSlice
 }

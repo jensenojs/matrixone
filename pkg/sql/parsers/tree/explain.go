@@ -166,7 +166,7 @@ func MakeOptionElem(name string, value string, buf *buffer.Buffer) OptionElem {
 }
 
 func MakeOptions(elem OptionElem, buf *buffer.Buffer) []OptionElem {
-	os := buffer.MakeSpecificSlice[OptionElem](buf, 0, 1)	
+	os := buffer.MakeSlice[OptionElem](buf, 0, 1)	
 	os = buffer.AppendSlice[OptionElem](buf, os, elem)
 	return os
 }
