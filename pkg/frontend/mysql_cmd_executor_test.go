@@ -391,28 +391,28 @@ func Test_mce_selfhandle(t *testing.T) {
 		mce.SetSession(ses)
 
 		ses.mrs = &MysqlResultSet{}
-		st1, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @@max_allowed_packet", 1, ses.GetBuffer())
+		st1, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @@max_allowed_packet", 1, ses.buf.GetQueryLevel())
 		convey.So(err, convey.ShouldBeNil)
 		sv1 := st1.(*tree.Select).Select.(*tree.SelectClause).Exprs[0].Expr.(*tree.VarExpr)
 		err = mce.handleSelectVariables(sv1, 0, 1)
 		convey.So(err, convey.ShouldBeNil)
 
 		ses.mrs = &MysqlResultSet{}
-		st2, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @@version_comment", 1, ses.GetBuffer())
+		st2, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @@version_comment", 1, ses.buf.GetQueryLevel())
 		convey.So(err, convey.ShouldBeNil)
 		sv2 := st2.(*tree.Select).Select.(*tree.SelectClause).Exprs[0].Expr.(*tree.VarExpr)
 		err = mce.handleSelectVariables(sv2, 0, 1)
 		convey.So(err, convey.ShouldBeNil)
 
 		ses.mrs = &MysqlResultSet{}
-		st3, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @@global.version_comment", 1, ses.GetBuffer())
+		st3, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @@global.version_comment", 1, ses.buf.GetQueryLevel())
 		convey.So(err, convey.ShouldBeNil)
 		sv3 := st3.(*tree.Select).Select.(*tree.SelectClause).Exprs[0].Expr.(*tree.VarExpr)
 		err = mce.handleSelectVariables(sv3, 0, 1)
 		convey.So(err, convey.ShouldBeNil)
 
 		ses.mrs = &MysqlResultSet{}
-		st4, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @version_comment", 1, ses.GetBuffer())
+		st4, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @version_comment", 1, ses.buf.GetQueryLevel())
 		convey.So(err, convey.ShouldBeNil)
 		sv4 := st4.(*tree.Select).Select.(*tree.SelectClause).Exprs[0].Expr.(*tree.VarExpr)
 		err = mce.handleSelectVariables(sv4, 0, 1)
@@ -443,7 +443,7 @@ func Test_mce_selfhandle(t *testing.T) {
 		convey.So(err, convey.ShouldBeNil)
 
 		set := "set @@tx_isolation=`READ-COMMITTED`"
-		setVar, err := parsers.ParseOne(ctx, dialect.MYSQL, set, 1, ses.GetBuffer())
+		setVar, err := parsers.ParseOne(ctx, dialect.MYSQL, set, 1, ses.buf.GetQueryLevel())
 		convey.So(err, convey.ShouldBeNil)
 
 		err = mce.handleSetVar(ctx, setVar.(*tree.SetVar))
@@ -734,12 +734,12 @@ func Test_handleSelectVariables(t *testing.T) {
 
 		mce.SetSession(ses)
 		proto.SetSession(ses)
-		st2, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @@tx_isolation", 1, ses.GetBuffer())
+		st2, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @@tx_isolation", 1, ses.buf.GetQueryLevel())
 		convey.So(err, convey.ShouldBeNil)
 		sv2 := st2.(*tree.Select).Select.(*tree.SelectClause).Exprs[0].Expr.(*tree.VarExpr)
 		convey.So(mce.handleSelectVariables(sv2, 0, 1), convey.ShouldBeNil)
 
-		st3, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @@XXX", 1, ses.GetBuffer())
+		st3, err := parsers.ParseOne(ctx, dialect.MYSQL, "select @@XXX", 1, ses.buf.GetQueryLevel())
 		convey.So(err, convey.ShouldBeNil)
 		sv3 := st3.(*tree.Select).Select.(*tree.SelectClause).Exprs[0].Expr.(*tree.VarExpr)
 		convey.So(mce.handleSelectVariables(sv3, 0, 1), convey.ShouldNotBeNil)

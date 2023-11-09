@@ -37,6 +37,7 @@ import (
 	"github.com/prashantv/gostub"
 	"github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTxnHandler_NewTxn(t *testing.T) {
@@ -762,4 +763,56 @@ func Test_doSelectGlobalSystemVariable(t *testing.T) {
 		_, err := ses.getGlobalSystemVariableValue("autocommit")
 		convey.So(err, convey.ShouldBeNil)
 	})
+}
+
+func Test_sessionBuf(t *testing.T) {
+	queryLevel := []string {
+		"drop prepare stmt_name1",
+		"deallocate prepare stmt_name1", 
+		"execute stmt_name1", 
+		"execute stmt_name1 using @var_name,@@sys_name",
+		"select * from t1 where a not ilike '%a'",
+		"alter database test set mysql_compatibility_mode = '{transaction_isolation: REPEATABLE-READ, lower_case_table_names: 0}'",
+		"show plugins",
+	}
+
+	sessionLevel := []string {
+		"prepare stmt_name1 from select * from t1",
+		"prepare stmt1 from 'update t1 set a=a+? where b = 1';",
+		"set @a_var = 2;",
+		"set autocommit=1;",
+	}
+
+	genSession := func(ctrl *gomock.Controller, pu *config.ParameterUnit, gSysVars *GlobalSystemVariables) *Session {
+		ioses := mock_frontend.NewMockIOSession(ctrl)
+		ioses.EXPECT().OutBuf().Return(buf.NewByteBuf(1024)).AnyTimes()
+		ioses.EXPECT().Write(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		ioses.EXPECT().RemoteAddress().Return("").AnyTimes()
+		ioses.EXPECT().Ref().AnyTimes()
+		sv, err := getSystemVariables("test/system_vars_config.toml")
+		if err != nil {
+			t.Error(err)
+		}
+		proto := NewMysqlClientProtocol(0, ioses, 1024, sv)
+		session := NewSession(proto, nil, pu, gSysVars, false, nil, nil)
+		session.SetRequestContext(context.Background())
+		return session
+	}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	txnClient := mock_frontend.NewMockTxnClient(ctrl)
+	eng := mock_frontend.NewMockEngine(ctrl)
+	pu := config.NewParameterUnit(&config.FrontendParameters{}, eng, txnClient, nil)
+	gSysVars := &GlobalSystemVariables{}
+
+	ses := genSession(ctrl, pu, gSysVars)
+
+	for _, sql := range queryLevel {
+		require.Equal(t, ses.buf.GetQueryLevel(), ses.buf.Get(sql))
+	}
+
+	for _, sql := range sessionLevel {
+		require.Equal(t, ses.buf.GetSessionLevel(), ses.buf.Get(sql))
+	}
 }

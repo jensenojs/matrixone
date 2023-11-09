@@ -16,8 +16,10 @@ package frontend
 
 import (
 	"context"
+	"strings"
 
 	"github.com/fagongzi/goetty/v2/buf"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/config"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -202,18 +204,23 @@ type outputPool interface {
 }
 
 func (prepareStmt *PrepareStmt) Close() {
-	if prepareStmt.params != nil {
-		prepareStmt.params.Free(prepareStmt.proc.Mp())
-	}
-	if prepareStmt.InsertBat != nil {
-		prepareStmt.InsertBat.SetCnt(1)
-		prepareStmt.InsertBat.Clean(prepareStmt.proc.Mp())
-		prepareStmt.InsertBat = nil
-	}
-	if prepareStmt.exprList != nil {
-		for _, exprs := range prepareStmt.exprList {
-			for _, expr := range exprs {
-				expr.Free()
+	if prepareStmt.proc != nil && prepareStmt.proc.SessionInfo.SessionBuf != nil {
+		sessionBuf := prepareStmt.proc.SessionInfo.SessionBuf
+		buffer.Free[tree.Statement](sessionBuf, &prepareStmt.PrepareStmt)
+	} else {
+		if prepareStmt.params != nil {
+			prepareStmt.params.Free(prepareStmt.proc.Mp())
+		}
+		if prepareStmt.InsertBat != nil {
+			prepareStmt.InsertBat.SetCnt(1)
+			prepareStmt.InsertBat.Clean(prepareStmt.proc.Mp())
+			prepareStmt.InsertBat = nil
+		}
+		if prepareStmt.exprList != nil {
+			for _, exprs := range prepareStmt.exprList {
+				for _, expr := range exprs {
+					expr.Free()
+				}
 			}
 		}
 	}
@@ -244,4 +251,49 @@ func (s *SessionAllocator) Alloc(capacity int) []byte {
 
 func (s SessionAllocator) Free(bs []byte) {
 	s.mp.Free(bs)
+}
+
+// Different buffers manage objects with different lifecycles
+type sessionBuf struct {
+	// normal SQL can be released after doComQuery finishes executing.
+	queryLevelBuf *buffer.Buffer
+
+	// the exception is SQL like Prepare, Set.
+	sessionLevelBuf *buffer.Buffer
+}
+
+func NewSessionBuf() *sessionBuf {
+	s := new(sessionBuf)
+	s.queryLevelBuf = buffer.New()
+	s.sessionLevelBuf = buffer.New()
+	return s
+}
+
+func (s *sessionBuf) Free() {
+	s.queryLevelBuf.Free()
+	s.sessionLevelBuf.Free()
+	s.queryLevelBuf = nil
+	s.sessionLevelBuf = nil
+}
+
+// TODO: need comments here
+func (s *sessionBuf) Get(sql string) *buffer.Buffer {
+	sqlLower := strings.ToLower(sql)
+	isPrepare := strings.HasPrefix(sqlLower, "prepare")
+	isSet := strings.HasPrefix(sqlLower, "set")
+
+	match := isPrepare || isSet
+	if match {
+		return s.sessionLevelBuf
+	} else {
+		return s.queryLevelBuf
+	}
+}
+
+func (s *sessionBuf) GetQueryLevel() *buffer.Buffer {
+	return s.queryLevelBuf
+}
+
+func (s *sessionBuf) GetSessionLevel() *buffer.Buffer {
+	return s.sessionLevelBuf
 }

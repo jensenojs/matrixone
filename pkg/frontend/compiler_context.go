@@ -90,7 +90,7 @@ func (tcc *TxnCompilerContext) GetSession() *Session {
 func (tcc *TxnCompilerContext) GetBuffer() *buffer.Buffer {
 	tcc.mu.Lock()
 	defer tcc.mu.Unlock()
-	return tcc.ses.buf
+	return tcc.ses.buf.GetQueryLevel()
 }
 
 func (tcc *TxnCompilerContext) GetTxnHandler() *TxnHandler {

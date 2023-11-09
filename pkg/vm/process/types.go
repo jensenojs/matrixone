@@ -16,11 +16,12 @@ package process
 
 import (
 	"context"
-	"github.com/matrixorigin/matrixone/pkg/logservice"
 	"io"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/matrixorigin/matrixone/pkg/logservice"
 
 	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/common/buffer"
@@ -116,7 +117,8 @@ type SessionInfo struct {
 	SeqAddValues   map[uint64]string
 	SeqLastValue   []string
 	SqlHelper      sqlHelper
-	Buf            *buffer.Buffer
+	QueryBuf       *buffer.Buffer
+	SessionBuf     *buffer.Buffer
 }
 
 // AnalyzeInfo  analyze information for query

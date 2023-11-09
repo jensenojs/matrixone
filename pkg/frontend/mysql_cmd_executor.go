@@ -950,7 +950,7 @@ func doShowVariables(ses *Session, proc *process.Process, sv *tree.ShowVariables
 		if err != nil {
 			return err
 		}
-		binder := plan2.NewDefaultBinder(proc.Ctx, nil, nil, &plan2.Type{Id: int32(types.T_varchar), Width: types.MaxVarcharLen}, []string{"variable_name", "value"}, buf)
+		binder := plan2.NewDefaultBinder(proc.Ctx, nil, nil, &plan2.Type{Id: int32(types.T_varchar), Width: types.MaxVarcharLen}, []string{"variable_name", "value"}, buf.GetQueryLevel())
 		planExpr, err := binder.BindExpr(sv.Where.Expr, 0, false)
 		if err != nil {
 			return err
@@ -1166,7 +1166,7 @@ func doPrepareString(ctx context.Context, ses *Session, st *tree.PrepareString) 
 	if err != nil {
 		return nil, err
 	}
-	stmts, err := mysql.Parse(ctx, st.Sql, v.(int64), ses.GetBuffer())
+	stmts, err := mysql.Parse(ctx, st.Sql, v.(int64), ses.buf.GetSessionLevel())
 	if err != nil {
 		return nil, err
 	}
@@ -1753,7 +1753,8 @@ var GetComputationWrapper = func(db string, input *UserInput, user string, eng e
 		if err != nil {
 			v = int64(1)
 		}
-		stmts, err = parsers.Parse(proc.Ctx, dialect.MYSQL, input.getSql(), v.(int64), ses.GetBuffer())
+		sql := input.getSql()
+		stmts, err = parsers.Parse(proc.Ctx, dialect.MYSQL, sql, v.(int64), ses.buf.Get(sql))
 		if err != nil {
 			return nil, err
 		}
@@ -2296,7 +2297,7 @@ var GetStmtExecList = func(db, sql, user string, eng engine.Engine, proc *proces
 		if err != nil {
 			return nil, err
 		}
-		stmts, err = parsers.Parse(proc.Ctx, dialect.MYSQL, sql, v.(int64), ses.GetBuffer())
+		stmts, err = parsers.Parse(proc.Ctx, dialect.MYSQL, sql, v.(int64), ses.buf.Get(sql))
 		if err != nil {
 			return nil, err
 		}
@@ -3558,7 +3559,8 @@ func (mce *MysqlCmdExecutor) doComQuery(requestCtx context.Context, input *UserI
 		StorageEngine: pu.StorageEngine,
 		LastInsertID:  ses.GetLastInsertID(),
 		SqlHelper:     ses.GetSqlHelper(),
-		Buf:           ses.GetBuffer(),
+		QueryBuf:      ses.buf.GetQueryLevel(),
+		SessionBuf:    ses.buf.GetSessionLevel(),
 	}
 	proc.SetResolveVariableFunc(mce.ses.txnCompileCtx.ResolveVariable)
 	proc.InitSeq()
@@ -3592,7 +3594,7 @@ func (mce *MysqlCmdExecutor) doComQuery(requestCtx context.Context, input *UserI
 		pu.StorageEngine,
 		proc, ses)
 	if err != nil {
-		requestCtx = RecordParseErrorStatement(requestCtx, ses, proc, beginInstant, parsers.HandleSqlForRecord(input.getSql(), ses.GetBuffer()), input.getSqlSourceTypes(), err)
+		requestCtx = RecordParseErrorStatement(requestCtx, ses, proc, beginInstant, parsers.HandleSqlForRecord(input.getSql(), ses.buf.Get(input.getSql())), input.getSqlSourceTypes(), err)
 		retErr = err
 		if _, ok := err.(*moerr.Error); !ok {
 			retErr = moerr.NewParseError(requestCtx, err.Error())
@@ -3603,13 +3605,13 @@ func (mce *MysqlCmdExecutor) doComQuery(requestCtx context.Context, input *UserI
 
 	defer func() {
 		ses.SetMysqlResultSet(nil)
-		ses.GetBuffer().Free()
+		ses.buf.GetQueryLevel().Free()
 	}()
 
 	canCache := true
 
 	singleStatement := len(cws) == 1
-	sqlRecord := parsers.HandleSqlForRecord(input.getSql(), ses.GetBuffer())
+	sqlRecord := parsers.HandleSqlForRecord(input.getSql(), ses.buf.Get(input.getSql()))
 	for i, cw := range cws {
 		if cwft, ok := cw.(*TxnComputationWrapper); ok {
 			if cwft.stmt.GetQueryType() == tree.QueryTypeDDL || cwft.stmt.GetQueryType() == tree.QueryTypeDCL ||
@@ -3766,19 +3768,19 @@ func (mce *MysqlCmdExecutor) doComQueryInProgress(requestCtx context.Context, in
 		pu.StorageEngine,
 		proc, ses)
 	if err != nil {
-		requestCtx = RecordParseErrorStatement(requestCtx, ses, proc, beginInstant, parsers.HandleSqlForRecord(input.getSql(), ses.GetBuffer()), input.getSqlSourceTypes(), err)
+		requestCtx = RecordParseErrorStatement(requestCtx, ses, proc, beginInstant, parsers.HandleSqlForRecord(input.getSql(), ses.buf.Get(input.getSql())), input.getSqlSourceTypes(), err)
 		retErr = moerr.NewParseError(requestCtx, err.Error())
 		logStatementStringStatus(requestCtx, ses, input.getSql(), fail, retErr)
 		return retErr
 	}
-	
+
 	defer func() {
 		ses.SetMysqlResultSet(nil)
-		ses.GetBuffer().Free()
+		ses.buf.GetQueryLevel().Free()
 	}()
 
 	singleStatement := len(stmtExecs) == 1
-	sqlRecord := parsers.HandleSqlForRecord(input.getSql(), ses.GetBuffer())
+	sqlRecord := parsers.HandleSqlForRecord(input.getSql(), ses.buf.Get(input.getSql()))
 	for i, exec := range stmtExecs {
 		// update UnixTime for new query, which is used for now() / CURRENT_TIMESTAMP
 		proc.UnixTime = time.Now().UnixNano()

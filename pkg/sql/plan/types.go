@@ -99,7 +99,8 @@ type CompilerContext interface {
 	GetContext() context.Context
 	// GetDatabaseId Get database id
 	GetDatabaseId(dbName string) (uint64, error)
-	GetBuffer() *buffer.Buffer
+
+	GetBuffer() *buffer.Buffer // TODO: need more think about this buffer lifecycle
 
 	GetProcess() *process.Process
 

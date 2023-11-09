@@ -91,7 +91,7 @@ func (c *compilerContext) GetProcess() *process.Process {
 }
 
 func (c *compilerContext) GetBuffer() *buffer.Buffer {
-	return c.proc.SessionInfo.Buf
+	return c.proc.SessionInfo.QueryBuf
 }
 
 func (c *compilerContext) GetQueryResultMeta(uuid string) ([]*plan.ColDef, string, error) {

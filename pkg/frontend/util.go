@@ -362,7 +362,7 @@ func getExprValue(e tree.Expr, mce *MysqlCmdExecutor, ses *Session) (interface{}
 	if oid == types.T_decimal64 || oid == types.T_decimal128 {
 		builder := plan2.NewQueryBuilder(plan.Query_SELECT, ses.GetTxnCompileCtx(), false)
 		bindContext := plan2.NewBindContext(builder, nil)
-		binder := plan2.NewSetVarBinder(builder, bindContext, ses.GetBuffer())
+		binder := plan2.NewSetVarBinder(builder, bindContext, ses.buf.GetSessionLevel())
 		planExpr, err = binder.BindExpr(e, 0, false)
 		if err != nil {
 			return nil, err
@@ -381,7 +381,7 @@ func GetSimpleExprValue(e tree.Expr, ses *Session) (interface{}, error) {
 	default:
 		builder := plan2.NewQueryBuilder(plan.Query_SELECT, ses.GetTxnCompileCtx(), false)
 		bindContext := plan2.NewBindContext(builder, nil)
-		binder := plan2.NewSetVarBinder(builder, bindContext, ses.GetBuffer())
+		binder := plan2.NewSetVarBinder(builder, bindContext, ses.buf.GetSessionLevel())
 		planExpr, err := binder.BindExpr(e, 0, false)
 		if err != nil {
 			return nil, err

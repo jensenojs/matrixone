@@ -75,11 +75,11 @@ func generateScopeCases(t *testing.T, testCases []string) []*Scope {
 	// getScope method generate and return the scope of a SQL string.
 	getScope := func(t1 *testing.T, sql string) *Scope {
 		proc := testutil.NewProcess()
-		proc.SessionInfo.Buf = buffer.New()
+		proc.SessionInfo.QueryBuf = buffer.New()
 		e, _, compilerCtx := testengine.New(context.Background())
 		opt := plan2.NewBaseOptimizer(compilerCtx)
 		ctx := compilerCtx.GetContext()
-		stmts, err := mysql.Parse(ctx, sql, 1, proc.SessionInfo.Buf)
+		stmts, err := mysql.Parse(ctx, sql, 1, proc.SessionInfo.QueryBuf)
 		require.NoError(t1, err)
 		qry, err := opt.Optimize(stmts[0], false)
 		require.NoError(t1, err)

@@ -132,7 +132,7 @@ func TestCompile(t *testing.T) {
 		// Enable memory check
 		tc.proc.FreeVectors()
 		require.Equal(t, int64(0), tc.proc.Mp().CurrNB())
-		tc.proc.SessionInfo.Buf.Free()
+		tc.proc.SessionInfo.QueryBuf.Free()
 	}
 }
 
@@ -153,9 +153,9 @@ func TestCompileWithFaults(t *testing.T) {
 
 func newTestCase(sql string, t *testing.T) compileTestCase {
 	proc := testutil.NewProcess()
-	proc.SessionInfo.Buf = buffer.New()
+	proc.SessionInfo.QueryBuf = buffer.New()
 	e, _, compilerCtx := testengine.New(context.Background())
-	stmts, err := mysql.Parse(compilerCtx.GetContext(), sql, 1, proc.SessionInfo.Buf)
+	stmts, err := mysql.Parse(compilerCtx.GetContext(), sql, 1, proc.SessionInfo.QueryBuf)
 	require.NoError(t, err)
 	pn, err := plan2.BuildPlan(compilerCtx, stmts[0], false)
 	if err != nil {

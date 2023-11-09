@@ -17,6 +17,7 @@ package compile
 import (
 	"context"
 	"errors"
+
 	"github.com/matrixorigin/matrixone/pkg/logservice"
 
 	"github.com/matrixorigin/matrixone/pkg/common/buffer"
@@ -215,7 +216,7 @@ func (exec *txnExecutor) Exec(sql string) (executor.Result, error) {
 		exec.s.aicm,
 	)
 	proc.SessionInfo.TimeZone = exec.opts.GetTimeZone()
-	proc.SessionInfo.Buf = exec.s.buf
+	proc.SessionInfo.QueryBuf = exec.s.buf
 
 	pn, err := plan.BuildPlan(
 		exec.s.getCompileContext(exec.ctx, proc, exec.opts),

@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/config"
@@ -242,7 +241,7 @@ type Session struct {
 	//	in the same transaction.
 	derivedStmt bool
 
-	buf *buffer.Buffer
+	buf *sessionBuf
 
 	//clear this part for every statement
 	stmtProfile struct {
@@ -554,7 +553,7 @@ func NewSession(proto Protocol, mp *mpool.MPool, pu *config.ParameterUnit,
 		ses.seqLastValue = new(string)
 	}
 
-	ses.buf = buffer.New()
+	ses.buf = NewSessionBuf()
 	ses.isNotBackgroundSession = isNotBackgroundSession
 	ses.sqlHelper = &SqlHelper{ses: ses}
 	ses.uuid, _ = uuid.NewUUID()
@@ -1176,10 +1175,6 @@ func (ses *Session) SetPrepareStmt(name string, prepareStmt *PrepareStmt) error 
 		prepareStmt.exprList = exprList
 	}
 
-	// var prepareStmtWithGoMem tree.Statement
-	// reflect.ValueOf(&prepareStmtWithGoMem).Elem().Set(reflect.ValueOf(&(prepareStmt.PrepareStmt)).Elem())
-	// prepareStmt.PrepareStmt = prepareStmtWithGoMem
-
 	ses.prepareStmts[name] = prepareStmt
 
 	return nil
@@ -1253,11 +1248,12 @@ func (ses *Session) GetTxnCompileCtx() *TxnCompilerContext {
 	return ses.txnCompileCtx
 }
 
-func (ses *Session) GetBuffer() *buffer.Buffer {
+func (ses *Session) GetBuffer() *sessionBuf {
 	ses.mu.Lock()
 	defer ses.mu.Unlock()
 	return ses.buf
 }
+
 
 // SetSessionVar sets the value of system variable in session
 func (ses *Session) SetSessionVar(name string, value interface{}) error {
@@ -1977,7 +1973,7 @@ func (bh *BackgroundHandler) Exec(ctx context.Context, sql string) error {
 	if err != nil {
 		return err
 	}
-	statements, err := mysql.Parse(ctx, sql, v.(int64), bh.ses.GetBuffer())
+	statements, err := mysql.Parse(ctx, sql, v.(int64), bh.ses.buf.Get(sql))
 	if err != nil {
 		return err
 	}
