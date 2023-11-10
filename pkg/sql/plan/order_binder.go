@@ -48,9 +48,9 @@ func (b *OrderBinder) BindExpr(astExpr tree.Expr) (*plan.Expr, error) {
 	}
 
 	if numVal, ok := astExpr.(*tree.NumVal); ok {
-		switch numVal.Value.Kind() {
+		switch numVal.Value.Get().Kind() {
 		case constant.Int:
-			colPos, _ := constant.Int64Val(numVal.Value)
+			colPos, _ := constant.Int64Val(numVal.Value.Get())
 			if numVal.Negative() {
 				colPos = -colPos
 			}

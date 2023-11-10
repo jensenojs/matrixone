@@ -18,6 +18,8 @@ import (
 	"go/constant"
 	"strings"
 
+	// "unsafe"
+
 	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 )
 
@@ -46,7 +48,7 @@ const (
 // the AST for the constant numeric value.
 type NumVal struct {
 	Constant
-	Value constant.Value
+	Value *BufConstant
 
 	// negative is the sign label
 	negative bool
@@ -65,15 +67,16 @@ func (n *NumVal) OrigString() string {
 }
 
 func (n *NumVal) Format(ctx *FmtCtx) {
-	if n.origString != "" {
-		ctx.WriteValue(n.ValType, FormatString(n.origString))
+	s := n.origString
+	if s != "" {
+		ctx.WriteValue(n.ValType, FormatString(s))
 		return
 	}
-	switch n.Value.Kind() {
+	switch (n.Value.Get()).Kind() {
 	case constant.String:
-		ctx.WriteValue(n.ValType, n.origString)
+		ctx.WriteValue(n.ValType, s)
 	case constant.Bool:
-		ctx.WriteString(strings.ToLower(n.Value.String()))
+		ctx.WriteString(strings.ToLower((n.Value.Get()).String()))
 	case constant.Unknown:
 		ctx.WriteString("null")
 	}
@@ -130,26 +133,30 @@ func (n *NumVal) Negative() bool {
 
 func NewNumVal(value constant.Value, origString string, negative bool, buf *buffer.Buffer) *NumVal {
 	var n *NumVal
+	mv := NewBufConstant(value)
 	if buf != nil {
 		n = buffer.Alloc[NumVal](buf)
+		buf.Pin(mv)
 	} else {
 		n = new(NumVal)
 	}
-	n.Value = value
 	n.negative = negative
+	n.Value = mv
 	n.origString = origString
 	return n
 }
 
 func NewNumValWithType(value constant.Value, origString string, negative bool, typ P_TYPE, buf *buffer.Buffer) *NumVal {
 	var n *NumVal
+	mv := NewBufConstant(value)
 	if buf != nil {
 		n = buffer.Alloc[NumVal](buf)
+		buf.Pin(mv)
 	} else {
 		n = new(NumVal)
 	}
-	n.Value = value
 	n.negative = negative
+	n.Value = mv
 	n.origString = origString
 	n.ValType = typ
 	return n
@@ -157,28 +164,32 @@ func NewNumValWithType(value constant.Value, origString string, negative bool, t
 
 func NewNumValWithResInt(value constant.Value, origString string, negative bool, resInt int64, buf *buffer.Buffer) *NumVal {
 	var n *NumVal
+	mv := NewBufConstant(value)
 	if buf != nil {
 		n = buffer.Alloc[NumVal](buf)
+		buf.Pin(mv)
 	} else {
 		n = new(NumVal)
 	}
-	n.Value = value
-	n.negative = negative
 	n.origString = origString
+	n.Value = mv
+	n.negative = negative
 	n.resInt = resInt
 	return n
 }
 
 func NewNumValWithResFoalt(value constant.Value, origString string, negative bool, resFloat float64, buf *buffer.Buffer) *NumVal {
 	var n *NumVal
+	mv := NewBufConstant(value)
 	if buf != nil {
 		n = buffer.Alloc[NumVal](buf)
+		buf.Pin(mv)
 	} else {
 		n = new(NumVal)
 	}
-	n.Value = value
-	n.negative = negative
 	n.origString = origString
+	n.Value = mv
+	n.negative = negative
 	n.resFloat = resFloat
 	return n
 }

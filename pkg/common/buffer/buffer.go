@@ -15,13 +15,23 @@
 package buffer
 
 import (
+	"runtime"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
 
 func New() *Buffer {
-	return new(Buffer)
+	b := new(Buffer)
+	b.pinner = new(runtime.Pinner)
+	b.pinner.Pin(b)
+	return b
+}
+
+func (b *Buffer) Pin(os ...any) {
+	for _, o := range os {
+		b.pinner.Pin(o)
+	}
 }
 
 func (b *Buffer) Free() {
@@ -29,6 +39,7 @@ func (b *Buffer) Free() {
 		panic("free with nil buffer")
 	}
 	b.Lock()
+	b.pinner.Unpin()
 	defer b.Unlock()
 	for i := range b.chunks {
 		unix.Munmap(b.chunks[i].data)

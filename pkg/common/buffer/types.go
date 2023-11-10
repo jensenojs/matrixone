@@ -14,7 +14,10 @@
 
 package buffer
 
-import "sync"
+import (
+	"runtime"
+	"sync"
+)
 
 const (
 	FULL                   = 0x01 // indicates that a chunk doesn't have any space left
@@ -36,5 +39,6 @@ type chunk struct {
 
 type Buffer struct {
 	sync.Mutex
+	pinner *runtime.Pinner
 	chunks []*chunk
 }

@@ -1572,12 +1572,12 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal, typ *Type) (*Expr, error) 
 	case tree.P_null:
 		return makePlan2NullConstExprWithType(), nil
 	case tree.P_bool:
-		val := constant.BoolVal(astExpr.Value)
+		val := constant.BoolVal(astExpr.Value.Get())
 		return makePlan2BoolConstExprWithType(val), nil
 	case tree.P_int64:
-		val, ok := constant.Int64Val(astExpr.Value)
+		val, ok := constant.Int64Val(astExpr.Value.Get())
 		if !ok {
-			return nil, moerr.NewInvalidInput(b.GetContext(), "invalid int value '%s'", astExpr.Value.String())
+			return nil, moerr.NewInvalidInput(b.GetContext(), "invalid int value '%s'", astExpr.Value.Get().String())
 		}
 		expr := makePlan2Int64ConstExprWithType(val)
 		if typ != nil && typ.Id == int32(types.T_varchar) {
@@ -1585,9 +1585,9 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal, typ *Type) (*Expr, error) 
 		}
 		return expr, nil
 	case tree.P_uint64:
-		val, ok := constant.Uint64Val(astExpr.Value)
+		val, ok := constant.Uint64Val(astExpr.Value.Get())
 		if !ok {
-			return nil, moerr.NewInvalidInput(b.GetContext(), "invalid int value '%s'", astExpr.Value.String())
+			return nil, moerr.NewInvalidInput(b.GetContext(), "invalid int value '%s'", astExpr.Value.Get().String())
 		}
 		return makePlan2Uint64ConstExprWithType(val), nil
 	case tree.P_decimal:
@@ -1663,7 +1663,7 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal, typ *Type) (*Expr, error) 
 				return expr, nil
 			}
 		}
-		floatValue, ok := constant.Float64Val(astExpr.Value)
+		floatValue, ok := constant.Float64Val(astExpr.Value.Get())
 		if !ok {
 			return returnDecimalExpr(originString)
 		}

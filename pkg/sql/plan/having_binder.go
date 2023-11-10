@@ -176,9 +176,9 @@ func (b *HavingBinder) processForceWindows(funcName string, astExpr *tree.FuncEx
 	for _, order := range astExpr.OrderBy {
 		orderExpr := order.Expr
 		if numVal, ok := order.Expr.(*tree.NumVal); ok {
-			switch numVal.Value.Kind() {
+			switch numVal.Value.Get().Kind() {
 			case constant.Int:
-				colPos, _ := constant.Int64Val(numVal.Value)
+				colPos, _ := constant.Int64Val(numVal.Value.Get())
 				if numVal.Negative() {
 					moerr.NewSyntaxError(b.GetContext(), "ORDER BY position %v is negative", colPos)
 				}

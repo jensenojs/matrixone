@@ -27,7 +27,7 @@ func ParseValueToBool(num *tree.NumVal) (bool, error) {
 	val := num.Value
 	str := num.String()
 	if !num.Negative() {
-		v, _ := constant.Uint64Val(val)
+		v, _ := constant.Uint64Val(val.Get())
 		if v == 0 {
 			return false, nil
 		} else if v == 1 {
