@@ -27,29 +27,27 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(_ any, buf *bytes.Buffer) {
 	buf.WriteString("processing on duplicate key before insert")
 }
 
-func (arg *Argument) Prepare(p *process.Process) error {
-	ap := arg
+func Prepare(p *proc, arg any) error {
+	ap := arg.(*Argument)
 	ap.ctr = &container{}
 	ap.ctr.InitReceiver(p, true)
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	anal := proc.GetAnalyze(arg.info.Idx)
+func Call(idx int, proc *proc, x any, isFirst, isLast bool) (process.ExecStatus, error) {
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
 
+	arg := x.(*Argument)
 	ctr := arg.ctr
-	result := vm.NewCallResult()
 
 	for {
 		switch ctr.state {
@@ -57,41 +55,35 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 			for {
 				bat, end, err := ctr.ReceiveFromAllRegs(anal)
 				if err != nil {
-					result.Status = vm.ExecStop
-					return result, nil
+					return process.ExecStop, nil
 				}
 
 				if end {
 					break
 				}
-				anal.Input(bat, arg.info.IsFirst)
+				anal.Input(bat, isFirst)
 				err = resetInsertBatchForOnduplicateKey(proc, bat, arg)
 				if err != nil {
 					bat.Clean(proc.Mp())
-					return result, err
+					return process.ExecNext, err
 				}
 
 			}
 			ctr.state = Eval
 
 		case Eval:
-			if len(ctr.insertBats) > 0 {
-				anal.Output(ctr.insertBats[0], arg.info.IsLast)
-				ctr.rbat = ctr.insertBats[0]
-				ctr.insertBats = ctr.insertBats[1:]
-				if len(ctr.insertBats) == 0 {
-					ctr.state = End
-				}
-				result.Batch = ctr.rbat
-				return result, nil
+			if ctr.insertBat != nil {
+				anal.Output(ctr.insertBat, isLast)
+				proc.SetInputBatch(ctr.insertBat)
+				ctr.insertBat = nil
+				ctr.state = End
+				return process.ExecNext, nil
 			}
 			ctr.state = End
-			return result, nil
 
 		case End:
-			result.Batch = nil
-			result.Status = vm.ExecStop
-			return result, nil
+			proc.SetInputBatch(nil)
+			return process.ExecStop, nil
 		}
 	}
 }
@@ -111,7 +103,7 @@ func resetInsertBatchForOnduplicateKey(proc *process.Process, originBatch *batch
 
 	tableDef := insertArg.TableDef
 	insertColCount := 0 //columns without hidden columns
-	if len(insertArg.ctr.insertBats) == 0 {
+	if insertArg.ctr.insertBat == nil {
 		attrs := make([]string, 0, len(originBatch.Vecs))
 		for _, col := range tableDef.Cols {
 			if col.Hidden && col.Name != catalog.FakePrimaryKeyColName {
@@ -124,20 +116,19 @@ func resetInsertBatchForOnduplicateKey(proc *process.Process, originBatch *batch
 			attrs = append(attrs, col.Name)
 		}
 		attrs = append(attrs, catalog.Row_ID)
-		bat := batch.NewWithSize(len(attrs))
-		bat.Attrs = attrs
+		insertArg.ctr.insertBat = batch.NewWithSize(len(attrs))
+		insertArg.ctr.insertBat.Attrs = attrs
 
 		insertArg.ctr.checkConflictBat = batch.NewWithSize(len(attrs))
 		insertArg.ctr.checkConflictBat.Attrs = append(insertArg.ctr.checkConflictBat.Attrs, attrs...)
 
 		for i, v := range originBatch.Vecs {
-			newVec := proc.GetVector(*v.GetType())
-			bat.SetVector(int32(i), newVec)
+			newVec := vector.NewVec(*v.GetType())
+			insertArg.ctr.insertBat.SetVector(int32(i), newVec)
 
-			ckVec := proc.GetVector(*v.GetType())
+			ckVec := vector.NewVec(*v.GetType())
 			insertArg.ctr.checkConflictBat.SetVector(int32(i), ckVec)
 		}
-		insertArg.ctr.insertBats = append(insertArg.ctr.insertBats, bat)
 	} else {
 		for _, col := range tableDef.Cols {
 			if col.Hidden && col.Name != catalog.FakePrimaryKeyColName {
@@ -152,7 +143,7 @@ func resetInsertBatchForOnduplicateKey(proc *process.Process, originBatch *batch
 		return err
 	}
 
-	insertBatch := insertArg.ctr.insertBats[len(insertArg.ctr.insertBats)-1]
+	insertBatch := insertArg.ctr.insertBat
 	checkConflictBatch := insertArg.ctr.checkConflictBat
 	attrs := make([]string, len(insertBatch.Attrs))
 	copy(attrs, insertBatch.Attrs)
@@ -270,10 +261,6 @@ func resetInsertBatchForOnduplicateKey(proc *process.Process, originBatch *batch
 		proc.PutBatch(newBatch)
 	}
 
-	if insertBatch.RowCount() > int(options.DefaultBlockMaxRows) {
-		insertArg.newInsertBatch(insertBatch, proc)
-	}
-
 	return nil
 }
 
@@ -295,7 +282,7 @@ func fetchOneRowAsBatch(idx int, originBatch *batch.Batch, proc *process.Process
 	newBatch.Attrs = attrs
 	var uErr error
 	for i, v := range originBatch.Vecs {
-		newVec := proc.GetVector(*v.GetType())
+		newVec := vector.NewVec(*v.GetType())
 		uErr = newVec.UnionOne(v, int64(idx), proc.Mp())
 		if uErr != nil {
 			newBatch.Clean(proc.Mp())
@@ -325,7 +312,7 @@ func updateOldBatch(evalBatch *batch.Batch, updateExpr map[string]*plan.Expr, pr
 				newBatch.SetVector(int32(i), newVec)
 			} else {
 				originVec = evalBatch.Vecs[i+columnCount]
-				newVec := proc.GetVector(*originVec.GetType())
+				newVec := vector.NewVec(*originVec.GetType())
 				err := newVec.UnionOne(originVec, int64(0), proc.Mp())
 				if err != nil {
 					newBatch.Clean(proc.Mp())
@@ -336,7 +323,7 @@ func updateOldBatch(evalBatch *batch.Batch, updateExpr map[string]*plan.Expr, pr
 		} else {
 			// keep old cols
 			originVec = evalBatch.Vecs[i]
-			newVec := proc.GetVector(*originVec.GetType())
+			newVec := vector.NewVec(*originVec.GetType())
 			err := newVec.UnionOne(originVec, int64(0), proc.Mp())
 			if err != nil {
 				newBatch.Clean(proc.Mp())
@@ -388,26 +375,4 @@ func checkConflict(proc *process.Process, newBatch *batch.Batch, checkConflictBa
 	}
 
 	return -1, "", nil
-}
-
-func (arg *Argument) newInsertBatch(bat *batch.Batch, proc *process.Process) {
-	tableDef := arg.TableDef
-	attrs := make([]string, 0, len(bat.Vecs))
-	for _, col := range tableDef.Cols {
-		if col.Hidden && col.Name != catalog.FakePrimaryKeyColName {
-			continue
-		}
-		attrs = append(attrs, col.Name)
-	}
-	for _, col := range tableDef.Cols {
-		attrs = append(attrs, col.Name)
-	}
-	attrs = append(attrs, catalog.Row_ID)
-	ibat := batch.NewWithSize(len(attrs))
-	ibat.Attrs = attrs
-	for i, v := range bat.Vecs {
-		newVec := proc.GetVector(*v.GetType())
-		ibat.SetVector(int32(i), newVec)
-	}
-	arg.ctr.insertBats = append(arg.ctr.insertBats, bat)
 }

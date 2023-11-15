@@ -34,11 +34,10 @@ const (
 
 	IOET_WALTxnCommand_AppendNode_V1          uint16 = 1
 	IOET_WALTxnCommand_DeleteNode_V1          uint16 = 1
-	IOET_WALTxnCommand_DeleteNode_V2          uint16 = 2
 	IOET_WALTxnCommand_PersistedDeleteNode_V1 uint16 = 1
 
 	IOET_WALTxnCommand_AppendNode_CurrVer          = IOET_WALTxnCommand_AppendNode_V1
-	IOET_WALTxnCommand_DeleteNode_CurrVer          = IOET_WALTxnCommand_DeleteNode_V2
+	IOET_WALTxnCommand_DeleteNode_CurrVer          = IOET_WALTxnCommand_DeleteNode_V1
 	IOET_WALTxnCommand_PersistedDeleteNode_CurrVer = IOET_WALTxnCommand_PersistedDeleteNode_V1
 )
 
@@ -50,8 +49,7 @@ func init() {
 		},
 		nil,
 		func(b []byte) (any, error) {
-			txnCmd := NewEmptyCmd(IOET_WALTxnCommand_AppendNode,
-				IOET_WALTxnCommand_AppendNode_V1)
+			txnCmd := NewEmptyCmd(IOET_WALTxnCommand_AppendNode)
 			err := txnCmd.UnmarshalBinary(b)
 			return txnCmd, err
 		},
@@ -63,21 +61,7 @@ func init() {
 		},
 		nil,
 		func(b []byte) (any, error) {
-			txnCmd := NewEmptyCmd(IOET_WALTxnCommand_DeleteNode,
-				IOET_WALTxnCommand_DeleteNode_V1)
-			err := txnCmd.UnmarshalBinary(b)
-			return txnCmd, err
-		},
-	)
-	objectio.RegisterIOEnrtyCodec(
-		objectio.IOEntryHeader{
-			Type:    IOET_WALTxnCommand_DeleteNode,
-			Version: IOET_WALTxnCommand_DeleteNode_V2,
-		},
-		nil,
-		func(b []byte) (any, error) {
-			txnCmd := NewEmptyCmd(IOET_WALTxnCommand_DeleteNode,
-				IOET_WALTxnCommand_DeleteNode_V2)
+			txnCmd := NewEmptyCmd(IOET_WALTxnCommand_DeleteNode)
 			err := txnCmd.UnmarshalBinary(b)
 			return txnCmd, err
 		},
@@ -89,8 +73,7 @@ func init() {
 		},
 		nil,
 		func(b []byte) (any, error) {
-			txnCmd := NewEmptyCmd(IOET_WALTxnCommand_PersistedDeleteNode,
-				IOET_WALTxnCommand_PersistedDeleteNode_V1)
+			txnCmd := NewEmptyCmd(IOET_WALTxnCommand_PersistedDeleteNode)
 			err := txnCmd.UnmarshalBinary(b)
 			return txnCmd, err
 		},
@@ -105,12 +88,12 @@ type UpdateCmd struct {
 	cmdType uint16
 }
 
-func NewEmptyCmd(cmdType uint16, version uint16) *UpdateCmd {
+func NewEmptyCmd(cmdType uint16) *UpdateCmd {
 	cmd := &UpdateCmd{}
 	cmd.BaseCustomizedCmd = txnbase.NewBaseCustomizedCmd(0, cmd)
 	cmd.cmdType = cmdType
 	if cmdType == IOET_WALTxnCommand_DeleteNode {
-		cmd.delete = NewDeleteNode(nil, 0, version)
+		cmd.delete = NewDeleteNode(nil, 0)
 	} else if cmdType == IOET_WALTxnCommand_AppendNode {
 		cmd.append = NewAppendNode(nil, 0, 0, nil)
 	} else if cmdType == IOET_WALTxnCommand_PersistedDeleteNode {

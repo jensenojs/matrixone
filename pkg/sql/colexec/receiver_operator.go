@@ -15,11 +15,10 @@
 package colexec
 
 import (
-	"reflect"
-	"time"
-
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
+	"reflect"
+	"time"
 )
 
 // isMergeType means the receiver operator receive batch from all regs or single by some order

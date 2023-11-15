@@ -24,7 +24,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 )
@@ -103,7 +102,15 @@ func (l *LocalETLFS) write(ctx context.Context, vector IOVector) error {
 		size = int64(last.Offset + last.Size)
 	}
 
-	r := newIOEntriesReader(ctx, vector.Entries)
+	var r io.Reader
+	r = newIOEntriesReader(ctx, vector.Entries)
+	if vector.Hash.Sum != nil && vector.Hash.New != nil {
+		h := vector.Hash.New()
+		r = io.TeeReader(r, h)
+		defer func() {
+			*vector.Hash.Sum = h.Sum(nil)
+		}()
+	}
 
 	// write
 	if err := l.ensureTempDir(); err != nil {
@@ -213,17 +220,15 @@ func (l *LocalETLFS) Read(ctx context.Context, vector *IOVector) error {
 
 			if entry.ToCacheData != nil {
 				r = io.TeeReader(r, entry.WriterForRead)
-				counter := new(atomic.Int64)
 				cr := &countingReader{
 					R: r,
-					C: counter,
 				}
 				cacheData, err := entry.ToCacheData(cr, nil, DefaultCacheDataAllocator)
 				if err != nil {
 					return err
 				}
 				vector.Entries[i].CachedData = cacheData
-				if entry.Size > 0 && counter.Load() != entry.Size {
+				if entry.Size > 0 && cr.N != entry.Size {
 					return moerr.NewUnexpectedEOFNoCtx(path.File)
 				}
 

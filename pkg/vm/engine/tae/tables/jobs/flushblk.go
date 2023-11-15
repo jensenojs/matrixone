@@ -16,8 +16,6 @@ package jobs
 
 import (
 	"context"
-	"math/rand"
-	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/perfcounter"
 
@@ -64,10 +62,7 @@ func NewFlushBlkTask(
 
 func (task *flushBlkTask) Scope() *common.ID { return task.meta.AsCommonID() }
 
-func (task *flushBlkTask) Execute(ctx context.Context) (err error) {
-	if v := ctx.Value(TestFlushBailout{}); v != nil {
-		time.Sleep(time.Duration(rand.Intn(200)) * time.Millisecond)
-	}
+func (task *flushBlkTask) Execute(ctx context.Context) error {
 	seg := task.meta.ID.Segment()
 	num, _ := task.meta.ID.Offsets()
 	name := objectio.BuildObjectName(seg, num)

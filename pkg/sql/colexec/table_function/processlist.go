@@ -29,7 +29,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/status"
 	"github.com/matrixorigin/matrixone/pkg/queryservice"
 	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/disttae"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
@@ -45,7 +44,7 @@ func processlistPrepare(proc *process.Process, arg *Argument) error {
 	return nil
 }
 
-func processlist(_ int, proc *process.Process, arg *Argument, result *vm.CallResult) (bool, error) {
+func processlist(_ int, proc *process.Process, arg *Argument) (bool, error) {
 	switch arg.ctr.state {
 	case dataProducing:
 		sessions, err := fetchSessions(proc.Ctx, proc.SessionInfo.Account,
@@ -61,7 +60,7 @@ func processlist(_ int, proc *process.Process, arg *Argument, result *vm.CallRes
 			}
 
 			tp := plan2.SessionsColTypes[idx]
-			bat.Vecs[i] = proc.GetVector(tp)
+			bat.Vecs[i] = vector.NewVec(tp)
 		}
 		bat.Attrs = arg.Attrs
 
@@ -152,12 +151,12 @@ func processlist(_ int, proc *process.Process, arg *Argument, result *vm.CallRes
 			}
 		}
 		bat.SetRowCount(bat.Vecs[0].Length())
-		result.Batch = bat
+		proc.SetInputBatch(bat)
 		arg.ctr.state = dataFinished
 		return false, nil
 
 	case dataFinished:
-		result.Batch = nil
+		proc.SetInputBatch(nil)
 		return true, nil
 	default:
 		return false, moerr.NewInternalError(proc.Ctx, "unknown state %v", arg.ctr.state)

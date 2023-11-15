@@ -15,7 +15,6 @@
 package plan
 
 import (
-	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"strings"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
@@ -33,11 +32,10 @@ func checkDropColumnWithPrimaryKey(colName string, pkey *plan.PrimaryKeyDef, ctx
 
 func checkDropColumnWithIndex(colName string, indexes []*plan.IndexDef, ctx CompilerContext) error {
 	for _, indexInfo := range indexes {
-		if indexInfo.TableExist {
+		if indexInfo.Unique {
 			for _, column := range indexInfo.Parts {
-				column = catalog.ResolveAlias(column)
 				if column == colName {
-					return moerr.NewInvalidInput(ctx.GetContext(), "can't drop column %s with index covered now", colName)
+					return moerr.NewInvalidInput(ctx.GetContext(), "can't drop column %s with unique index covered now", colName)
 				}
 			}
 		}

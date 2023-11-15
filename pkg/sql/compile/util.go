@@ -65,8 +65,7 @@ var (
 
 var (
 	insertIntoSingleIndexTableWithPKeyFormat    = "insert into  %s.`%s` select (%s), %s from %s.%s where (%s) is not null;"
-	insertIntoUniqueIndexTableWithPKeyFormat    = "insert into  %s.`%s` select serial(%s), %s from %s.%s where serial(%s) is not null;"
-	insertIntoSecondaryIndexTableWithPKeyFormat = "insert into  %s.`%s` select serial_full(%s), %s from %s.%s;"
+	insertIntoIndexTableWithPKeyFormat          = "insert into  %s.`%s` select serial(%s), %s from %s.%s where serial(%s) is not null;"
 	insertIntoSingleIndexTableWithoutPKeyFormat = "insert into  %s.`%s` select (%s) from %s.%s where (%s) is not null;"
 	insertIntoIndexTableWithoutPKeyFormat       = "insert into  %s.`%s` select serial(%s) from %s.%s where serial(%s) is not null;"
 	createIndexTableForamt                      = "create table %s.`%s` (%s);"
@@ -80,18 +79,12 @@ var (
 	updateMoIndexesTruncateTableFormat           = `update mo_catalog.mo_indexes set table_id = %v where table_id = %v`
 )
 
-var (
-	deleteMoTablePartitionsWithDatabaseIdFormat = `delete from mo_catalog.mo_table_partitions where database_id = %v;`
-	deleteMoTablePartitionsWithTableIdFormat    = `delete from mo_catalog.mo_table_partitions where table_id = %v;`
-	//deleteMoTablePartitionsWithTableIdAndIndexNameFormat = `delete from mo_catalog.mo_table_partitions where table_id = %v and name = '%s';`
-)
-
 // genCreateIndexTableSql: Generate ddl statements for creating index table
 func genCreateIndexTableSql(indexTableDef *plan.TableDef, indexDef *plan.IndexDef, DBName string) string {
 	var sql string
 	planCols := indexTableDef.GetCols()
 	for i, planCol := range planCols {
-		if i >= 1 {
+		if i == 1 {
 			sql += ","
 		}
 		sql += planCol.Name + " "
@@ -108,7 +101,7 @@ func genCreateIndexTableSql(indexTableDef *plan.TableDef, indexDef *plan.IndexDe
 		case types.T_decimal64:
 			sql += fmt.Sprintf("DECIMAL(%d,%d)", planCol.Typ.Width, planCol.Typ.Scale)
 		case types.T_decimal128:
-			sql += fmt.Sprintf("DECIMAL(%d,%d)", planCol.Typ.Width, planCol.Typ.Scale)
+			sql += fmt.Sprintf("DECIAML(%d,%d)", planCol.Typ.Width, planCol.Typ.Scale)
 		default:
 			sql += typeId.String()
 		}
@@ -120,7 +113,7 @@ func genCreateIndexTableSql(indexTableDef *plan.TableDef, indexDef *plan.IndexDe
 }
 
 // genInsertIndexTableSql: Generate an insert statement for inserting data into the index table
-func genInsertIndexTableSql(originTableDef *plan.TableDef, indexDef *plan.IndexDef, DBName string, isUnique bool) string {
+func genInsertIndexTableSql(originTableDef *plan.TableDef, indexDef *plan.IndexDef, DBName string) string {
 	// insert data into index table
 	var insertSQL string
 	temp := partsToColsStr(indexDef.Parts)
@@ -149,11 +142,7 @@ func genInsertIndexTableSql(originTableDef *plan.TableDef, indexDef *plan.IndexD
 		if len(indexDef.Parts) == 1 {
 			insertSQL = fmt.Sprintf(insertIntoSingleIndexTableWithPKeyFormat, DBName, indexDef.IndexTableName, temp, pKeyMsg, DBName, originTableDef.Name, temp)
 		} else {
-			if isUnique {
-				insertSQL = fmt.Sprintf(insertIntoUniqueIndexTableWithPKeyFormat, DBName, indexDef.IndexTableName, temp, pKeyMsg, DBName, originTableDef.Name, temp)
-			} else {
-				insertSQL = fmt.Sprintf(insertIntoSecondaryIndexTableWithPKeyFormat, DBName, indexDef.IndexTableName, temp, pKeyMsg, DBName, originTableDef.Name)
-			}
+			insertSQL = fmt.Sprintf(insertIntoIndexTableWithPKeyFormat, DBName, indexDef.IndexTableName, temp, pKeyMsg, DBName, originTableDef.Name, temp)
 		}
 	}
 	return insertSQL
@@ -177,11 +166,6 @@ func genInsertMOIndexesSql(eg engine.Engine, proc *process.Process, databaseId s
 				}
 
 				for i, part := range indexdef.Parts {
-					// NOTE: Don't resolve the alias here.
-					// If we resolve it here, it will insert "OriginalPKColumnName" into the "mo_catalog.mo_indexes" table instead of
-					// "AliasPKColumnName". This will result is issues filter "Programmatically added PK" from the output of
-					// "show indexes" and "show create table" command.
-
 					//1. index id
 					if isFirst {
 						fmt.Fprintf(buffer, "(%d, ", index_id)
@@ -208,37 +192,25 @@ func genInsertMOIndexesSql(eg engine.Engine, proc *process.Process, databaseId s
 					}
 					fmt.Fprintf(buffer, "'%s', ", index_type)
 
-					//6. algorithm
-					var algorithm = indexdef.IndexAlgo
-					fmt.Fprintf(buffer, "'%s', ", algorithm)
-
-					//7. algorithm_table_type
-					var algorithm_table_type = indexdef.IndexAlgoTableType
-					fmt.Fprintf(buffer, "'%s', ", algorithm_table_type)
-
-					//8. algorithm_params
-					var algorithm_params = indexdef.IndexAlgoParams
-					fmt.Fprintf(buffer, "'%s', ", algorithm_params)
-
-					// 9. index visible
+					// 6. index visible
 					fmt.Fprintf(buffer, "%d, ", INDEX_VISIBLE_YES)
 
-					// 10. index vec_hidden
+					// 7. index vec_hidden
 					fmt.Fprintf(buffer, "%d, ", INDEX_HIDDEN_NO)
 
-					// 11. index vec_comment
+					// 8. index vec_comment
 					fmt.Fprintf(buffer, "'%s', ", indexdef.Comment)
 
-					// 12. index vec_column_name
+					// 9. index vec_column_name
 					fmt.Fprintf(buffer, "'%s', ", part)
 
-					// 13. index vec_ordinal_position
+					// 10. index vec_ordinal_position
 					fmt.Fprintf(buffer, "%d, ", i+1)
 
-					// 14. index vec_options
+					// 11. index vec_options
 					fmt.Fprintf(buffer, "%s, ", NULL_VALUE)
 
-					// 15. index vec_index_table
+					// 12. index vec_index_table
 					if indexdef.TableExist {
 						fmt.Fprintf(buffer, "'%s')", indexdef.IndexTableName)
 					} else {
@@ -275,34 +247,25 @@ func genInsertMOIndexesSql(eg engine.Engine, proc *process.Process, databaseId s
 					// 5.index_type
 					fmt.Fprintf(buffer, "'%s', ", INDEX_TYPE_PRIMARY)
 
-					//6. algorithm
-					fmt.Fprintf(buffer, "'%s', ", EMPTY_STRING)
-
-					//7. algorithm_table_type
-					fmt.Fprintf(buffer, "'%s', ", EMPTY_STRING)
-
-					//8. algorithm_params
-					fmt.Fprintf(buffer, "'%s', ", EMPTY_STRING)
-
-					//9. index visible
+					// 6. index visible
 					fmt.Fprintf(buffer, "%d, ", INDEX_VISIBLE_YES)
 
-					// 10. index vec_hidden
+					// 7. index vec_hidden
 					fmt.Fprintf(buffer, "%d, ", INDEX_HIDDEN_NO)
 
-					// 11. index vec_comment
+					// 8. index vec_comment
 					fmt.Fprintf(buffer, "'%s', ", EMPTY_STRING)
 
-					// 12. index vec_column_name
+					// 9. index vec_column_name
 					fmt.Fprintf(buffer, "'%s', ", colName)
 
-					// 13. index vec_ordinal_position
+					// 10. index vec_ordinal_position
 					fmt.Fprintf(buffer, "%d, ", i+1)
 
-					// 14. index vec_options
+					// 11. index vec_options
 					fmt.Fprintf(buffer, "%s, ", NULL_VALUE)
 
-					// 15. index vec_index_table
+					// 12. index vec_index_table
 					fmt.Fprintf(buffer, "%s)", NULL_VALUE)
 				}
 			}
@@ -425,7 +388,6 @@ func genNewUniqueIndexDuplicateCheck(c *Compile, database, table, cols string) e
 func partsToColsStr(parts []string) string {
 	var temp string
 	for i, part := range parts {
-		part = catalog.ResolveAlias(part)
 		if i == 0 {
 			temp += part
 		} else {

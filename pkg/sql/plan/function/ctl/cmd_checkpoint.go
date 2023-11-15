@@ -25,7 +25,7 @@ import (
 )
 
 func handleCheckpoint() handleFunc {
-	return GetTNHandlerFunc(
+	return getTNHandlerFunc(
 		pb.CmdMethod_Checkpoint,
 		func(_ string) ([]uint64, error) {
 			return nil, nil

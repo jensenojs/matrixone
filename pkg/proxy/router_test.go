@@ -72,7 +72,8 @@ func TestRouter_SelectEmptyCN(t *testing.T) {
 	mc := clusterservice.NewMOCluster(hc, 3*time.Second)
 	defer mc.Close()
 	rt.SetGlobalVariables(runtime.ClusterService, mc)
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 	re := testRebalancer(t, st, logger, mc)
 
 	ru := newRouter(mc, re, true)
@@ -107,7 +108,8 @@ func TestRouter_RouteForCommon(t *testing.T) {
 	mc := clusterservice.NewMOCluster(hc, 3*time.Second)
 	defer mc.Close()
 	rt.SetGlobalVariables(runtime.ClusterService, mc)
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 	re := testRebalancer(t, st, logger, mc)
 
 	ru := newRouter(mc, re, true)
@@ -182,8 +184,7 @@ func TestRouter_RouteForSys(t *testing.T) {
 	st := stopper.NewStopper("test-proxy", stopper.WithLogger(rt.Logger().RawLogger()))
 	defer st.Stop()
 	hc := &mockHAKeeperClient{}
-	mc := clusterservice.NewMOCluster(hc, 3*time.Second,
-		clusterservice.WithDisableRefresh())
+	mc := clusterservice.NewMOCluster(hc, 3*time.Second)
 	defer mc.Close()
 	rt.SetGlobalVariables(runtime.ClusterService, mc)
 	re := testRebalancer(t, st, logger, mc)
@@ -195,7 +196,8 @@ func TestRouter_RouteForSys(t *testing.T) {
 	hc.updateCN("cn1", "", map[string]metadata.LabelList{
 		tenantLabelKey: {Labels: []string{"t1"}},
 	})
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 	ctx := context.TODO()
 	cn, err := ru.Route(ctx, clientInfo{labelInfo: li1, username: "dump"}, nil)
 	require.NoError(t, err)
@@ -207,7 +209,8 @@ func TestRouter_RouteForSys(t *testing.T) {
 	require.Nil(t, cn)
 
 	hc.updateCN("cn2", "", map[string]metadata.LabelList{})
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 	cn, err = ru.Route(ctx, clientInfo{labelInfo: li1}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, cn)
@@ -216,7 +219,8 @@ func TestRouter_RouteForSys(t *testing.T) {
 	hc.updateCN("cn3", "", map[string]metadata.LabelList{
 		"k1": {Labels: []string{"v1"}},
 	})
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 	cn, err = ru.Route(ctx, clientInfo{labelInfo: li1}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, cn)
@@ -225,7 +229,8 @@ func TestRouter_RouteForSys(t *testing.T) {
 	hc.updateCN("cn4", "", map[string]metadata.LabelList{
 		tenantLabelKey: {Labels: []string{"sys"}},
 	})
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 	cn, err = ru.Route(ctx, clientInfo{labelInfo: li1}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, cn)
@@ -320,7 +325,8 @@ func TestRouter_ConnectAndSelectBalanced(t *testing.T) {
 	mc := clusterservice.NewMOCluster(hc, 3*time.Second)
 	defer mc.Close()
 	rt.SetGlobalVariables(runtime.ClusterService, mc)
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 	re := testRebalancer(t, st, logger, mc)
 
 	ru := newRouter(mc, re, true)
@@ -427,7 +433,8 @@ func TestRouter_ConnectAndSelectSpecify(t *testing.T) {
 	mc := clusterservice.NewMOCluster(hc, 3*time.Second)
 	defer mc.Close()
 	rt.SetGlobalVariables(runtime.ClusterService, mc)
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 	re := testRebalancer(t, st, logger, mc)
 
 	ru := newRouter(mc, re, true)
@@ -523,7 +530,8 @@ func TestRouter_Filter(t *testing.T) {
 	mc := clusterservice.NewMOCluster(hc, 3*time.Second)
 	defer mc.Close()
 	rt.SetGlobalVariables(runtime.ClusterService, mc)
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 	re := testRebalancer(t, st, logger, mc)
 
 	ru := newRouter(mc, re, true)
@@ -581,7 +589,8 @@ func TestRouter_RetryableConnect(t *testing.T) {
 	mc := clusterservice.NewMOCluster(hc, 3*time.Second)
 	defer mc.Close()
 	rt.SetGlobalVariables(runtime.ClusterService, mc)
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 	re := testRebalancer(t, st, logger, mc)
 
 	ru := newRouter(mc, re, false)

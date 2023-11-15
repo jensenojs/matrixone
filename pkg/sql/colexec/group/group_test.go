@@ -16,14 +16,11 @@ package group
 
 import (
 	"bytes"
-	"testing"
-
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
+	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/agg"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/value_scan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -93,26 +90,33 @@ func init() {
 func TestString(t *testing.T) {
 	buf := new(bytes.Buffer)
 	for _, tc := range tcs {
-		tc.arg.String(buf)
+		String(tc.arg, buf)
 	}
 }
 
 func TestGroup(t *testing.T) {
 	for _, tc := range tcs {
-		err := tc.arg.Prepare(tc.proc)
+		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
-
-		bats := []*batch.Batch{
-			newBatch(t, tc.flgs, tc.arg.Types, tc.proc, Rows),
-			newBatch(t, tc.flgs, tc.arg.Types, tc.proc, Rows),
-			batch.EmptyBatch,
+		tc.proc.Reg.InputBatch = newBatch(t, tc.flgs, tc.arg.Types, tc.proc, Rows)
+		_, err = Call(0, tc.proc, tc.arg, false, false)
+		require.NoError(t, err)
+		tc.proc.Reg.InputBatch = newBatch(t, tc.flgs, tc.arg.Types, tc.proc, Rows)
+		_, err = Call(0, tc.proc, tc.arg, false, false)
+		require.NoError(t, err)
+		tc.proc.Reg.InputBatch = batch.EmptyBatch
+		_, err = Call(0, tc.proc, tc.arg, false, false)
+		require.NoError(t, err)
+		tc.proc.Reg.InputBatch = nil
+		_, err = Call(0, tc.proc, tc.arg, false, false)
+		require.NoError(t, err)
+		if tc.proc.Reg.InputBatch != nil {
+			tc.proc.Reg.InputBatch.Clean(tc.proc.Mp())
 		}
-		resetChildren(tc.arg, bats)
-		_, err = tc.arg.Call(tc.proc)
+		tc.proc.Reg.InputBatch = nil
+		_, err = Call(0, tc.proc, tc.arg, false, false)
 		require.NoError(t, err)
-
-		tc.arg.Free(tc.proc, false, nil)
-		tc.arg.children[0].Free(tc.proc, false, nil)
+		tc.arg.Free(tc.proc, false)
 		tc.proc.FreeVectors()
 		require.Equal(t, int64(0), tc.proc.Mp().CurrNB())
 	}
@@ -126,20 +130,23 @@ func BenchmarkGroup(b *testing.B) {
 		}
 		t := new(testing.T)
 		for _, tc := range tcs {
-			err := tc.arg.Prepare(tc.proc)
+			err := Prepare(tc.proc, tc.arg)
 			require.NoError(t, err)
-			bats := []*batch.Batch{
-				newBatch(t, tc.flgs, tc.arg.Types, tc.proc, BenchmarkRows),
-				newBatch(t, tc.flgs, tc.arg.Types, tc.proc, BenchmarkRows),
-				batch.EmptyBatch,
+			tc.proc.Reg.InputBatch = newBatch(t, tc.flgs, tc.arg.Types, tc.proc, BenchmarkRows)
+			_, err = Call(0, tc.proc, tc.arg, false, false)
+			require.NoError(t, err)
+			tc.proc.Reg.InputBatch = newBatch(t, tc.flgs, tc.arg.Types, tc.proc, BenchmarkRows)
+			_, err = Call(0, tc.proc, tc.arg, false, false)
+			require.NoError(t, err)
+			tc.proc.Reg.InputBatch = batch.EmptyBatch
+			_, err = Call(0, tc.proc, tc.arg, false, false)
+			require.NoError(t, err)
+			tc.proc.Reg.InputBatch = nil
+			_, err = Call(0, tc.proc, tc.arg, false, false)
+			require.NoError(t, err)
+			if tc.proc.Reg.InputBatch != nil {
+				tc.proc.Reg.InputBatch.Clean(tc.proc.Mp())
 			}
-			resetChildren(tc.arg, bats)
-			_, err = tc.arg.Call(tc.proc)
-			require.NoError(t, err)
-
-			tc.arg.Free(tc.proc, false, nil)
-			tc.arg.children[0].Free(tc.proc, false, nil)
-			tc.proc.FreeVectors()
 		}
 	}
 }
@@ -162,11 +169,6 @@ func newTestCase(flgs []bool, ts []types.Type, exprs []*plan.Expr, aggs []agg.Ag
 			Exprs: exprs,
 			Types: ts,
 			Aggs:  aggs,
-			info: &vm.OperatorInfo{
-				Idx:     1,
-				IsFirst: false,
-				IsLast:  false,
-			},
 		},
 	}
 }
@@ -185,19 +187,4 @@ func newExpression(pos int32) *plan.Expr {
 // create a new block based on the type information, flgs[i] == ture: has null
 func newBatch(t *testing.T, flgs []bool, ts []types.Type, proc *process.Process, rows int64) *batch.Batch {
 	return testutil.NewBatch(ts, false, int(rows), proc.Mp())
-}
-
-func resetChildren(arg *Argument, bats []*batch.Batch) {
-	if len(arg.children) == 0 {
-		arg.AppendChild(&value_scan.Argument{
-			Batchs: bats,
-		})
-
-	} else {
-		arg.children = arg.children[:0]
-		arg.AppendChild(&value_scan.Argument{
-			Batchs: bats,
-		})
-	}
-	arg.ctr.state = vm.Build
 }

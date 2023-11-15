@@ -25,7 +25,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/testutil"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 	"github.com/stretchr/testify/require"
 )
@@ -64,29 +63,29 @@ func init() {
 func TestString(t *testing.T) {
 	buf := new(bytes.Buffer)
 	for _, tc := range tcs {
-		tc.arg.String(buf)
+		String(tc.arg, buf)
 	}
 }
 
 func TestBuild(t *testing.T) {
 	for _, tc := range tcs[:1] {
-		err := tc.arg.Prepare(tc.proc)
+		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
 		tc.proc.Reg.MergeReceivers[0].Ch <- newBatch(t, tc.flgs, tc.types, tc.proc, Rows)
 		tc.proc.Reg.MergeReceivers[0].Ch <- batch.EmptyBatch
 		tc.proc.Reg.MergeReceivers[0].Ch <- nil
 		for {
-			ok, err := tc.arg.Call(tc.proc)
+			ok, err := Call(0, tc.proc, tc.arg, false, false)
 			require.NoError(t, err)
-			require.Equal(t, false, ok.Status == vm.ExecStop)
-			mp := ok.Batch.AuxData.(*hashmap.JoinMap)
+			require.Equal(t, false, ok == process.ExecStop)
+			mp := tc.proc.Reg.InputBatch.AuxData.(*hashmap.JoinMap)
 			tc.proc.Reg.MergeReceivers[0].Ch <- nil
 			mp.Free()
-			ok.Batch.Clean(tc.proc.Mp())
+			tc.proc.Reg.InputBatch.Clean(tc.proc.Mp())
 			break
 		}
 		tc.proc.Reg.MergeReceivers[0].Ch <- nil
-		tc.arg.Free(tc.proc, false, nil)
+		tc.arg.Free(tc.proc, false)
 		tc.proc.FreeVectors()
 		require.Equal(t, int64(0), tc.proc.Mp().CurrNB())
 	}
@@ -102,19 +101,19 @@ func BenchmarkBuild(b *testing.B) {
 		}
 		t := new(testing.T)
 		for _, tc := range tcs {
-			err := tc.arg.Prepare(tc.proc)
+			err := Prepare(tc.proc, tc.arg)
 			require.NoError(t, err)
 			tc.proc.Reg.MergeReceivers[0].Ch <- newBatch(t, tc.flgs, tc.types, tc.proc, Rows)
 			tc.proc.Reg.MergeReceivers[0].Ch <- batch.EmptyBatch
 			tc.proc.Reg.MergeReceivers[0].Ch <- nil
 			for {
-				ok, err := tc.arg.Call(tc.proc)
+				ok, err := Call(0, tc.proc, tc.arg, false, false)
 				require.NoError(t, err)
 				require.Equal(t, true, ok)
-				mp := ok.Batch.AuxData.(*hashmap.JoinMap)
+				mp := tc.proc.Reg.InputBatch.AuxData.(*hashmap.JoinMap)
 				tc.proc.Reg.MergeReceivers[0].Ch <- nil
 				mp.Free()
-				ok.Batch.Clean(tc.proc.Mp())
+				tc.proc.Reg.InputBatch.Clean(tc.proc.Mp())
 				break
 			}
 		}
@@ -153,11 +152,6 @@ func newTestCase(flgs []bool, ts []types.Type, cs []*plan.Expr) buildTestCase {
 			Typs:        ts,
 			Conditions:  cs,
 			NeedHashMap: true,
-			Info: &vm.OperatorInfo{
-				Idx:     0,
-				IsFirst: false,
-				IsLast:  false,
-			},
 		},
 	}
 }

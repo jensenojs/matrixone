@@ -136,7 +136,6 @@ func TestKeepaliveBind(t *testing.T) {
 			m.Store(1,
 				newRemoteLockTable(
 					"s1",
-					time.Second,
 					bind,
 					c,
 					func(lt pb.LockTable) {}))
@@ -171,7 +170,7 @@ func TestValid(t *testing.T) {
 		time.Hour,
 		func(a *lockTableAllocator) {
 			b := a.Get("s1", 1)
-			assert.Empty(t, a.Valid([]pb.LockTable{b}))
+			assert.True(t, a.Valid([]pb.LockTable{b}))
 		})
 }
 
@@ -182,7 +181,7 @@ func TestValidWithServiceInvalid(t *testing.T) {
 		func(a *lockTableAllocator) {
 			b := a.Get("s1", 1)
 			b.ServiceID = "s2"
-			assert.NotEmpty(t, a.Valid([]pb.LockTable{b}))
+			assert.False(t, a.Valid([]pb.LockTable{b}))
 		})
 }
 
@@ -193,7 +192,7 @@ func TestValidWithVersionChanged(t *testing.T) {
 		func(a *lockTableAllocator) {
 			b := a.Get("s1", 1)
 			b.Version++
-			assert.NotEmpty(t, a.Valid([]pb.LockTable{b}))
+			assert.False(t, a.Valid([]pb.LockTable{b}))
 		})
 }
 

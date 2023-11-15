@@ -22,7 +22,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
@@ -61,7 +60,7 @@ func TableNamesOfDB(db handle.Database) ([]string, error) {
 }
 
 func AppendDataToTable(ctx context.Context, rel handle.Relation, bat *batch.Batch) (err error) {
-	tnBat := containers.ToTNBatch(bat, common.WorkspaceAllocator)
+	tnBat := containers.ToTNBatch(bat)
 	defer tnBat.Close()
 	err = rel.Append(ctx, tnBat)
 	return

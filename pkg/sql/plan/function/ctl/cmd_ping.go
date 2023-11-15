@@ -23,7 +23,7 @@ import (
 )
 
 func handlePing() handleFunc {
-	return GetTNHandlerFunc(
+	return getTNHandlerFunc(
 		pb.CmdMethod_Ping,
 		func(parameter string) ([]uint64, error) {
 			if len(parameter) > 0 {

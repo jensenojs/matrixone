@@ -73,13 +73,13 @@ func NewMinioSDK(
 			},
 		})
 	}
-	if args.AssumeRoleARN != "" {
+	if args.RoleARN != "" {
 		// assume role
 		credentialProviders = append(credentialProviders, &credentials.STSAssumeRole{
 			Options: credentials.STSAssumeRoleOptions{
 				AccessKey:       args.KeyID,
 				SecretKey:       args.KeySecret,
-				RoleARN:         args.AssumeRoleARN,
+				RoleARN:         args.RoleARN,
 				RoleSessionName: args.ExternalID,
 			},
 		})
@@ -485,7 +485,7 @@ func (a *MinioSDK) getObject(ctx context.Context, key string, min *int64, max *i
 		func(offset int64) (io.ReadCloser, error) {
 			obj, err := doWithRetry(
 				"s3 get object",
-				func() (obj *minio.Object, err error) {
+				func() (*minio.Object, error) {
 					return a.client.GetObject(ctx, a.bucket, key, minio.GetObjectOptions{})
 				},
 				maxRetryAttemps,

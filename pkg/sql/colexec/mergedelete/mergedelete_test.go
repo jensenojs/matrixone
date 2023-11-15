@@ -26,9 +26,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/deletion"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/value_scan"
 	"github.com/matrixorigin/matrixone/pkg/testutil"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/stretchr/testify/require"
 )
@@ -144,16 +142,11 @@ func TestMergeDelete(t *testing.T) {
 	argument1 := Argument{
 		DelSource:    &mockRelation{},
 		AffectedRows: 0,
-		info: &vm.OperatorInfo{
-			Idx:     0,
-			IsFirst: false,
-			IsLast:  false,
-		},
 	}
 
-	argument1.Prepare(proc)
-	resetChildren(&argument1, batch1)
-	_, err = argument1.Call(proc)
+	Prepare(proc, &argument1)
+	proc.Reg.InputBatch = batch1
+	_, err = Call(0, proc, &argument1, false, false)
 	require.NoError(t, err)
 	require.Equal(t, uint64(15), argument1.AffectedRows)
 
@@ -172,8 +165,8 @@ func TestMergeDelete(t *testing.T) {
 		require.Equal(t, 15, vec.Length(), fmt.Sprintf("column number: %d", i))
 	}
 
-	resetChildren(&argument1, batch2)
-	_, err = argument1.Call(proc)
+	proc.Reg.InputBatch = batch2
+	_, err = Call(0, proc, &argument1, false, false)
 	require.NoError(t, err)
 	require.Equal(t, uint64(60), argument1.AffectedRows)
 
@@ -193,7 +186,7 @@ func TestMergeDelete(t *testing.T) {
 	}
 
 	// free resource
-	argument1.Free(proc, false, nil)
+	argument1.Free(proc, false)
 	metaLocBat0.Clean(proc.GetMPool())
 	metaLocBat1.Clean(proc.GetMPool())
 	metaLocBat2.Clean(proc.GetMPool())
@@ -203,18 +196,4 @@ func TestMergeDelete(t *testing.T) {
 	// constVector can't free
 	// 2 * 16 is 2 header of const vector.
 	require.Equal(t, int64(16+2*16), proc.GetMPool().CurrNB())
-}
-
-func resetChildren(arg *Argument, bat *batch.Batch) {
-	if len(arg.children) == 0 {
-		arg.AppendChild(&value_scan.Argument{
-			Batchs: []*batch.Batch{bat},
-		})
-
-	} else {
-		arg.children = arg.children[:0]
-		arg.AppendChild(&value_scan.Argument{
-			Batchs: []*batch.Batch{bat},
-		})
-	}
 }

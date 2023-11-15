@@ -16,10 +16,9 @@ package intersectall
 
 import (
 	"bytes"
-
 	"github.com/matrixorigin/matrixone/pkg/common/hashmap"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/vm"
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -29,13 +28,13 @@ const (
 	End
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(_ any, buf *bytes.Buffer) {
 	buf.WriteString(" intersect all ")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) error {
+func Prepare(proc *process.Process, arg any) error {
 	var err error
-	ap := arg
+	ap := arg.(*Argument)
 	ap.ctr = new(container)
 	ap.ctr.InitReceiver(proc, false)
 	if ap.ctr.hashTable, err = hashmap.NewStrMap(true, ap.IBucket, ap.NBucket, proc.Mp()); err != nil {
@@ -53,17 +52,17 @@ func (arg *Argument) Prepare(proc *process.Process) error {
 // use values from left relation to probe and update the array.
 // throw away values that do not exist in the hash table.
 // preserve values that exist in the hash table (the minimum of the number of times that exist in either).
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
+func Call(idx int, proc *process.Process, argument any, isFirst bool, isLast bool) (process.ExecStatus, error) {
 	var err error
-	analyzer := proc.GetAnalyze(arg.info.Idx)
+	analyzer := proc.GetAnalyze(idx)
 	analyzer.Start()
 	defer analyzer.Stop()
-	result := vm.NewCallResult()
+	arg := argument.(*Argument)
 	for {
 		switch arg.ctr.state {
 		case Build:
-			if err = arg.ctr.build(proc, analyzer, arg.info.IsFirst); err != nil {
-				return result, err
+			if err = arg.ctr.build(proc, analyzer, isFirst); err != nil {
+				return process.ExecNext, err
 			}
 			if arg.ctr.hashTable != nil {
 				analyzer.Alloc(arg.ctr.hashTable.Size())
@@ -72,20 +71,19 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 
 		case Probe:
 			last := false
-			last, err = arg.ctr.probe(proc, analyzer, arg.info.IsFirst, arg.info.IsLast, &result)
+			last, err = arg.ctr.probe(proc, analyzer, isFirst, isLast)
 			if err != nil {
-				return result, err
+				return process.ExecNext, err
 			}
 			if last {
 				arg.ctr.state = End
 				continue
 			}
-			return result, nil
+			return process.ExecNext, nil
 
 		case End:
-			result.Batch = nil
-			result.Status = vm.ExecStop
-			return result, nil
+			proc.SetInputBatch(nil)
+			return process.ExecStop, nil
 		}
 	}
 }
@@ -145,11 +143,7 @@ func (ctr *container) build(proc *process.Process, analyzer process.Analyze, isF
 // If a row of the batch appears in the hash table and the value of it in the ctr.counter is greater than 0，
 // send it to the next operator and counter--; else, continue.
 // if batch is the last one, return true, else return false.
-func (ctr *container) probe(proc *process.Process, analyzer process.Analyze, isFirst bool, isLast bool, result *vm.CallResult) (bool, error) {
-	if ctr.buf != nil {
-		proc.PutBatch(ctr.buf)
-		ctr.buf = nil
-	}
+func (ctr *container) probe(proc *process.Process, analyzer process.Analyze, isFirst bool, isLast bool) (bool, error) {
 	for {
 		bat, _, err := ctr.ReceiveFromSingleReg(0, analyzer)
 		if err != nil {
@@ -158,23 +152,27 @@ func (ctr *container) probe(proc *process.Process, analyzer process.Analyze, isF
 		if bat == nil {
 			return true, nil
 		}
-		analyzer.Input(bat, isFirst)
 		if bat.Last() {
-			ctr.buf = bat
-			result.Batch = ctr.buf
+			proc.SetInputBatch(bat)
 			return false, nil
 		}
 		if bat.IsEmpty() {
 			proc.PutBatch(bat)
 			continue
 		}
+
+		analyzer.Input(bat, isFirst)
+		//data to send to the next op
+		var outputBat *batch.Batch
 		//counter to record whether a row should add to output batch or not
 		var cnt int
 
 		//init output batch
-		ctr.buf = batch.NewWithSize(len(bat.Vecs))
-		for i := range bat.Vecs {
-			ctr.buf.Vecs[i] = proc.GetVector(*bat.Vecs[i].GetType())
+		{
+			outputBat = batch.NewWithSize(len(bat.Vecs))
+			for i := range bat.Vecs {
+				outputBat.Vecs[i] = vector.NewVec(*bat.Vecs[i].GetType())
+			}
 		}
 
 		// probe hashTable
@@ -214,11 +212,11 @@ func (ctr *container) probe(proc *process.Process, analyzer process.Analyze, isF
 					cnt++
 
 				}
-				ctr.buf.AddRowCount(cnt)
+				outputBat.AddRowCount(cnt)
 
 				if cnt > 0 {
 					for colNum := range bat.Vecs {
-						if err := ctr.buf.Vecs[colNum].UnionBatch(bat.Vecs[colNum], int64(i), cnt, ctr.inserted[:n], proc.Mp()); err != nil {
+						if err := outputBat.Vecs[colNum].UnionBatch(bat.Vecs[colNum], int64(i), cnt, ctr.inserted[:n], proc.Mp()); err != nil {
 							bat.Clean(proc.Mp())
 							return false, err
 						}
@@ -227,10 +225,10 @@ func (ctr *container) probe(proc *process.Process, analyzer process.Analyze, isF
 			}
 
 		}
-		analyzer.Alloc(int64(ctr.buf.Size()))
-		analyzer.Output(ctr.buf, isLast)
+		analyzer.Alloc(int64(outputBat.Size()))
+		analyzer.Output(outputBat, isLast)
 
-		result.Batch = ctr.buf
+		proc.SetInputBatch(outputBat)
 		proc.PutBatch(bat)
 		return false, nil
 	}

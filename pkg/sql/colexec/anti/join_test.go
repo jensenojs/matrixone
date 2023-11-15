@@ -27,7 +27,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/hashbuild"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 	"github.com/matrixorigin/matrixone/pkg/testutil"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 	"github.com/stretchr/testify/require"
 )
@@ -77,7 +76,7 @@ func init() {
 func TestString(t *testing.T) {
 	buf := new(bytes.Buffer)
 	for _, tc := range tcs {
-		tc.arg.String(buf)
+		String(tc.arg, buf)
 	}
 }
 
@@ -87,7 +86,7 @@ func TestAnti(t *testing.T) {
 		if jm, ok := bat.AuxData.(*hashmap.JoinMap); ok {
 			jm.SetDupCount(int64(1))
 		}
-		err := tc.arg.Prepare(tc.proc)
+		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
 		tc.proc.Reg.MergeReceivers[0].Ch <- newBatch(t, tc.flgs, tc.types, tc.proc, Rows)
 		tc.proc.Reg.MergeReceivers[0].Ch <- batch.EmptyBatch
@@ -97,19 +96,19 @@ func TestAnti(t *testing.T) {
 		tc.proc.Reg.MergeReceivers[0].Ch <- nil
 		tc.proc.Reg.MergeReceivers[1].Ch <- bat
 		for {
-			ok, err := tc.arg.Call(tc.proc)
-			if ok.Status == vm.ExecStop || err != nil {
+			if ok, err := Call(0, tc.proc, tc.arg, false, false); ok == process.ExecStop || err != nil {
 				break
 			}
+			tc.proc.Reg.InputBatch.Clean(tc.proc.Mp())
 		}
 		tc.proc.Reg.MergeReceivers[0].Ch <- nil
 		tc.proc.Reg.MergeReceivers[1].Ch <- nil
-		tc.arg.Free(tc.proc, false, nil)
+		tc.arg.Free(tc.proc, false)
 		tc.proc.FreeVectors()
 		require.Equal(t, int64(0), tc.proc.Mp().CurrNB())
 	}
 	for _, tc := range tcs {
-		err := tc.arg.Prepare(tc.proc)
+		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
 		tc.proc.Reg.MergeReceivers[0].Ch <- newBatch(t, tc.flgs, tc.types, tc.proc, Rows)
 		tc.proc.Reg.MergeReceivers[0].Ch <- batch.EmptyBatch
@@ -119,14 +118,14 @@ func TestAnti(t *testing.T) {
 		tc.proc.Reg.MergeReceivers[0].Ch <- nil
 		tc.proc.Reg.MergeReceivers[1].Ch <- nil
 		for {
-			ok, err := tc.arg.Call(tc.proc)
-			if ok.Status == vm.ExecStop || err != nil {
+			if ok, err := Call(0, tc.proc, tc.arg, false, false); ok == process.ExecStop || err != nil {
 				break
 			}
+			tc.proc.Reg.InputBatch.Clean(tc.proc.Mp())
 		}
 		tc.proc.Reg.MergeReceivers[0].Ch <- nil
 		tc.proc.Reg.MergeReceivers[1].Ch <- nil
-		tc.arg.Free(tc.proc, false, nil)
+		tc.arg.Free(tc.proc, false)
 		tc.proc.FreeVectors()
 		require.Equal(t, int64(0), tc.proc.Mp().CurrNB())
 	}
@@ -157,7 +156,7 @@ func BenchmarkAnti(b *testing.B) {
 		t := new(testing.T)
 		for _, tc := range tcs {
 			bat := hashBuild(t, tc)
-			err := tc.arg.Prepare(tc.proc)
+			err := Prepare(tc.proc, tc.arg)
 			require.NoError(t, err)
 			tc.proc.Reg.MergeReceivers[0].Ch <- newBatch(t, tc.flgs, tc.types, tc.proc, Rows)
 			tc.proc.Reg.MergeReceivers[0].Ch <- batch.EmptyBatch
@@ -167,10 +166,10 @@ func BenchmarkAnti(b *testing.B) {
 			tc.proc.Reg.MergeReceivers[0].Ch <- nil
 			tc.proc.Reg.MergeReceivers[1].Ch <- bat
 			for {
-				ok, err := tc.arg.Call(tc.proc)
-				if ok.Status == vm.ExecStop || err != nil {
+				if ok, err := Call(0, tc.proc, tc.arg, false, false); ok == process.ExecStop || err != nil {
 					break
 				}
+				tc.proc.Reg.InputBatch.Clean(tc.proc.Mp())
 			}
 		}
 	}
@@ -249,36 +248,26 @@ func newTestCase(m *mpool.MPool, flgs []bool, ts []types.Type, rp []int32, cs []
 			Result:     rp,
 			Conditions: cs,
 			Cond:       cond,
-			info: &vm.OperatorInfo{
-				Idx:     1,
-				IsFirst: false,
-				IsLast:  false,
-			},
 		},
 		barg: &hashbuild.Argument{
 			Typs:        ts,
 			NeedHashMap: true,
 			Conditions:  cs[1],
-			Info: &vm.OperatorInfo{
-				Idx:     0,
-				IsFirst: false,
-				IsLast:  false,
-			},
 		},
 	}
 }
 
 func hashBuild(t *testing.T, tc antiTestCase) *batch.Batch {
-	err := tc.barg.Prepare(tc.proc)
+	err := hashbuild.Prepare(tc.proc, tc.barg)
 	require.NoError(t, err)
 	tc.proc.Reg.MergeReceivers[0].Ch <- newBatch(t, tc.flgs, tc.types, tc.proc, Rows)
 	for _, r := range tc.proc.Reg.MergeReceivers {
 		r.Ch <- nil
 	}
-	ok, err := tc.barg.Call(tc.proc)
+	ok, err := hashbuild.Call(0, tc.proc, tc.barg, false, false)
 	require.NoError(t, err)
-	require.Equal(t, false, ok.Status == vm.ExecStop)
-	return ok.Batch
+	require.Equal(t, false, ok == process.ExecStop)
+	return tc.proc.Reg.InputBatch
 }
 
 // create a new block based on the type information, flgs[i] == ture: has null

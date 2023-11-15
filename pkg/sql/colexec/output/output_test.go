@@ -21,9 +21,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/value_scan"
 	"github.com/matrixorigin/matrixone/pkg/testutil"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 	"github.com/stretchr/testify/require"
 )
@@ -57,11 +55,6 @@ func init() {
 			arg: &Argument{
 				Data: nil,
 				Func: sqlOutput,
-				info: &vm.OperatorInfo{
-					Idx:     0,
-					IsFirst: false,
-					IsLast:  false,
-				},
 			},
 		},
 	}
@@ -70,32 +63,33 @@ func init() {
 func TestString(t *testing.T) {
 	buf := new(bytes.Buffer)
 	for _, tc := range tcs {
-		tc.arg.String(buf)
+		String(tc.arg, buf)
 	}
 }
 
 func TestPrepare(t *testing.T) {
 	for _, tc := range tcs {
-		err := tc.arg.Prepare(tc.proc)
+		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
 	}
 }
 
 func TestOutput(t *testing.T) {
 	for _, tc := range tcs {
-		err := tc.arg.Prepare(tc.proc)
+		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
-
-		bats := []*batch.Batch{
-			newBatch(t, tc.types, tc.proc, Rows),
-			newBatch(t, tc.types, tc.proc, Rows),
-			batch.EmptyBatch,
-		}
-		resetChildren(tc.arg, bats)
-		_, err = tc.arg.Call(tc.proc)
+		tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows)
+		_, err = Call(0, tc.proc, tc.arg, false, false)
 		require.NoError(t, err)
-		tc.arg.Free(tc.proc, false, nil)
-		tc.arg.children[0].Free(tc.proc, false, nil)
+		tc.proc.Reg.InputBatch = newBatch(t, tc.types, tc.proc, Rows)
+		_, err = Call(0, tc.proc, tc.arg, false, false)
+		require.NoError(t, err)
+		tc.proc.Reg.InputBatch = batch.EmptyBatch
+		_, err = Call(0, tc.proc, tc.arg, false, false)
+		require.NoError(t, err)
+		tc.proc.Reg.InputBatch = nil
+		_, err = Call(0, tc.proc, tc.arg, false, false)
+		require.NoError(t, err)
 		tc.proc.FreeVectors()
 		require.Equal(t, int64(0), tc.proc.Mp().CurrNB())
 	}
@@ -104,18 +98,4 @@ func TestOutput(t *testing.T) {
 // create a new block based on the type information
 func newBatch(t *testing.T, ts []types.Type, proc *process.Process, rows int64) *batch.Batch {
 	return testutil.NewBatch(ts, false, int(rows), proc.Mp())
-}
-
-func resetChildren(arg *Argument, bats []*batch.Batch) {
-	if len(arg.children) == 0 {
-		arg.AppendChild(&value_scan.Argument{
-			Batchs: bats,
-		})
-
-	} else {
-		arg.children = arg.children[:0]
-		arg.AppendChild(&value_scan.Argument{
-			Batchs: bats,
-		})
-	}
 }

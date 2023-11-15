@@ -19,48 +19,54 @@ import (
 	"fmt"
 
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
-	n := arg
+func String(arg any, buf *bytes.Buffer) {
+	n := arg.(*Argument)
 	buf.WriteString(fmt.Sprintf("offset(%v)", n.Offset))
 }
 
-func (arg *Argument) Prepare(_ *process.Process) error {
+func Prepare(_ *process.Process, _ any) error {
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	result, err := arg.children[0].Call(proc)
-	if err != nil {
-		return result, err
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	bat := proc.InputBatch()
+	if bat == nil {
+		return process.ExecStop, nil
 	}
-	if result.Batch == nil || result.Batch.IsEmpty() || result.Batch.Last() {
-		return result, nil
+	if bat.Last() {
+		proc.SetInputBatch(bat)
+		return process.ExecNext, nil
 	}
-	bat := result.Batch
-	anal := proc.GetAnalyze(arg.info.Idx)
+	if bat.IsEmpty() {
+		proc.PutBatch(bat)
+		proc.SetInputBatch(batch.EmptyBatch)
+		return process.ExecNext, nil
+	}
+	ap := arg.(*Argument)
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
-	anal.Input(bat, arg.info.IsFirst)
+	anal.Input(bat, isFirst)
 
-	if arg.Seen > arg.Offset {
-		return result, nil
+	if ap.Seen > ap.Offset {
+		return process.ExecNext, nil
 	}
 	length := bat.RowCount()
-	if arg.Seen+uint64(length) > arg.Offset {
-		sels := newSels(int64(arg.Offset-arg.Seen), int64(length)-int64(arg.Offset-arg.Seen), proc)
-		arg.Seen += uint64(length)
+	if ap.Seen+uint64(length) > ap.Offset {
+		sels := newSels(int64(ap.Offset-ap.Seen), int64(length)-int64(ap.Offset-ap.Seen), proc)
+		ap.Seen += uint64(length)
 		bat.Shrink(sels)
 		proc.Mp().PutSels(sels)
-		result.Batch = bat
-		return result, nil
+		proc.SetInputBatch(bat)
+		return process.ExecNext, nil
 	}
-	arg.Seen += uint64(length)
-	result.Batch = batch.EmptyBatch
-	return result, nil
+	ap.Seen += uint64(length)
+	proc.PutBatch(bat)
+	proc.SetInputBatch(batch.EmptyBatch)
+	return process.ExecNext, nil
 }
 
 func newSels(start, count int64, proc *process.Process) []int64 {

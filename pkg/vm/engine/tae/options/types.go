@@ -62,6 +62,7 @@ const (
 )
 
 type Options struct {
+	CacheCfg      *CacheCfg      `toml:"cache-cfg"`
 	StorageCfg    *StorageCfg    `toml:"storage-cfg"`
 	CheckpointCfg *CheckpointCfg `toml:"checkpoint-cfg"`
 	SchedulerCfg  *SchedulerCfg  `toml:"scheduler-cfg"`

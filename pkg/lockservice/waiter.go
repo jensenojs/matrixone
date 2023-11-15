@@ -22,7 +22,6 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	pb "github.com/matrixorigin/matrixone/pkg/pb/lock"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
@@ -71,12 +70,10 @@ const (
 type waiter struct {
 	// belong to which txn
 	txn      pb.WaitTxn
-	waitFor  [][]byte
 	status   atomic.Int32
 	refCount atomic.Int32
 	c        chan notifyValue
 	event    event
-	waitAt   time.Time
 
 	// just used for testing
 	beforeSwapStatusAdjustFunc func()
@@ -240,10 +237,6 @@ func (w *waiter) notify(value notifyValue) bool {
 	}
 }
 
-func (w *waiter) startWait() {
-	w.waitAt = time.Now()
-}
-
 func (w *waiter) reset() {
 	notifies := len(w.c)
 	if notifies > 0 {
@@ -255,7 +248,6 @@ func (w *waiter) reset() {
 	logWaiterContactPool(w, "put")
 	w.txn = pb.WaitTxn{}
 	w.event = event{}
-	w.waitFor = w.waitFor[:0]
 	w.setStatus(ready)
 	waiterPool.Put(w)
 }

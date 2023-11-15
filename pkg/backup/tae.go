@@ -80,7 +80,6 @@ func BackupData(ctx context.Context, srcFs, dstFs fileservice.FileService, dir s
 		retByts = append(retByts, executor.GetBytesRows(cols[0]))
 		return true
 	})
-	res.Close()
 
 	fileName, err := getFileNames(ctx, retByts)
 	if err != nil {
@@ -207,9 +206,9 @@ func CopyFile(ctx context.Context, srcFs, dstFs fileservice.FileService, dentry 
 		name = path.Join(dstDir, name)
 	}
 	ioVec := &fileservice.IOVector{
-		FilePath: name,
-		Entries:  make([]fileservice.IOEntry, 1),
-		Policy:   fileservice.SkipAllCache,
+		FilePath:    name,
+		Entries:     make([]fileservice.IOEntry, 1),
+		CachePolicy: fileservice.SkipAll,
 	}
 	logutil.Infof("copy file %v", dentry)
 	ioVec.Entries[0] = fileservice.IOEntry{
@@ -221,9 +220,9 @@ func CopyFile(ctx context.Context, srcFs, dstFs fileservice.FileService, dentry 
 		return nil, err
 	}
 	dstIoVec := fileservice.IOVector{
-		FilePath: name,
-		Entries:  make([]fileservice.IOEntry, 1),
-		Policy:   fileservice.SkipAllCache,
+		FilePath:    name,
+		Entries:     make([]fileservice.IOEntry, 1),
+		CachePolicy: fileservice.SkipAll,
 	}
 	dstIoVec.Entries[0] = fileservice.IOEntry{
 		Offset: 0,

@@ -109,9 +109,7 @@ func NewMOCluster(
 			panic(err)
 		}
 	} else {
-		c.readyOnce.Do(func() {
-			close(c.readyC)
-		})
+		close(c.readyC)
 	}
 	return c
 }
@@ -152,12 +150,7 @@ func (c *cluster) GetTNService(selector Selector, apply func(metadata.TNService)
 	}
 }
 
-func (c *cluster) ForceRefresh(sync bool) {
-	if sync {
-		c.refresh()
-		return
-	}
-
+func (c *cluster) ForceRefresh() {
 	select {
 	case c.forceRefreshC <- struct{}{}:
 	default:
@@ -194,7 +187,7 @@ func (c *cluster) waitReady() {
 }
 
 func (c *cluster) refreshTask(ctx context.Context) {
-	c.ForceRefresh(false)
+	c.ForceRefresh()
 
 	timer := time.NewTimer(c.refreshInterval)
 	defer timer.Stop()
@@ -278,7 +271,6 @@ func newTNService(tn logpb.TNStore) metadata.TNService {
 		LogTailServiceAddress: tn.LogtailServerAddress,
 		LockServiceAddress:    tn.LockServiceAddress,
 		CtlAddress:            tn.CtlAddress,
-		QueryAddress:          tn.QueryAddress,
 	}
 	v.Shards = make([]metadata.TNShard, 0, len(tn.Shards))
 	for _, s := range tn.Shards {

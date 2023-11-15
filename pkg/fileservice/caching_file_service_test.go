@@ -49,7 +49,6 @@ func testCachingFileService(
 				Data: data,
 			},
 		},
-		Policy: SkipAllCache,
 	})
 	assert.Nil(t, err)
 
@@ -76,7 +75,7 @@ func testCachingFileService(
 
 	// nocache
 	vec := makeVec()
-	vec.Policy = SkipAllCache
+	vec.CachePolicy = SkipAll
 	err = fs.Read(ctx, vec)
 	assert.Nil(t, err)
 

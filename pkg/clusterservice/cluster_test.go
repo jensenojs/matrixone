@@ -59,7 +59,8 @@ func TestClusterForceRefresh(t *testing.T) {
 
 			hc.addCN("cn0")
 			cnt = 0
-			c.ForceRefresh(true)
+			c.ForceRefresh()
+			time.Sleep(time.Millisecond * 100)
 			c.GetCNService(NewServiceIDSelector("cn0"), apply)
 			assert.Equal(t, 1, cnt)
 		})
@@ -96,7 +97,8 @@ func BenchmarkGetService(b *testing.B) {
 			c.GetTNService(NewServiceIDSelector("dn0"), apply)
 
 			hc.addTN("dn0")
-			c.ForceRefresh(true)
+			c.ForceRefresh()
+			time.Sleep(time.Millisecond * 100)
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -117,7 +119,8 @@ func TestCluster_DebugUpdateCNLabel(t *testing.T) {
 			hc.addCN("cn0")
 			err := c.DebugUpdateCNLabel("cn0", map[string][]string{"k1": {"v1"}})
 			require.NoError(t, err)
-			c.ForceRefresh(true)
+			c.ForceRefresh()
+			time.Sleep(time.Millisecond * 100)
 			c.GetCNService(NewServiceIDSelector("cn0"), apply)
 			require.Equal(t, 1, len(cns))
 			require.Equal(t, "cn0", cns[0].ServiceID)

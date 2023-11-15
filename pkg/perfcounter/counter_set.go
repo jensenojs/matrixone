@@ -22,9 +22,10 @@ import (
 )
 
 type CounterSet struct {
-	FileService FileServiceCounterSet
-	DistTAE     DistTAECounterSet
-	TAE         TAECounterSet
+	FileService       FileServiceCounterSet
+	FileServiceByName map[string]*CounterSet
+	DistTAE           DistTAECounterSet
+	TAE               TAECounterSet
 }
 
 type FileServiceCounterSet struct {
@@ -52,9 +53,7 @@ type FileServiceCounterSet struct {
 			Hit              stats.Counter
 			GetFileContent   stats.Counter
 			SetFileContent   stats.Counter
-			OpenIOEntryFile  stats.Counter
-			OpenFullFile     stats.Counter
-			CreateFile       stats.Counter
+			OpenFile         stats.Counter
 			StatFile         stats.Counter
 			WriteFile        stats.Counter
 			Error            stats.Counter

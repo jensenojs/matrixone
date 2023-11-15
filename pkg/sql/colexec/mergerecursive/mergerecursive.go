@@ -16,60 +16,58 @@ package mergerecursive
 
 import (
 	"bytes"
-
-	"github.com/matrixorigin/matrixone/pkg/vm"
+	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(_ any, buf *bytes.Buffer) {
 	buf.WriteString(" merge recursive ")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) error {
-	ap := arg
+func Prepare(proc *process.Process, arg any) error {
+	ap := arg.(*Argument)
 	ap.ctr = new(container)
 	ap.ctr.InitReceiver(proc, true)
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	anal := proc.GetAnalyze(arg.info.Idx)
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
+	ap := arg.(*Argument)
+	ctr := ap.ctr
+	var sb *batch.Batch
 
-	result := vm.NewCallResult()
-	for !arg.ctr.last {
-		bat, _, err := arg.ctr.ReceiveFromSingleReg(0, anal)
+	for !ctr.last {
+		bat, _, err := ctr.ReceiveFromSingleReg(0, anal)
 		if err != nil {
-			result.Status = vm.ExecStop
-			return result, err
+			return process.ExecStop, err
 		}
 		if bat == nil || bat.End() {
-			result.Batch = nil
-			result.Status = vm.ExecStop
-			return result, nil
+			proc.SetInputBatch(nil)
+			return process.ExecStop, nil
 		}
 		if bat.Last() {
-			arg.ctr.last = true
+			ctr.last = true
 		}
-		arg.ctr.bats = append(arg.ctr.bats, bat)
+		ctr.bats = append(ctr.bats, bat)
 	}
-	arg.buf = arg.ctr.bats[0]
-	arg.ctr.bats = arg.ctr.bats[1:]
+	sb = ctr.bats[0]
+	ctr.bats = ctr.bats[1:]
 
-	if arg.buf.Last() {
-		arg.ctr.last = false
-	}
-
-	if arg.buf.End() {
-		arg.buf.Clean(proc.Mp())
-		result.Batch = nil
-		result.Status = vm.ExecStop
-		return result, nil
+	if sb.Last() {
+		ctr.last = false
 	}
 
-	anal.Input(arg.buf, arg.info.IsFirst)
-	anal.Output(arg.buf, arg.info.IsLast)
-	result.Batch = arg.buf
-	return result, nil
+	if sb.End() {
+		sb.Clean(proc.Mp())
+		proc.SetInputBatch(nil)
+		return process.ExecStop, nil
+	}
+
+	anal.Input(sb, isFirst)
+	anal.Output(sb, isLast)
+	proc.SetInputBatch(sb)
+	return process.ExecNext, nil
 }

@@ -88,8 +88,7 @@ func (l *lockTableAllocator) KeepLockTableBind(serviceID string) bool {
 	return b.active()
 }
 
-func (l *lockTableAllocator) Valid(binds []pb.LockTable) []uint64 {
-	var invalid []uint64
+func (l *lockTableAllocator) Valid(binds []pb.LockTable) bool {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	for _, b := range binds {
@@ -104,10 +103,10 @@ func (l *lockTableAllocator) Valid(binds []pb.LockTable) []uint64 {
 					zap.String("current", current.DebugString()),
 					zap.String("received", b.DebugString()))
 			}
-			invalid = append(invalid, b.Table)
+			return false
 		}
 	}
-	return invalid
+	return true
 }
 
 func (l *lockTableAllocator) Close() error {

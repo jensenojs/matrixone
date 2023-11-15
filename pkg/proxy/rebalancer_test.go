@@ -67,7 +67,8 @@ func TestCollectTunnels(t *testing.T) {
 	cn11 := prepareCN("cn11", hc, ha, reqLabel, cnLabels)
 	cn12 := prepareCN("cn12", hc, ha, reqLabel, cnLabels)
 	_ = prepareCN("cn13", hc, ha, reqLabel, cnLabels)
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 
 	t.Run("tolerance-0.1", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
@@ -125,6 +126,9 @@ func TestCollectTunnels(t *testing.T) {
 
 func TestCollectTunnels_Mixed(t *testing.T) {
 	runtime.SetupProcessLevelRuntime(runtime.DefaultRuntime())
+	hc := &mockHAKeeperClient{}
+	mc := clusterservice.NewMOCluster(hc, 3*time.Second)
+	defer mc.Close()
 	rt := runtime.DefaultRuntime()
 	logger := rt.Logger()
 	st := stopper.NewStopper("test-proxy", stopper.WithLogger(rt.Logger().RawLogger()))
@@ -138,17 +142,14 @@ func TestCollectTunnels_Mixed(t *testing.T) {
 		tenantLabelKey: {Labels: []string{"t1"}},
 		"k1":           {Labels: []string{"v1"}},
 	}
+	shared01 := prepareCN("shared01", hc, ha, reqLabel, nil)
+	shared02 := prepareCN("shared02", hc, ha, reqLabel, nil)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 
 	t.Run("balance-in-shared", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel()
-		hc := &mockHAKeeperClient{}
-		mc := clusterservice.NewMOCluster(hc, 3*time.Second)
-		defer mc.Close()
-
-		shared01 := prepareCN("shared01", hc, ha, reqLabel, nil)
-		shared02 := prepareCN("shared02", hc, ha, reqLabel, nil)
-		mc.ForceRefresh(true)
 
 		re := testRebalancer(t, st, logger, mc)
 		re.tolerance = 0
@@ -166,16 +167,9 @@ func TestCollectTunnels_Mixed(t *testing.T) {
 	t.Run("balance-in-selected", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel()
-		hc := &mockHAKeeperClient{}
-		mc := clusterservice.NewMOCluster(hc, 3*time.Second)
-		defer mc.Close()
 
-		_ = prepareCN("shared01", hc, ha, reqLabel, nil)
-		_ = prepareCN("shared02", hc, ha, reqLabel, nil)
 		tenant01 := prepareCN("tenant01", hc, ha, reqLabel, cnLabels)
 		tenant02 := prepareCN("tenant02", hc, ha, reqLabel, cnLabels)
-		mc.ForceRefresh(true)
-
 		re := testRebalancer(t, st, logger, mc)
 		re.tolerance = 0
 		tu1 := newTunnel(ctx, logger, cs)
@@ -192,15 +186,10 @@ func TestCollectTunnels_Mixed(t *testing.T) {
 	t.Run("migrate-tunnels-to-selected", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel()
-		hc := &mockHAKeeperClient{}
-		mc := clusterservice.NewMOCluster(hc, 3*time.Second)
-		defer mc.Close()
 
-		shared01 := prepareCN("shared01", hc, ha, reqLabel, nil)
-		shared02 := prepareCN("shared02", hc, ha, reqLabel, nil)
 		_ = prepareCN("tenant01", hc, ha, reqLabel, cnLabels)
-		mc.ForceRefresh(true)
-
+		mc.ForceRefresh()
+		time.Sleep(time.Millisecond * 200)
 		re := testRebalancer(t, st, logger, mc)
 		re.tolerance = 0
 		tu1 := newTunnel(ctx, logger, cs)
@@ -217,16 +206,11 @@ func TestCollectTunnels_Mixed(t *testing.T) {
 	t.Run("mixed-tunnels", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel()
-		hc := &mockHAKeeperClient{}
-		mc := clusterservice.NewMOCluster(hc, 3*time.Second)
-		defer mc.Close()
 
-		shared01 := prepareCN("shared01", hc, ha, reqLabel, nil)
-		_ = prepareCN("shared02", hc, ha, reqLabel, nil)
 		tenant01 := prepareCN("tenant01", hc, ha, reqLabel, cnLabels)
 		tenant02 := prepareCN("tenant02", hc, ha, reqLabel, cnLabels)
-		mc.ForceRefresh(true)
-
+		mc.ForceRefresh()
+		time.Sleep(time.Millisecond * 200)
 		re := testRebalancer(t, st, logger, mc)
 		re.tolerance = 0
 		tu1 := newTunnel(ctx, logger, cs)
@@ -299,7 +283,8 @@ func TestDoRebalance(t *testing.T) {
 	defer func() {
 		require.NoError(t, stopFn12())
 	}()
-	tp.mc.ForceRefresh(true)
+	tp.mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 
 	ctx, cancel := context.WithTimeout(tp.ctx, 10*time.Second)
 	defer cancel()

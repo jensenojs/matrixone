@@ -19,12 +19,11 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
-	n := arg
+func String(arg any, buf *bytes.Buffer) {
+	n := arg.(*Argument)
 	buf.WriteString("projection(")
 	for i, e := range n.Es {
 		if i > 0 {
@@ -35,53 +34,58 @@ func (arg *Argument) String(buf *bytes.Buffer) {
 	buf.WriteString(")")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) (err error) {
-	ap := arg
+func Prepare(proc *process.Process, arg any) (err error) {
+	ap := arg.(*Argument)
 	ap.ctr = new(container)
 	ap.ctr.projExecutors, err = colexec.NewExpressionExecutorsFromPlanExpressions(proc, ap.Es)
 
 	return err
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	anal := proc.GetAnalyze(arg.info.Idx)
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
 
-	result, err := arg.children[0].Call(proc)
-	if err != nil {
-		return result, err
+	bat := proc.InputBatch()
+	if bat == nil {
+		proc.SetInputBatch(nil)
+		return process.ExecStop, nil
 	}
-	if result.Batch == nil || result.Batch.IsEmpty() || result.Batch.Last() {
-		return result, nil
+	if bat.Last() {
+		proc.SetInputBatch(bat)
+		return process.ExecNext, nil
 	}
-	bat := result.Batch
-	anal.Input(bat, arg.info.IsFirst)
+	if bat.IsEmpty() {
+		proc.PutBatch(bat)
+		proc.SetInputBatch(batch.EmptyBatch)
+		return process.ExecNext, nil
+	}
 
-	if arg.buf != nil {
-		proc.PutBatch(arg.buf)
-		arg.buf = nil
-	}
-
-	arg.buf = batch.NewWithSize(len(arg.Es))
+	anal.Input(bat, isFirst)
+	ap := arg.(*Argument)
+	rbat := batch.NewWithSize(len(ap.Es))
 
 	// do projection.
-	for i := range arg.ctr.projExecutors {
-		vec, err := arg.ctr.projExecutors[i].Eval(proc, []*batch.Batch{bat})
+	for i := range ap.ctr.projExecutors {
+		vec, err := ap.ctr.projExecutors[i].Eval(proc, []*batch.Batch{bat})
 		if err != nil {
-			return result, err
+			return process.ExecNext, err
 		}
-		arg.buf.Vecs[i] = vec
+		rbat.Vecs[i] = vec
 	}
 
-	newAlloc, err := colexec.FixProjectionResult(proc, arg.ctr.projExecutors, arg.buf, bat)
+	newAlloc, err := colexec.FixProjectionResult(proc, ap.ctr.projExecutors, rbat, bat)
 	if err != nil {
-		return result, err
+		bat.Clean(proc.Mp())
+		return process.ExecNext, err
 	}
 	anal.Alloc(int64(newAlloc))
-	arg.buf.SetRowCount(bat.RowCount())
 
-	anal.Output(arg.buf, arg.info.IsLast)
-	result.Batch = arg.buf
-	return result, nil
+	rbat.SetRowCount(bat.RowCount())
+
+	proc.PutBatch(bat)
+	anal.Output(rbat, isLast)
+	proc.SetInputBatch(rbat)
+	return process.ExecNext, nil
 }

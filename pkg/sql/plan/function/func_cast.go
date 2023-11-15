@@ -302,7 +302,6 @@ var supportedTypeCast = map[types.T][]types.T{
 		types.T_time, types.T_timestamp,
 		types.T_char, types.T_varchar, types.T_blob, types.T_text,
 		types.T_binary, types.T_varbinary,
-		types.T_array_float32, types.T_array_float64,
 	},
 
 	types.T_json: {
@@ -4071,10 +4070,7 @@ func ArrayToArray[I types.RealNumbers, O types.RealNumbers](
 		} else {
 			// Eg:- VECF32(3) --> VECF64(3)
 			_v := types.BytesToArray[I](v)
-			cast, err := moarray.Cast[I, O](_v)
-			if err != nil {
-				return err
-			}
+			cast := moarray.Cast[I, O](_v)
 			bytes := types.ArrayToBytes[O](cast)
 			if err := to.AppendBytes(bytes, false); err != nil {
 				return err

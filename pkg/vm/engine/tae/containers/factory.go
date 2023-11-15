@@ -15,12 +15,11 @@
 package containers
 
 import (
-	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 )
 
-func MakeVector(typ types.Type, mp *mpool.MPool) (vec Vector) {
-	return NewVector(typ, Options{Allocator: mp})
+func MakeVector(typ types.Type, opts ...Options) (vec Vector) {
+	return NewVector(typ, opts...)
 }
 
 func BuildBatchWithPool(
@@ -49,7 +48,7 @@ func BuildBatch(attrs []string, colTypes []types.Type, opts Options) *Batch {
 		Vecs:    make([]Vector, 0, len(attrs)),
 	}
 	for i, attr := range attrs {
-		vec := NewVector(colTypes[i], opts)
+		vec := MakeVector(colTypes[i], opts)
 		bat.AddVector(attr, vec)
 	}
 	return bat

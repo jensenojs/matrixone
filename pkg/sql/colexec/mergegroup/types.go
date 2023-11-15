@@ -19,11 +19,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
-
-var _ vm.Operator = new(Argument)
 
 const (
 	Build = iota
@@ -54,20 +51,9 @@ type container struct {
 type Argument struct {
 	NeedEval bool // need to projection the aggregate column
 	ctr      *container
-
-	info     *vm.OperatorInfo
-	children []vm.Operator
 }
 
-func (arg *Argument) SetInfo(info *vm.OperatorInfo) {
-	arg.info = info
-}
-
-func (arg *Argument) AppendChild(child vm.Operator) {
-	arg.children = append(arg.children, child)
-}
-
-func (arg *Argument) Free(proc *process.Process, pipelineFailed bool, err error) {
+func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {
 	ctr := arg.ctr
 	if ctr != nil {
 		mp := proc.Mp()

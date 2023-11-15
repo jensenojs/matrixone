@@ -86,7 +86,6 @@ func (b *ObjectColumnMetasBuilder) UpdateZm(idx int, zm index.ZM) {
 	}
 	index.UpdateZM(b.zms[idx], zm.GetMinBuf())
 	index.UpdateZM(b.zms[idx], zm.GetMaxBuf())
-	b.zms[idx].SetSum(zm.GetSumBuf())
 }
 
 func (b *ObjectColumnMetasBuilder) GetPKData() []containers.Vector {

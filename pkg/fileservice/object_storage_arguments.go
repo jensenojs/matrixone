@@ -23,30 +23,22 @@ import (
 )
 
 type ObjectStorageArguments struct {
-	// misc
-	Name                string `toml:"name"`
+	BearerToken         string `toml:"bearer-token"`
+	Bucket              string `toml:"bucket"`
+	Endpoint            string `toml:"endpoint"`
+	ExternalID          string `toml:"external-id"`
+	IsMinio             bool   `toml:"is-minio"`
+	KeyID               string `toml:"key-id"`
 	KeyPrefix           string `toml:"key-prefix"`
+	KeySecret           string `toml:"key-secret"`
+	Name                string `toml:"name"`
+	RAMRole             string `toml:"ram-role"`
+	Region              string `toml:"region"`
+	RoleARN             string `toml:"role-arn"`
+	RoleSessionName     string `toml:"role-session-name"`
+	SecurityToken       string `toml:"security-token"`
+	SessionToken        string `toml:"session-token"`
 	SharedConfigProfile string `toml:"shared-config-profile"`
-
-	// s3
-	Bucket   string `toml:"bucket"`
-	Endpoint string `toml:"endpoint"`
-	IsMinio  bool   `toml:"is-minio"`
-	Region   string `toml:"region"`
-
-	// credentials
-	AssumeRoleARN     string `toml:"role-arn"`
-	BearerToken       string `toml:"bearer-token"`
-	ExternalID        string `toml:"external-id"`
-	KeyID             string `toml:"key-id"`
-	KeySecret         string `toml:"key-secret"`
-	OIDCProviderARN   string `toml:"oidc-provider-arn"`
-	OIDCRoleARN       string `toml:"oidc-role-arn"`
-	OIDCTokenFilePath string `toml:"oidc-token-file-path"`
-	RAMRole           string `toml:"ram-role"`
-	RoleSessionName   string `toml:"role-session-name"`
-	SecurityToken     string `toml:"security-token"`
-	SessionToken      string `toml:"session-token"`
 }
 
 func (o *ObjectStorageArguments) SetFromString(arguments []string) error {
@@ -79,7 +71,7 @@ func (o *ObjectStorageArguments) SetFromString(arguments []string) error {
 		case "region":
 			o.Region = value
 		case "role-arn":
-			o.AssumeRoleARN = value
+			o.RoleARN = value
 		case "role-session-name":
 			o.RoleSessionName = value
 		case "secret", "key-secret", "secret-id":
@@ -90,12 +82,6 @@ func (o *ObjectStorageArguments) SetFromString(arguments []string) error {
 			o.SharedConfigProfile = value
 		case "token", "session-token":
 			o.SessionToken = value
-		case "oidc-provider-arn":
-			o.OIDCProviderARN = value
-		case "oidc-token-file-path":
-			o.OIDCTokenFilePath = value
-		case "oidc-role-arn":
-			o.OIDCRoleARN = value
 
 		default:
 			return moerr.NewInvalidInputNoCtx("invalid S3 argument: %s", pair)

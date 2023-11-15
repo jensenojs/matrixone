@@ -287,8 +287,7 @@ func (col *columnCache) applyAutoValues(
 	rows int,
 	skipped *ranges,
 	filter func(i int) bool,
-	apply func(int, uint64) error,
-	txnOp client.TxnOperator) error {
+	apply func(int, uint64) error) error {
 	cul := col.concurrencyApply.Load()
 	col.concurrencyApply.Add(1)
 	col.Lock()
@@ -304,7 +303,7 @@ func (col *columnCache) applyAutoValues(
 		}
 
 		if col.ranges.empty() {
-			if err := col.allocateLocked(ctx, tableID, rows, cul, txnOp); err != nil {
+			if err := col.allocateLocked(ctx, tableID, rows, cul); err != nil {
 				return false, err
 			}
 		}
@@ -375,8 +374,7 @@ func (col *columnCache) allocateLocked(
 	ctx context.Context,
 	tableID uint64,
 	count int,
-	beforeApplyCount uint64,
-	txnOp client.TxnOperator) error {
+	beforeApplyCount uint64) error {
 	if err := col.waitPrevAllocatingLocked(ctx); err != nil {
 		return err
 	}
@@ -396,7 +394,7 @@ func (col *columnCache) allocateLocked(
 			tableID,
 			col.col.ColName,
 			count*n,
-			txnOp)
+			nil)
 		if err == nil {
 			col.allocateCount.Add(1)
 			col.applyAllocateLocked(from, to)
@@ -405,7 +403,7 @@ func (col *columnCache) allocateLocked(
 	}
 }
 
-func (col *columnCache) maybeAllocate(ctx context.Context, tableID uint64, txnOp client.TxnOperator) {
+func (col *columnCache) maybeAllocate(ctx context.Context, tableID uint64) {
 	col.Lock()
 	low := col.ranges.left() <= col.cfg.LowCapacity
 	col.Unlock()
@@ -413,7 +411,7 @@ func (col *columnCache) maybeAllocate(ctx context.Context, tableID uint64, txnOp
 		col.preAllocate(context.WithValue(context.Background(), defines.TenantIDKey{}, ctx.Value(defines.TenantIDKey{})),
 			tableID,
 			col.cfg.CountPerAllocate,
-			txnOp)
+			nil)
 	}
 }
 
@@ -480,7 +478,7 @@ func insertAutoValues[T constraints.Integer](
 	// all values are filled after insert
 	defer func() {
 		vec.SetNulls(nil)
-		col.maybeAllocate(ctx, tableID, txnOp)
+		col.maybeAllocate(ctx, tableID)
 	}()
 
 	vs := vector.MustFixedCol[T](vec)
@@ -524,7 +522,7 @@ func insertAutoValues[T constraints.Integer](
 			}
 		}
 	}
-	col.preAllocate(ctx, tableID, rows, txnOp)
+	col.preAllocate(ctx, tableID, rows, nil)
 	err := col.applyAutoValues(
 		ctx,
 		tableID,
@@ -546,8 +544,7 @@ func insertAutoValues[T constraints.Integer](
 			vs[i] = T(v)
 			lastInsertValue = v
 			return nil
-		},
-		txnOp)
+		})
 	if err != nil {
 		return 0, err
 	}

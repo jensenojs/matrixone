@@ -21,7 +21,9 @@ import (
 )
 
 func TestFormat(t *testing.T) {
-	c := &CounterSet{}
+	c := &CounterSet{
+		FileServiceByName: make(map[string]*CounterSet),
+	}
 	buf := new(bytes.Buffer)
 	format(buf, reflect.ValueOf(c), reflect.TypeOf(c))
 }

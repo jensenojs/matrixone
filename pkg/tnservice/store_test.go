@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrixorigin/matrixone/pkg/perfcounter"
+
 	"github.com/matrixorigin/matrixone/pkg/common/runtime"
 	"github.com/matrixorigin/matrixone/pkg/defines"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
@@ -294,7 +296,9 @@ func newTestStore(
 			clock.NewHLCClock(
 				func() int64 { return time.Now().UTC().UnixNano() },
 				time.Duration(math.MaxInt64))))
+	CounterSet := new(perfcounter.CounterSet)
 	s, err := NewService(
+		CounterSet,
 		c,
 		rt,
 		fs,

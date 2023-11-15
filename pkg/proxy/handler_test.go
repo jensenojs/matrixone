@@ -200,7 +200,8 @@ func TestHandler_Handle(t *testing.T) {
 	defer func() {
 		require.NoError(t, stopFn())
 	}()
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 
 	// start proxy.
 	s, err := NewServer(ctx, cfg, WithRuntime(runtime.DefaultRuntime()),
@@ -341,7 +342,8 @@ func TestHandler_HandleWithSSL(t *testing.T) {
 	defer func() {
 		require.NoError(t, stopFn())
 	}()
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 
 	// start proxy.
 	s, err := NewServer(ctx, cfg, WithRuntime(runtime.DefaultRuntime()),
@@ -415,7 +417,8 @@ func testWithServer(t *testing.T, fn func(*testing.T, string, *Server)) {
 	defer func() {
 		require.NoError(t, stopFn())
 	}()
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 
 	// start proxy.
 	s, err := NewServer(ctx, cfg, WithRuntime(runtime.DefaultRuntime()),

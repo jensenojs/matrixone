@@ -17,7 +17,6 @@ package taskservice
 import (
 	"context"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
@@ -108,12 +107,11 @@ func (t *resumeTask) Handle(ctx context.Context) error {
 		return err
 	}
 
-	ar := t.task.activeRoutine.Load()
-	if ar == nil || *ar == nil {
+	if t.task.activeRoutine == nil {
 		return moerr.NewInternalError(ctx, "cannot handle resume operation, "+
 			"active routine not set for task %d", t.task.task.ID)
 	}
-	return (*ar).Resume()
+	return t.task.activeRoutine.Resume()
 }
 
 type pauseTask struct {
@@ -147,12 +145,11 @@ func (t *pauseTask) Handle(ctx context.Context) error {
 	}
 
 	if t.runner.exists(tk.ID) {
-		ar := t.task.activeRoutine.Load()
-		if ar == nil || *ar == nil {
+		if t.task.activeRoutine == nil {
 			return moerr.NewInternalError(ctx, "cannot handle pause operation, "+
 				"active routine not set for task %d", t.task.task.ID)
 		}
-		if err := (*ar).Pause(); err != nil {
+		if err := t.task.activeRoutine.Pause(); err != nil {
 			return err
 		}
 	}
@@ -190,12 +187,11 @@ func (t *cancelTask) Handle(ctx context.Context) error {
 		return err
 	}
 	if t.runner.exists(tk.ID) {
-		ar := t.task.activeRoutine.Load()
-		if ar == nil || *ar == nil {
+		if t.task.activeRoutine == nil {
 			return moerr.NewInternalError(ctx, "cannot handle cancel operation, "+
 				"active routine not set for task %d", t.task.task.ID)
 		}
-		return (*ar).Cancel()
+		return t.task.activeRoutine.Cancel()
 	}
 	return nil
 }
@@ -216,7 +212,7 @@ type daemonTask struct {
 	executor TaskExecutor
 	// activeRoutine is the go-routine runs in background to execute
 	// the daemon task.
-	activeRoutine atomic.Pointer[ActiveRoutine]
+	activeRoutine ActiveRoutine
 }
 
 func (r *taskRunner) newDaemonTask(t task.DaemonTask) (*daemonTask, error) {

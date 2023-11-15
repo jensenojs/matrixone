@@ -17,7 +17,6 @@ package lockservice
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -28,13 +27,11 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 	"github.com/matrixorigin/matrixone/pkg/txn/clock"
 	"github.com/matrixorigin/matrixone/pkg/util/list"
-	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 	"github.com/matrixorigin/matrixone/pkg/util/trace"
 )
 
 type service struct {
 	cfg                  Config
-	serviceID            string
 	tables               sync.Map // table id -> locktable
 	activeTxnHolder      activeTxnHolder
 	fsp                  *fixedSlicePool
@@ -61,23 +58,18 @@ type service struct {
 func NewLockService(cfg Config) LockService {
 	cfg.Validate()
 	s := &service{
-		// If a cn with the same uuid is restarted within a short period of time, it will lead to
-		// the possibility that the remote locks will not be released, because the heartbeat timeout
-		// of a remote lockservice cannot be detected. To solve this problem we use uuid+create-time as
-		// service id, then a cn reboot with the same uuid will also be considered as not a lockservice.
-		serviceID: getServiceIdentifier(cfg.ServiceID, time.Now().UnixNano()),
-		cfg:       cfg,
-		fsp:       newFixedSlicePool(int(cfg.MaxFixedSliceSize)),
+		cfg:    cfg,
+		fsp:    newFixedSlicePool(int(cfg.MaxFixedSliceSize)),
+		events: newWaiterEvents(eventsWorkers),
 		stopper: stopper.NewStopper("lock-service",
 			stopper.WithLogger(getLogger().RawLogger())),
 		fetchWhoWaitingListC: make(chan who, 10240),
 	}
 	s.mu.allocating = make(map[uint64]chan struct{})
-	s.activeTxnHolder = newMapBasedTxnHandler(s.serviceID, s.fsp)
+	s.activeTxnHolder = newMapBasedTxnHandler(s.cfg.ServiceID, s.fsp)
 	s.deadlockDetector = newDeadlockDetector(
 		s.fetchTxnWaitingList,
 		s.abortDeadlockTxn)
-	s.events = newWaiterEvents(eventsWorkers, s.deadlockDetector)
 	s.clock = runtime.ProcessLevelRuntime().Clock()
 	s.initRemote()
 	s.events.start()
@@ -93,13 +85,6 @@ func (s *service) Lock(
 	rows [][]byte,
 	txnID []byte,
 	options pb.LockOptions) (pb.Result, error) {
-	v2.TxnLockTotalCounter.Inc()
-
-	start := time.Now()
-	defer func() {
-		v2.TxnAcquireLockDurationHistogram.Observe(time.Since(start).Seconds())
-	}()
-
 	// FIXME(fagongzi): too many mem alloc in trace
 	ctx, span := trace.Debug(ctx, "lockservice.lock")
 	defer span.End()
@@ -109,7 +94,7 @@ func (s *service) Lock(
 	}
 
 	txn := s.activeTxnHolder.getActiveTxn(txnID, true, "")
-	l, err := s.getLockTableWithCreate(tableID, true)
+	l, err := s.getLockTable(tableID)
 	if err != nil {
 		return pb.Result{}, err
 	}
@@ -143,11 +128,6 @@ func (s *service) Unlock(
 	ctx context.Context,
 	txnID []byte,
 	commitTS timestamp.Timestamp) error {
-	start := time.Now()
-	defer func() {
-		v2.TxnUnlockDurationHistogram.Observe(time.Since(start).Seconds())
-	}()
-
 	// FIXME(fagongzi): too many mem alloc in trace
 	_, span := trace.Debug(ctx, "lockservice.unlock")
 	defer span.End()
@@ -162,18 +142,14 @@ func (s *service) Unlock(
 		return nil
 	}
 
-	defer logUnlockTxn(s.serviceID, txn)()
-	txn.close(s.serviceID, txnID, commitTS, s.getLockTable)
+	defer logUnlockTxn(s.cfg.ServiceID, txn)()
+	txn.close(s.cfg.ServiceID, txnID, commitTS, s.getLockTable)
 	// The deadlock detector will hold the deadlocked transaction that is aborted
 	// to avoid the situation where the deadlock detection is interfered with by
 	// the abort transaction. When a transaction is unlocked, the deadlock detector
 	// needs to be notified to release memory.
 	s.deadlockDetector.txnClosed(txnID)
 	return nil
-}
-
-func (s *service) GetServiceID() string {
-	return s.serviceID
 }
 
 func (s *service) GetConfig() Config {
@@ -208,7 +184,7 @@ func (s *service) Close() error {
 }
 
 func (s *service) fetchTxnWaitingList(txn pb.WaitTxn, waiters *waiters) (bool, error) {
-	if txn.CreatedOn == s.serviceID {
+	if txn.CreatedOn == s.cfg.ServiceID {
 		activeTxn := s.activeTxnHolder.getActiveTxn(txn.TxnID, false, "")
 		// the active txn closed
 		if activeTxn == nil {
@@ -219,7 +195,7 @@ func (s *service) fetchTxnWaitingList(txn pb.WaitTxn, waiters *waiters) (bool, e
 			return true, nil
 		}
 		return activeTxn.fetchWhoWaitingMe(
-			s.serviceID,
+			s.cfg.ServiceID,
 			txnID,
 			s.activeTxnHolder,
 			waiters.add,
@@ -247,11 +223,11 @@ func (s *service) abortDeadlockTxn(wait pb.WaitTxn, err error) {
 	if activeTxn == nil {
 		return
 	}
-	activeTxn.abort(s.serviceID, wait, err)
+	activeTxn.abort(s.cfg.ServiceID, wait, err)
 }
 
 func (s *service) getLockTable(tableID uint64) (lockTable, error) {
-	return s.getLockTableWithCreate(tableID, false)
+	return s.getLockTableWithCreate(tableID, true)
 }
 
 func (s *service) waitLockTableBind(tableID uint64, locked bool) lockTable {
@@ -305,7 +281,7 @@ func (s *service) getLockTableWithCreate(tableID uint64, create bool) (lockTable
 	bind, err := getLockTableBind(
 		s.remote.client,
 		tableID,
-		s.serviceID)
+		s.cfg.ServiceID)
 	if err != nil {
 		return nil, err
 	}
@@ -318,30 +294,34 @@ func (s *service) getLockTableWithCreate(tableID uint64, create bool) (lockTable
 }
 
 func (s *service) handleBindChanged(newBind pb.LockTable) {
-	new := s.createLockTableByBind(newBind)
-	old, loaded := s.tables.Swap(newBind.Table, new)
-	if loaded {
-		old.(lockTable).close()
+	// TODO(fagongzi): replace with swap if upgrade to go1.20
+	old, loaded := s.tables.LoadAndDelete(newBind.Table)
+	if !loaded {
+		panic("missing lock table")
 	}
-	logRemoteBindChanged(s.serviceID, old.(lockTable).getBind(), newBind)
+	s.tables.Store(
+		newBind.Table,
+		s.createLockTableByBind(newBind))
+	logRemoteBindChanged(s.cfg.ServiceID, old.(lockTable).getBind(), newBind)
+	old.(lockTable).close()
 }
 
 func (s *service) createLockTableByBind(bind pb.LockTable) lockTable {
 	defer logLockTableCreated(
-		s.serviceID,
+		s.cfg.ServiceID,
 		bind,
-		bind.ServiceID != s.serviceID)
+		bind.ServiceID != s.cfg.ServiceID)
 
-	if bind.ServiceID == s.serviceID {
+	if bind.ServiceID == s.cfg.ServiceID {
 		return newLocalLockTable(
 			bind,
 			s.fsp,
+			s.deadlockDetector,
 			s.events,
 			s.clock)
 	} else {
 		return newRemoteLockTable(
-			s.serviceID,
-			s.cfg.RemoteLockTimeout.Duration,
+			s.cfg.ServiceID,
 			bind,
 			s.remote.client,
 			s.handleBindChanged)
@@ -487,10 +467,7 @@ func (h *mapBasedTxnHolder) getTimeoutRemoveTxn(
 			if _, ok := timeoutServices[remoteService]; ok {
 				timeoutTxns = append(timeoutTxns, util.UnsafeStringToBytes(txnKey))
 			}
-		}
 
-		for k := range timeoutServices {
-			delete(h.mu.remoteServices, k)
 		}
 	}
 	return timeoutTxns, wait
@@ -499,15 +476,4 @@ func (h *mapBasedTxnHolder) getTimeoutRemoveTxn(
 type remote struct {
 	id   string
 	time time.Time
-}
-
-func getServiceIdentifier(id string, version int64) string {
-	return fmt.Sprintf("%19d%s", version, id)
-}
-
-func getUUIDFromServiceIdentifier(id string) string {
-	if len(id) <= 19 {
-		return id
-	}
-	return id[19:]
 }

@@ -51,7 +51,6 @@ import (
 	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
 	"github.com/matrixorigin/matrixone/pkg/util/errutil"
 	"github.com/matrixorigin/matrixone/pkg/util/trace"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -67,14 +66,14 @@ var (
 	STATEMENT_ACCOUNT = "account"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(_ any, buf *bytes.Buffer) {
 	buf.WriteString("external output")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) error {
+func Prepare(proc *process.Process, arg any) error {
 	_, span := trace.Start(proc.Ctx, "ExternalPrepare")
 	defer span.End()
-	param := arg.Es
+	param := arg.(*Argument).Es
 	if proc.Lim.MaxMsgSize == 0 {
 		param.maxBatchSize = uint64(morpc.GetMessageSize())
 	} else {
@@ -119,52 +118,48 @@ func (arg *Argument) Prepare(proc *process.Process) error {
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
 	ctx, span := trace.Start(proc.Ctx, "ExternalCall")
+	defer span.End()
+	select {
+	case <-proc.Ctx.Done():
+		proc.SetInputBatch(nil)
+		return process.ExecStop, nil
+	default:
+	}
 	t1 := time.Now()
-	anal := proc.GetAnalyze(arg.info.Idx)
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer func() {
 		anal.Stop()
 		anal.AddScanTime(t1)
-		span.End()
 	}()
-	anal.Input(nil, arg.info.IsFirst)
-
-	var err error
-	result := vm.NewCallResult()
-	param := arg.Es
+	anal.Input(nil, isFirst)
+	param := arg.(*Argument).Es
 	if param.Fileparam.End {
-		result.Status = vm.ExecStop
-		return result, nil
+		proc.SetInputBatch(nil)
+		return process.ExecStop, nil
 	}
 	if param.plh == nil && param.Extern.ScanType != tree.INLINE {
 		if param.Fileparam.FileIndex >= len(param.FileList) {
-			result.Status = vm.ExecStop
-			return result, nil
+			proc.SetInputBatch(nil)
+			return process.ExecStop, nil
 		}
 		param.Fileparam.Filepath = param.FileList[param.Fileparam.FileIndex]
 		param.Fileparam.FileIndex++
 	}
-	if arg.buf != nil {
-		proc.PutBatch(arg.buf)
-		arg.buf = nil
-	}
-	arg.buf, err = scanFileData(ctx, param, proc)
+	bat, err := scanFileData(ctx, param, proc)
 	if err != nil {
 		param.Fileparam.End = true
-		return result, err
+		return process.ExecNext, err
 	}
 
-	if arg.buf != nil {
-		anal.Output(arg.buf, arg.info.IsLast)
-		anal.Alloc(int64(arg.buf.Size()))
+	proc.SetInputBatch(bat)
+	if bat != nil {
+		anal.Output(bat, isLast)
+		anal.Alloc(int64(bat.Size()))
 	}
-	result.Batch = arg.buf
-	if result.Batch != nil {
-		result.Batch.ShuffleIDX = param.Idx
-	}
-	return result, nil
+	return process.ExecNext, nil
 }
 
 func containColname(col string) bool {
@@ -1130,31 +1125,12 @@ func getOneRowData(bat *batch.Batch, line []string, rowIdx int, param *ExternalP
 					return err
 				}
 			}
-		case types.T_char, types.T_varchar, types.T_binary, types.T_varbinary, types.T_blob, types.T_text:
+		case types.T_char, types.T_varchar, types.T_binary, types.T_varbinary, types.T_blob, types.T_text,
+			types.T_array_float32, types.T_array_float64:
 			// XXX Memory accounting?
 			buf.WriteString(field)
 			bs := buf.Bytes()
 			err := vector.SetBytesAt(vec, rowIdx, bs, mp)
-			if err != nil {
-				return err
-			}
-			buf.Reset()
-		case types.T_array_float32:
-			arrBytes, err := types.StringToArrayToBytes[float32](field)
-			if err != nil {
-				return err
-			}
-			err = vector.SetBytesAt(vec, rowIdx, arrBytes, mp)
-			if err != nil {
-				return err
-			}
-			buf.Reset()
-		case types.T_array_float64:
-			arrBytes, err := types.StringToArrayToBytes[float64](field)
-			if err != nil {
-				return err
-			}
-			err = vector.SetBytesAt(vec, rowIdx, arrBytes, mp)
 			if err != nil {
 				return err
 			}

@@ -17,14 +17,10 @@ package compile
 import (
 	"context"
 	"fmt"
+	"github.com/matrixorigin/matrixone/pkg/logservice"
 	"hash/crc32"
 	"sync/atomic"
 	"time"
-
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/preinsertsecondaryindex"
-	"go.uber.org/zap"
-
-	"github.com/matrixorigin/matrixone/pkg/logservice"
 
 	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
@@ -91,10 +87,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/stream"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/table_function"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/top"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/value_scan"
 	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
 	"github.com/matrixorigin/matrixone/pkg/txn/client"
-	"github.com/matrixorigin/matrixone/pkg/udf"
 	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -112,18 +106,9 @@ func CnServerMessageHandler(
 	lockService lockservice.LockService,
 	queryService queryservice.QueryService,
 	hakeeper logservice.CNHAKeeperClient,
-	udfService udf.Service,
 	cli client.TxnClient,
 	aicm *defines.AutoIncrCacheManager,
 	messageAcquirer func() morpc.Message) error {
-	defer func() {
-		if e := recover(); e != nil {
-			err := moerr.ConvertPanicError(ctx, e)
-			getLogger().Error("panic in cn message handler",
-				zap.String("error", err.Error()))
-			cs.Close()
-		}
-	}()
 
 	msg, ok := message.(*pipeline.Message)
 	if !ok {
@@ -132,7 +117,7 @@ func CnServerMessageHandler(
 	}
 
 	receiver := newMessageReceiverOnServer(ctx, cnAddr, msg,
-		cs, messageAcquirer, storeEngine, fileService, lockService, queryService, hakeeper, udfService, cli, aicm)
+		cs, messageAcquirer, storeEngine, fileService, lockService, queryService, hakeeper, cli, aicm)
 
 	// rebuild pipeline to run and send query result back.
 	err := cnMessageHandle(&receiver)
@@ -222,41 +207,22 @@ func receiveMessageFromCnServer(c *Compile, s *Scope, sender *messageSenderOnCli
 		}
 	}
 
-	var lastArg vm.Operator
-	var oldChild []vm.Operator
+	var isConnector bool
+	var lastArg vm.InstructionArgument
 	switch arg := lastInstruction.Arg.(type) {
 	case *connector.Argument:
+		isConnector = true
 		lastArg = arg
-		oldChild = arg.Children
-		arg.Children = nil
-		defer func() {
-			arg.Children = oldChild
-		}()
 	case *dispatch.Argument:
 		lastArg = arg
-		oldChild = arg.Children
-		defer func() {
-			arg.Children = oldChild
-		}()
 	default:
 		return moerr.NewInvalidInput(c.ctx, "last operator should only be connector or dispatcher")
 	}
 
-	valueScanOperator := &value_scan.Argument{}
-	info := &vm.OperatorInfo{
-		Idx:     -1,
-		IsFirst: false,
-		IsLast:  false,
-	}
-	lastArg.SetInfo(info)
-	lastArg.AppendChild(valueScanOperator)
 	for {
 		val, err = sender.receiveMessage()
-		if err != nil {
+		if err != nil || val == nil {
 			return err
-		}
-		if val == nil {
-			break
 		}
 
 		m := val.(*pipeline.Message)
@@ -273,7 +239,7 @@ func receiveMessageFromCnServer(c *Compile, s *Scope, sender *messageSenderOnCli
 				}
 				mergeAnalyseInfo(c.anal, ana)
 			}
-			break
+			return nil
 		}
 		// XXX some order check just for safety ?
 		if sequence != m.Sequence {
@@ -295,34 +261,23 @@ func receiveMessageFromCnServer(c *Compile, s *Scope, sender *messageSenderOnCli
 		}
 
 		bat, err := decodeBatch(c.proc.Mp(), c.proc, dataBuffer)
-		if bat != batch.EmptyBatch {
-			bat.AddCnt(1)
-		}
 		dataBuffer = nil
 		if err != nil {
 			return err
 		}
 		lastAnalyze.Network(bat)
-		valueScanOperator.Batchs = append(valueScanOperator.Batchs, bat)
-		result, err := lastArg.Call(s.Proc)
-		if err != nil || result.Status == vm.ExecStop {
-			valueScanOperator.Free(s.Proc, false, err)
-			return err
+		s.Proc.SetInputBatch(bat)
+
+		if isConnector {
+			if ok, err := connector.Call(-1, s.Proc, lastArg, false, false); err != nil || ok == process.ExecStop {
+				return err
+			}
+		} else {
+			if ok, err := dispatch.Call(-1, s.Proc, lastArg, false, false); err != nil || ok == process.ExecStop {
+				return err
+			}
 		}
-		valueScanOperator.Free(s.Proc, false, err)
 	}
-	// for {
-	// 	ok, err := lastArg.Call(s.Proc)
-	// 	if err != nil {
-	// 		valueScanOperator.Free(s.Proc, false, err)
-	// 		return err
-	// 	}
-	// 	if ok.Status == vm.ExecStop {
-	// 		break
-	// 	}
-	// }
-	// valueScanOperator.Free(s.Proc, false, err)
-	return nil
 }
 
 // remoteRun sends a scope for remote running and receive the results.
@@ -342,42 +297,48 @@ func (s *Scope) remoteRun(c *Compile) error {
 	lastArg := lastInstruction.Arg
 	switch arg := lastArg.(type) {
 	case *connector.Argument:
-		arg.Prepare(s.Proc)
+		connector.Prepare(s.Proc, arg)
 	case *dispatch.Argument:
-		arg.Prepare(s.Proc)
+		dispatch.Prepare(s.Proc, arg)
 	default:
 		return moerr.NewInvalidInput(c.ctx, "last operator should only be connector or dispatcher")
 	}
+	failed := false
+	defer func() {
+		lastArg.Free(s.Proc, failed)
+	}()
 
 	sData, errEncode := encodeScope(s)
 	if errEncode != nil {
-		lastArg.Free(s.Proc, true, errEncode)
+		failed = true
 		return errEncode
 	}
 	s.Instructions = append(s.Instructions, lastInstruction)
 
 	// encode the process related information
-	pData, errEncodeProc := encodeProcessInfo(s.Proc, c.sql)
+	pData, errEncodeProc := encodeProcessInfo(s.Proc)
 	if errEncodeProc != nil {
-		lastArg.Free(s.Proc, true, errEncodeProc)
+		failed = true
 		return errEncodeProc
 	}
 
 	// new sender and do send work.
 	sender, err := newMessageSenderOnClient(s.Proc.Ctx, s.NodeInfo.Addr)
 	if err != nil {
-		lastArg.Free(s.Proc, true, err)
+		failed = true
 		return err
 	}
 	defer sender.close()
 	err = sender.send(sData, pData, pipeline.PipelineMessage)
 	if err != nil {
-		lastArg.Free(s.Proc, true, err)
+		failed = true
 		return err
 	}
 
-	err = receiveMessageFromCnServer(c, s, sender, lastInstruction)
-	lastArg.Free(s.Proc, err != nil, err)
+	if err = receiveMessageFromCnServer(c, s, sender, lastInstruction); err != nil {
+		failed = true
+	}
+
 	return err
 }
 
@@ -416,14 +377,10 @@ func decodeScope(data []byte, proc *process.Process, isRemote bool, eng engine.E
 }
 
 // encodeProcessInfo get needed information from proc, and do serialization work.
-func encodeProcessInfo(proc *process.Process, sql string) ([]byte, error) {
+func encodeProcessInfo(proc *process.Process) ([]byte, error) {
 	procInfo := &pipeline.ProcessInfo{}
-	if len(proc.AnalInfos) == 0 {
-		getLogger().Error("empty plan", zap.String("sql", sql))
-	}
 	{
 		procInfo.Id = proc.Id
-		procInfo.Sql = sql
 		procInfo.Lim = convertToPipelineLimitation(proc.Lim)
 		procInfo.UnixTime = proc.UnixTime
 		procInfo.AccountId = defines.GetAccountId(proc.Ctx)
@@ -772,10 +729,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 		in.PreInsertUnique = &pipeline.PreInsertUnique{
 			PreInsertUkCtx: t.PreInsertCtx,
 		}
-	case *preinsertsecondaryindex.Argument:
-		in.PreInsertSecondaryIndex = &pipeline.PreInsertSecondaryIndex{
-			PreInsertSkCtx: t.PreInsertCtx,
-		}
 	case *anti.Argument:
 		in.Anti = &pipeline.AntiJoin{
 			Ibucket:   t.Ibucket,
@@ -785,7 +738,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 			LeftCond:  t.Conditions[0],
 			RightCond: t.Conditions[1],
 			Result:    t.Result,
-			HashOnPk:  t.HashOnPK,
 		}
 	case *shuffle.Argument:
 		in.Shuffle = &pipeline.Shuffle{}
@@ -868,7 +820,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 			LeftCond:               t.Conditions[0],
 			RightCond:              t.Conditions[1],
 			RuntimeFilterBuildList: t.RuntimeFilterSpecs,
-			HashOnPk:               t.HashOnPK,
 		}
 	case *right.Argument:
 		rels, poses := getRelColList(t.Result)
@@ -883,7 +834,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 			LeftCond:               t.Conditions[0],
 			RightCond:              t.Conditions[1],
 			RuntimeFilterBuildList: t.RuntimeFilterSpecs,
-			HashOnPk:               t.HashOnPK,
 		}
 	case *rightsemi.Argument:
 		in.RightSemiJoin = &pipeline.RightSemiJoin{
@@ -895,7 +845,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 			LeftCond:               t.Conditions[0],
 			RightCond:              t.Conditions[1],
 			RuntimeFilterBuildList: t.RuntimeFilterSpecs,
-			HashOnPk:               t.HashOnPK,
 		}
 	case *rightanti.Argument:
 		in.RightAntiJoin = &pipeline.RightAntiJoin{
@@ -907,7 +856,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 			LeftCond:               t.Conditions[0],
 			RightCond:              t.Conditions[1],
 			RuntimeFilterBuildList: t.RuntimeFilterSpecs,
-			HashOnPk:               t.HashOnPK,
 		}
 	case *limit.Argument:
 		in.Limit = t.Limit
@@ -978,7 +926,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 			LeftCond:               t.Conditions[0],
 			RightCond:              t.Conditions[1],
 			RuntimeFilterBuildList: t.RuntimeFilterSpecs,
-			HashOnPk:               t.HashOnPK,
 		}
 	case *single.Argument:
 		relList, colList := getRelColList(t.Result)
@@ -992,7 +939,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 			LeftCond:               t.Conditions[0],
 			RightCond:              t.Conditions[1],
 			RuntimeFilterBuildList: t.RuntimeFilterSpecs,
-			HashOnPk:               t.HashOnPK,
 		}
 	case *top.Argument:
 		in.Limit = uint64(t.Limit)
@@ -1053,7 +999,6 @@ func convertToPipelineInstruction(opr *vm.Instruction, ctx *scopeContext, ctxId 
 			Types:     convertToPlanTypes(t.Typs),
 			Expr:      t.Cond,
 			OnList:    t.OnList,
-			HashOnPk:  t.HashOnPK,
 		}
 	case *table_function.Argument:
 		in.TableFunction = &pipeline.TableFunction{
@@ -1168,11 +1113,6 @@ func convertToVmInstruction(opr *pipeline.Instruction, ctx *scopeContext, eng en
 		v.Arg = &preinsertunique.Argument{
 			PreInsertCtx: t.GetPreInsertUkCtx(),
 		}
-	case vm.PreInsertSecondaryIndex:
-		t := opr.GetPreInsertSecondaryIndex()
-		v.Arg = &preinsertsecondaryindex.Argument{
-			PreInsertCtx: t.GetPreInsertSkCtx(),
-		}
 	case vm.OnDuplicateKey:
 		t := opr.GetOnDuplicateKey()
 		v.Arg = &onduplicatekey.Argument{
@@ -1194,8 +1134,7 @@ func convertToVmInstruction(opr *pipeline.Instruction, ctx *scopeContext, eng en
 			Conditions: [][]*plan.Expr{
 				t.LeftCond, t.RightCond,
 			},
-			Result:   t.Result,
-			HashOnPK: t.HashOnPk,
+			Result: t.Result,
 		}
 	case vm.Shuffle:
 		t := opr.GetShuffle()
@@ -1280,7 +1219,6 @@ func convertToVmInstruction(opr *pipeline.Instruction, ctx *scopeContext, eng en
 			Result:             convertToResultPos(t.RelList, t.ColList),
 			Conditions:         [][]*plan.Expr{t.LeftCond, t.RightCond},
 			RuntimeFilterSpecs: t.RuntimeFilterBuildList,
-			HashOnPK:           t.HashOnPk,
 		}
 	case vm.Right:
 		t := opr.GetRightJoin()
@@ -1293,7 +1231,6 @@ func convertToVmInstruction(opr *pipeline.Instruction, ctx *scopeContext, eng en
 			Cond:               t.Expr,
 			Conditions:         [][]*plan.Expr{t.LeftCond, t.RightCond},
 			RuntimeFilterSpecs: t.RuntimeFilterBuildList,
-			HashOnPK:           t.HashOnPk,
 		}
 	case vm.RightSemi:
 		t := opr.GetRightSemiJoin()
@@ -1305,7 +1242,6 @@ func convertToVmInstruction(opr *pipeline.Instruction, ctx *scopeContext, eng en
 			Cond:               t.Expr,
 			Conditions:         [][]*plan.Expr{t.LeftCond, t.RightCond},
 			RuntimeFilterSpecs: t.RuntimeFilterBuildList,
-			HashOnPK:           t.HashOnPk,
 		}
 	case vm.RightAnti:
 		t := opr.GetRightAntiJoin()
@@ -1317,7 +1253,6 @@ func convertToVmInstruction(opr *pipeline.Instruction, ctx *scopeContext, eng en
 			Cond:               t.Expr,
 			Conditions:         [][]*plan.Expr{t.LeftCond, t.RightCond},
 			RuntimeFilterSpecs: t.RuntimeFilterBuildList,
-			HashOnPK:           t.HashOnPk,
 		}
 	case vm.Limit:
 		v.Arg = &limit.Argument{Limit: opr.Limit}
@@ -1387,7 +1322,6 @@ func convertToVmInstruction(opr *pipeline.Instruction, ctx *scopeContext, eng en
 			Typs:               convertToTypes(t.Types),
 			Conditions:         [][]*plan.Expr{t.LeftCond, t.RightCond},
 			RuntimeFilterSpecs: t.RuntimeFilterBuildList,
-			HashOnPK:           t.HashOnPk,
 		}
 	case vm.Single:
 		t := opr.GetSingleJoin()
@@ -1399,7 +1333,6 @@ func convertToVmInstruction(opr *pipeline.Instruction, ctx *scopeContext, eng en
 			Typs:               convertToTypes(t.Types),
 			Conditions:         [][]*plan.Expr{t.LeftCond, t.RightCond},
 			RuntimeFilterSpecs: t.RuntimeFilterBuildList,
-			HashOnPK:           t.HashOnPk,
 		}
 	case vm.Mark:
 		t := opr.GetMarkJoin()
@@ -1411,7 +1344,6 @@ func convertToVmInstruction(opr *pipeline.Instruction, ctx *scopeContext, eng en
 			Typs:       convertToTypes(t.Types),
 			Cond:       t.Expr,
 			OnList:     t.OnList,
-			HashOnPK:   t.HashOnPk,
 		}
 	case vm.Top:
 		v.Arg = &top.Argument{

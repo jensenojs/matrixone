@@ -25,7 +25,6 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	plan "github.com/matrixorigin/matrixone/pkg/pb/plan"
 	tree "github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
-	function "github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 	process "github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -329,10 +328,10 @@ func (mr *MockCompilerContext2MockRecorder) ResolveById(tableId interface{}) *go
 }
 
 // ResolveUdf mocks base method.
-func (m *MockCompilerContext2) ResolveUdf(name string, args []*Expr) (*function.Udf, error) {
+func (m *MockCompilerContext2) ResolveUdf(name string, args []*Expr) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ResolveUdf", name, args)
-	ret0, _ := ret[0].(*function.Udf)
+	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

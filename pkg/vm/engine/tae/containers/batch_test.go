@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/testutils"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -202,7 +201,7 @@ func TestApproxSize(t *testing.T) {
 	t.Log(vec.ApproxSize())
 	defer vec.Close()
 
-	svec := MakeVector(types.T_varchar.ToType(), common.DefaultAllocator)
+	svec := MakeVector(types.T_varchar.ToType())
 	defer svec.Close()
 	sizeCnt := 0
 	for i := 0; i < 1024; i++ {

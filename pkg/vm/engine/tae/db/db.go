@@ -16,11 +16,10 @@ package db
 
 import (
 	"context"
+	"github.com/matrixorigin/matrixone/pkg/util/fault"
 	"io"
 	"sync/atomic"
 	"time"
-
-	"github.com/matrixorigin/matrixone/pkg/util/fault"
 
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/db/dbutils"
@@ -60,7 +59,6 @@ type DB struct {
 
 	BGScanner          wb.IHeartbeater
 	BGCheckpointRunner checkpoint.Runner
-	MergeHandle        *MergeTaskBuilder
 
 	DiskCleaner *gc2.DiskCleaner
 
@@ -94,9 +92,11 @@ func (db *DB) ForceCheckpoint(
 	if err != nil {
 		return err
 	}
-	if err = db.BGCheckpointRunner.ForceIncrementalCheckpoint(ts, true); err != nil {
+	if err = db.BGCheckpointRunner.ForceIncrementalCheckpoint(ts); err != nil {
 		return err
 	}
+	lsn := db.BGCheckpointRunner.MaxLSNInRange(ts)
+	_, err = db.Wal.RangeCheckpoint(1, lsn)
 	logutil.Debugf("[Force Checkpoint] takes %v", time.Since(t0))
 	return err
 }

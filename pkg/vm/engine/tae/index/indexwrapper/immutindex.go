@@ -21,6 +21,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/db/dbutils"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
@@ -70,11 +71,12 @@ func (idx ImmutIndex) BatchDedup(
 		buf = idx.bf.GetBloomFilter(uint32(idx.location.ID()))
 	} else {
 		var bf objectio.BloomFilter
-		if bf, err = objectio.FastLoadBF(
+		if bf, err = blockio.LoadBF(
 			ctx,
 			idx.location,
-			false,
+			rt.Cache.FilterIndex,
 			rt.Fs.Service,
+			false,
 		); err != nil {
 			return
 		}
@@ -112,11 +114,12 @@ func (idx ImmutIndex) Dedup(
 		buf = idx.bf.GetBloomFilter(uint32(idx.location.ID()))
 	} else {
 		var bf objectio.BloomFilter
-		if bf, err = objectio.FastLoadBF(
+		if bf, err = blockio.LoadBF(
 			ctx,
 			idx.location,
-			false,
+			rt.Cache.FilterIndex,
 			rt.Fs.Service,
+			false,
 		); err != nil {
 			return
 		}

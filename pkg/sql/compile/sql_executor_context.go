@@ -17,13 +17,11 @@ package compile
 import (
 	"context"
 	"strconv"
-	"sync"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/defines"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 	"github.com/matrixorigin/matrixone/pkg/sql/util"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -32,15 +30,10 @@ import (
 var _ plan.CompilerContext = new(compilerContext)
 
 type compilerContext struct {
-	ctx        context.Context
-	defaultDB  string
-	engine     engine.Engine
-	proc       *process.Process
-	statsCache *plan.StatsCache
-
-	buildAlterView       bool
-	dbOfView, nameOfView string
-	mu                   sync.Mutex
+	ctx       context.Context
+	defaultDB string
+	engine    engine.Engine
+	proc      *process.Process
 }
 
 func (c *compilerContext) CheckSubscriptionValid(subName, accName string, pubName string) error {
@@ -72,7 +65,7 @@ func newCompilerContext(
 	}
 }
 
-func (c *compilerContext) ResolveUdf(name string, ast []*plan.Expr) (*function.Udf, error) {
+func (c *compilerContext) ResolveUdf(name string, ast []*plan.Expr) (string, error) {
 	panic("not supported in internal sql executor")
 }
 
@@ -81,22 +74,11 @@ func (c *compilerContext) ResolveAccountIds(accountNames []string) ([]uint32, er
 }
 
 func (c *compilerContext) Stats(obj *plan.ObjectRef) bool {
-	t, err := c.getRelation(obj.GetSchemaName(), obj.GetObjName())
-	if err != nil {
-		return false
-	}
-	s := c.GetStatsCache().GetStatsInfoMap(t.GetTableID(c.ctx), true)
-	if s == nil {
-		return false
-	}
-	return t.Stats(c.ctx, nil, s)
+	return false
 }
 
 func (c *compilerContext) GetStatsCache() *plan.StatsCache {
-	if c.statsCache == nil {
-		c.statsCache = plan.NewStatsCache()
-	}
-	return c.statsCache
+	return nil
 }
 
 func (c *compilerContext) GetSubscriptionMeta(dbName string) (*plan.SubscriptionMeta, error) {
@@ -215,17 +197,11 @@ func (c *compilerContext) ResolveVariable(varName string, isSystemVar bool, isGl
 }
 
 func (c *compilerContext) SetBuildingAlterView(yesOrNo bool, dbName, viewName string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.buildAlterView = yesOrNo
-	c.dbOfView = dbName
-	c.nameOfView = viewName
+	panic("not supported in internal sql executor")
 }
 
 func (c *compilerContext) GetBuildingAlterView() (bool, string, string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.buildAlterView, c.dbOfView, c.nameOfView
+	panic("not supported in internal sql executor")
 }
 
 func (c *compilerContext) ensureDatabaseIsNotEmpty(dbName string) (string, error) {

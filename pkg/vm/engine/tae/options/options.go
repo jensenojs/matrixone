@@ -130,7 +130,13 @@ func (o *Options) FillDefaults(dirname string) *Options {
 	}
 
 	if o.TransferTableTTL == time.Duration(0) {
-		o.TransferTableTTL = time.Second * 90
+		o.TransferTableTTL = time.Second * 120
+	}
+
+	if o.CacheCfg == nil {
+		o.CacheCfg = &CacheCfg{
+			IndexCapacity: DefaultIndexCacheSize,
+		}
 	}
 
 	if o.StorageCfg == nil {

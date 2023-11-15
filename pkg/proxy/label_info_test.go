@@ -31,6 +31,7 @@ import (
 type mockHAKeeperClient struct {
 	sync.RWMutex
 	value logpb.ClusterDetails
+	err   error
 }
 
 func (c *mockHAKeeperClient) updateCN(uuid string, addr string, labels map[string]metadata.LabelList) {
@@ -57,31 +58,20 @@ func (c *mockHAKeeperClient) updateCN(uuid string, addr string, labels map[strin
 	c.value.CNStores = append(c.value.CNStores, *cs)
 }
 
-func (c *mockHAKeeperClient) Close() error                                 { return nil }
-func (c *mockHAKeeperClient) AllocateID(_ context.Context) (uint64, error) { return 0, nil }
-func (c *mockHAKeeperClient) AllocateIDByKey(_ context.Context, _ string) (uint64, error) {
+func (c *mockHAKeeperClient) Close() error                                   { return nil }
+func (c *mockHAKeeperClient) AllocateID(ctx context.Context) (uint64, error) { return 0, nil }
+func (c *mockHAKeeperClient) AllocateIDByKey(ctx context.Context, key string) (uint64, error) {
 	return uint64(nextClientConnID()), nil
 }
-func (c *mockHAKeeperClient) AllocateIDByKeyWithBatch(_ context.Context, _ string, _ uint64) (uint64, error) {
+func (c *mockHAKeeperClient) AllocateIDByKeyWithBatch(ctx context.Context, key string, batch uint64) (uint64, error) {
 	return uint64(nextClientConnID()), nil
 }
-func (c *mockHAKeeperClient) GetClusterDetails(_ context.Context) (logpb.ClusterDetails, error) {
+func (c *mockHAKeeperClient) GetClusterDetails(ctx context.Context) (logpb.ClusterDetails, error) {
 	c.RLock()
 	defer c.RUnlock()
-
-	// return a deepcopy of inner state to avoid data race
-	r := logpb.ClusterDetails{}
-	bytes, err := c.value.Marshal()
-	if err != nil {
-		return r, err
-	}
-	if err := r.Unmarshal(bytes); err != nil {
-		return r, err
-	}
-	return r, nil
+	return c.value, c.err
 }
-
-func (c *mockHAKeeperClient) GetClusterState(_ context.Context) (logpb.CheckerState, error) {
+func (c *mockHAKeeperClient) GetClusterState(ctx context.Context) (logpb.CheckerState, error) {
 	return logpb.CheckerState{
 		TaskTableUser: logpb.TaskTableUser{
 			Username: "u1",
@@ -90,31 +80,7 @@ func (c *mockHAKeeperClient) GetClusterState(_ context.Context) (logpb.CheckerSt
 	}, nil
 }
 
-func (c *mockHAKeeperClient) GetCNState(_ context.Context) (logpb.CNState, error) {
-	return logpb.CNState{}, nil
-}
-
-func (c *mockHAKeeperClient) UpdateCNLabel(_ context.Context, _ logpb.CNStoreLabel) error {
-	return nil
-}
-
-func (c *mockHAKeeperClient) UpdateCNWorkState(_ context.Context, _ logpb.CNWorkState) error {
-	return nil
-}
-
-func (c *mockHAKeeperClient) PatchCNStore(_ context.Context, _ logpb.CNStateLabel) error {
-	return nil
-}
-
-func (c *mockHAKeeperClient) DeleteCNStore(_ context.Context, _ logpb.DeleteCNStore) error {
-	return nil
-}
-
-func (c *mockHAKeeperClient) SendProxyHeartbeat(_ context.Context, _ logpb.ProxyHeartbeat) (logpb.CommandBatch, error) {
-	return logpb.CommandBatch{}, nil
-}
-
-func (c *mockHAKeeperClient) updateCNWorkState(_ context.Context, state logpb.CNWorkState) error {
+func (c *mockHAKeeperClient) updateCNWorkState(ctx context.Context, state logpb.CNWorkState) error {
 	c.Lock()
 	defer c.Unlock()
 	for i := range c.value.CNStores {
@@ -271,7 +237,8 @@ func TestLabelSelector(t *testing.T) {
 	runtime.SetupProcessLevelRuntime(runtime.DefaultRuntime())
 	mc := clusterservice.NewMOCluster(hc, 3*time.Second)
 	defer func() { mc.Close() }()
-	mc.ForceRefresh(true)
+	mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 
 	var servers []CNServer
 	mc.GetCNService(se, func(s metadata.CNService) bool {

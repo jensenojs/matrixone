@@ -847,7 +847,8 @@ func TestSelectForSuperTenant_C0(t *testing.T) {
 
 		cnLabels2 := map[string]metadata.LabelList{}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 
@@ -879,7 +880,8 @@ func TestSelectForSuperTenant_C1(t *testing.T) {
 			},
 		}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 
@@ -910,7 +912,8 @@ func TestSelectForSuperTenant_C2(t *testing.T) {
 			},
 		}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 
@@ -941,7 +944,8 @@ func TestSelectForSuperTenant_C3(t *testing.T) {
 			},
 		}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 
@@ -971,7 +975,8 @@ func TestSelectForSuperTenant_C4(t *testing.T) {
 			},
 		}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 
@@ -996,7 +1001,8 @@ func TestSelectForSuperTenant_C5(t *testing.T) {
 
 		cnLabels2 := map[string]metadata.LabelList{}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 
@@ -1022,7 +1028,8 @@ func TestSelectForSuperTenant_C6(t *testing.T) {
 
 		cnLabels2 := map[string]metadata.LabelList{}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 
@@ -1055,7 +1062,8 @@ func TestSelectForSuperTenant_C7(t *testing.T) {
 			},
 		}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 
@@ -1086,7 +1094,8 @@ func TestSelectForSuperTenant_C8(t *testing.T) {
 			},
 		}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 
@@ -1112,7 +1121,8 @@ func TestSelectForCommonTenant_C1(t *testing.T) {
 
 		cnLabels2 := map[string]metadata.LabelList{}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 
@@ -1148,7 +1158,8 @@ func TestSelectForCommonTenant_C2(t *testing.T) {
 			},
 		}
 		hc.updateCN("cn2", cnLabels2)
-		c.ForceRefresh(true)
+		c.ForceRefresh()
+		time.Sleep(time.Millisecond * 100)
 
 		var cns []*metadata.CNService
 

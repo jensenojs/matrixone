@@ -26,7 +26,7 @@ import (
 )
 
 func handleAddFaultPoint() handleFunc {
-	return GetTNHandlerFunc(
+	return getTNHandlerFunc(
 		pb.CmdMethod_AddFaultPoint,
 		func(_ string) ([]uint64, error) {
 			return nil, nil

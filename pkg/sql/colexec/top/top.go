@@ -20,16 +20,16 @@ import (
 	"fmt"
 
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 
 	"github.com/matrixorigin/matrixone/pkg/compare"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
-	ap := arg
+func String(arg any, buf *bytes.Buffer) {
+	ap := arg.(*Argument)
 	buf.WriteString("top([")
 	for i, f := range ap.Fs {
 		if i > 0 {
@@ -40,8 +40,8 @@ func (arg *Argument) String(buf *bytes.Buffer) {
 	buf.WriteString(fmt.Sprintf("], %v)", ap.Limit))
 }
 
-func (arg *Argument) Prepare(proc *process.Process) (err error) {
-	ap := arg
+func Prepare(proc *process.Process, arg any) (err error) {
+	ap := arg.(*Argument)
 	ap.ctr = new(container)
 	if ap.Limit > 1024 {
 		ap.ctr.sels = make([]int64, 0, 1024)
@@ -61,57 +61,49 @@ func (arg *Argument) Prepare(proc *process.Process) (err error) {
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	ap := arg
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	ap := arg.(*Argument)
 	ctr := ap.ctr
-	anal := proc.GetAnalyze(arg.info.Idx)
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
-
-	if ap.Limit == 0 {
-		result := vm.NewCallResult()
-		result.Status = vm.ExecStop
-		return result, nil
-	}
-
-	if ctr.state == vm.Build {
-		for {
-			result, err := arg.children[0].Call(proc)
-			if err != nil {
-				return result, err
-			}
-			bat := result.Batch
+	for {
+		switch ctr.state {
+		case Build:
+			bat := proc.InputBatch()
 			if bat == nil {
-				ctr.state = vm.Eval
-				break
-			}
-			if bat.IsEmpty() {
+				ctr.state = Eval
 				continue
 			}
-			err = ctr.build(ap, bat, proc, anal)
-			if err != nil {
-				return result, err
+			if bat.IsEmpty() {
+				proc.PutBatch(bat)
+				proc.SetInputBatch(batch.EmptyBatch)
+				return process.ExecNext, nil
 			}
+			if ap.Limit == 0 {
+				proc.PutBatch(bat)
+				proc.SetInputBatch(nil)
+				return process.ExecStop, nil
+			}
+			err := ctr.build(ap, bat, proc, anal)
+			if err != nil {
+				ap.Free(proc, true)
+			}
+			return process.ExecNext, err
+
+		case Eval:
+			if ctr.bat == nil {
+				proc.SetInputBatch(nil)
+				return process.ExecStop, nil
+			}
+			err := ctr.eval(ap.Limit, proc)
+			ap.Free(proc, err != nil)
+			if err == nil {
+				return process.ExecStop, nil
+			}
+			return process.ExecNext, err
 		}
 	}
-
-	result := vm.NewCallResult()
-	if ctr.state == vm.Eval {
-		ctr.state = vm.End
-		if ctr.bat != nil {
-			err := ctr.eval(ap.Limit, proc, &result)
-			if err != nil {
-				return result, err
-			}
-		}
-		return result, nil
-	}
-
-	if ctr.state == vm.End {
-		return result, nil
-	}
-
-	panic("bug")
 }
 
 func (ctr *container) build(ap *Argument, bat *batch.Batch, proc *process.Process, analyze process.Analyze) error {
@@ -147,7 +139,7 @@ func (ctr *container) build(ap *Argument, bat *batch.Batch, proc *process.Proces
 		}
 		ctr.bat = batch.NewWithSize(len(bat.Vecs))
 		for i, vec := range bat.Vecs {
-			ctr.bat.Vecs[i] = proc.GetVector(*vec.GetType())
+			ctr.bat.Vecs[i] = vector.NewVec(*vec.GetType())
 		}
 		ctr.cmps = make([]compare.Compare, len(bat.Vecs))
 		for i := range ctr.cmps {
@@ -166,6 +158,8 @@ func (ctr *container) build(ap *Argument, bat *batch.Batch, proc *process.Proces
 		}
 	}
 	err := ctr.processBatch(ap.Limit, bat, proc)
+	proc.PutBatch(bat)
+	proc.SetInputBatch(batch.EmptyBatch)
 	return err
 }
 
@@ -214,7 +208,7 @@ func (ctr *container) processBatch(limit int64, bat *batch.Batch, proc *process.
 	return nil
 }
 
-func (ctr *container) eval(limit int64, proc *process.Process, result *vm.CallResult) error {
+func (ctr *container) eval(limit int64, proc *process.Process) error {
 	if int64(len(ctr.sels)) < limit {
 		ctr.sort()
 	}
@@ -232,7 +226,8 @@ func (ctr *container) eval(limit int64, proc *process.Process, result *vm.CallRe
 		ctr.bat.Vecs[i].Free(proc.Mp())
 	}
 	ctr.bat.Vecs = ctr.bat.Vecs[:ctr.n]
-	result.Batch = ctr.bat
+	proc.SetInputBatch(ctr.bat)
+	ctr.bat = nil
 	return nil
 }
 

@@ -22,23 +22,22 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(_ any, buf *bytes.Buffer) {
 	buf.WriteString(" single join ")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) (err error) {
-	ap := arg
+func Prepare(proc *process.Process, arg any) (err error) {
+	ap := arg.(*Argument)
 	ap.ctr = new(container)
 	ap.ctr.InitReceiver(proc, false)
 	ap.ctr.inBuckets = make([]uint8, hashmap.UnitLimit)
 	ap.ctr.vecs = make([]*vector.Vector, len(ap.Conditions[0]))
 	ap.ctr.bat = batch.NewWithSize(len(ap.Typs))
 	for i, typ := range ap.Typs {
-		ap.ctr.bat.Vecs[i] = proc.GetVector(typ)
+		ap.ctr.bat.Vecs[i] = vector.NewVec(typ)
 	}
 
 	ap.ctr.evecs = make([]evalVector, len(ap.Conditions[0]))
@@ -55,25 +54,24 @@ func (arg *Argument) Prepare(proc *process.Process) (err error) {
 	return err
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	anal := proc.GetAnalyze(arg.info.Idx)
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
-	ap := arg
+	ap := arg.(*Argument)
 	ctr := ap.ctr
-	result := vm.NewCallResult()
 	for {
 		switch ctr.state {
 		case Build:
 			if err := ctr.build(ap, proc, anal); err != nil {
-				return result, err
+				return process.ExecNext, err
 			}
 			ctr.state = Probe
 
 		case Probe:
 			bat, _, err := ctr.ReceiveFromSingleReg(0, anal)
 			if err != nil {
-				return result, err
+				return process.ExecNext, err
 			}
 
 			if bat == nil {
@@ -81,33 +79,30 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 				continue
 			}
 			if bat.Last() {
-				result.Batch = bat
-				return result, nil
+				proc.SetInputBatch(bat)
+				return process.ExecNext, nil
 			}
 			if bat.IsEmpty() {
 				proc.PutBatch(bat)
 				continue
 			}
 			if ctr.bat.RowCount() == 0 {
-				if err := ctr.emptyProbe(bat, ap, proc, anal, arg.info.IsFirst, arg.info.IsLast, &result); err != nil {
+				if err := ctr.emptyProbe(bat, ap, proc, anal, isFirst, isLast); err != nil {
 					bat.Clean(proc.Mp())
-					result.Status = vm.ExecStop
-					return result, err
+					return process.ExecStop, err
 				}
 			} else {
-				if err := ctr.probe(bat, ap, proc, anal, arg.info.IsFirst, arg.info.IsLast, &result); err != nil {
+				if err := ctr.probe(bat, ap, proc, anal, isFirst, isLast); err != nil {
 					bat.Clean(proc.Mp())
-					result.Status = vm.ExecStop
-					return result, err
+					return process.ExecStop, err
 				}
 			}
 			proc.PutBatch(bat)
-			return result, nil
+			return process.ExecNext, nil
 
 		default:
-			result.Batch = nil
-			result.Status = vm.ExecStop
-			return result, nil
+			proc.SetInputBatch(nil)
+			return process.ExecStop, nil
 		}
 	}
 }
@@ -119,10 +114,6 @@ func (ctr *container) build(ap *Argument, proc *process.Process, anal process.An
 	}
 
 	if bat != nil {
-		if ctr.bat != nil {
-			proc.PutBatch(ctr.bat)
-			ctr.bat = nil
-		}
 		ctr.bat = bat
 		ctr.mp = bat.DupJmAuxData()
 		anal.Alloc(ctr.mp.Size())
@@ -130,41 +121,34 @@ func (ctr *container) build(ap *Argument, proc *process.Process, anal process.An
 	return nil
 }
 
-func (ctr *container) emptyProbe(bat *batch.Batch, ap *Argument, proc *process.Process, anal process.Analyze, isFirst bool, isLast bool, result *vm.CallResult) error {
+func (ctr *container) emptyProbe(bat *batch.Batch, ap *Argument, proc *process.Process, anal process.Analyze, isFirst bool, isLast bool) error {
 	anal.Input(bat, isFirst)
-	if ctr.rbat != nil {
-		proc.PutBatch(ctr.rbat)
-		ctr.rbat = nil
-	}
-	ctr.rbat = batch.NewWithSize(len(ap.Result))
+	rbat := batch.NewWithSize(len(ap.Result))
 	for i, rp := range ap.Result {
 		if rp.Rel == 0 {
-			ctr.rbat.Vecs[i] = bat.Vecs[rp.Pos]
+			rbat.Vecs[i] = bat.Vecs[rp.Pos]
 			bat.Vecs[rp.Pos] = nil
 		} else {
-			ctr.rbat.Vecs[i] = vector.NewConstNull(*ctr.bat.Vecs[rp.Pos].GetType(), bat.RowCount(), proc.Mp())
+			rbat.Vecs[i] = vector.NewConstNull(*ctr.bat.Vecs[rp.Pos].GetType(), bat.RowCount(), proc.Mp())
 		}
 	}
-	ctr.rbat.AddRowCount(bat.RowCount())
-	anal.Output(ctr.rbat, isLast)
-	result.Batch = ctr.rbat
+	rbat.AddRowCount(bat.RowCount())
+	anal.Output(rbat, isLast)
+	proc.SetInputBatch(rbat)
 	return nil
 }
 
-func (ctr *container) probe(bat *batch.Batch, ap *Argument, proc *process.Process, anal process.Analyze, isFirst bool, isLast bool, result *vm.CallResult) error {
+func (ctr *container) probe(bat *batch.Batch, ap *Argument, proc *process.Process, anal process.Analyze, isFirst bool, isLast bool) error {
 	anal.Input(bat, isFirst)
-	if ctr.rbat != nil {
-		proc.PutBatch(ctr.rbat)
-		ctr.rbat = nil
-	}
-	ctr.rbat = batch.NewWithSize(len(ap.Result))
+	rbat := batch.NewWithSize(len(ap.Result))
 	for i, rp := range ap.Result {
 		if rp.Rel != 0 {
-			ctr.rbat.Vecs[i] = proc.GetVector(*ctr.bat.Vecs[rp.Pos].GetType())
+			rbat.Vecs[i] = vector.NewVec(*ctr.bat.Vecs[rp.Pos].GetType())
 		}
 	}
 
 	if err := ctr.evalJoinCondition(bat, proc); err != nil {
+		rbat.Clean(proc.Mp())
 		return err
 	}
 
@@ -192,26 +176,30 @@ func (ctr *container) probe(bat *batch.Batch, ap *Argument, proc *process.Proces
 			if zvals[k] == 0 || vals[k] == 0 {
 				for j, rp := range ap.Result {
 					if rp.Rel != 0 {
-						if err := ctr.rbat.Vecs[j].UnionNull(proc.Mp()); err != nil {
+						if err := rbat.Vecs[j].UnionNull(proc.Mp()); err != nil {
+							rbat.Clean(proc.Mp())
 							return err
 						}
 					}
 				}
 				continue
 			}
-			if ap.HashOnPK {
-				matched := false
-				if ap.Cond != nil {
+			idx := 0
+			matched := false
+			sels := mSels[vals[k]-1]
+			if ap.Cond != nil {
+				for j, sel := range sels {
 					if err := colexec.SetJoinBatchValues(ctr.joinBat1, bat, int64(i+k),
 						1, ctr.cfs1); err != nil {
 						return err
 					}
-					if err := colexec.SetJoinBatchValues(ctr.joinBat2, ctr.bat, int64(vals[k]-1),
+					if err := colexec.SetJoinBatchValues(ctr.joinBat2, ctr.bat, int64(sel),
 						1, ctr.cfs2); err != nil {
 						return err
 					}
 					vec, err := ctr.expr.Eval(proc, []*batch.Batch{ctr.joinBat1, ctr.joinBat2})
 					if err != nil {
+						rbat.Clean(proc.Mp())
 						return err
 					}
 					if vec.IsConstNull() || vec.GetNulls().Contains(0) {
@@ -222,81 +210,35 @@ func (ctr *container) probe(bat *batch.Batch, ap *Argument, proc *process.Proces
 					if bs[0] {
 						if matched {
 							vec.Free(proc.Mp())
+							rbat.Clean(proc.Mp())
 							return moerr.NewInternalError(proc.Ctx, "scalar subquery returns more than 1 row")
 						}
 						matched = true
+						idx = j
 					}
 					vec.Free(proc.Mp())
 				}
-				if ap.Cond != nil && !matched {
-					for j, rp := range ap.Result {
-						if rp.Rel != 0 {
-							if err := ctr.rbat.Vecs[j].UnionNull(proc.Mp()); err != nil {
-								return err
-							}
-						}
-					}
-					continue
-				}
+			} else if len(sels) > 1 {
+				rbat.Clean(proc.Mp())
+				return moerr.NewInternalError(proc.Ctx, "scalar subquery returns more than 1 row")
+			}
+			if ap.Cond != nil && !matched {
 				for j, rp := range ap.Result {
 					if rp.Rel != 0 {
-						if err := ctr.rbat.Vecs[j].UnionOne(ctr.bat.Vecs[rp.Pos], int64(vals[k]-1), proc.Mp()); err != nil {
+						if err := rbat.Vecs[j].UnionNull(proc.Mp()); err != nil {
+							rbat.Clean(proc.Mp())
 							return err
 						}
 					}
 				}
-			} else {
-				idx := 0
-				matched := false
-				sels := mSels[vals[k]-1]
-				if ap.Cond != nil {
-					for j, sel := range sels {
-						if err := colexec.SetJoinBatchValues(ctr.joinBat1, bat, int64(i+k),
-							1, ctr.cfs1); err != nil {
-							return err
-						}
-						if err := colexec.SetJoinBatchValues(ctr.joinBat2, ctr.bat, int64(sel),
-							1, ctr.cfs2); err != nil {
-							return err
-						}
-						vec, err := ctr.expr.Eval(proc, []*batch.Batch{ctr.joinBat1, ctr.joinBat2})
-						if err != nil {
-							return err
-						}
-						if vec.IsConstNull() || vec.GetNulls().Contains(0) {
-							vec.Free(proc.Mp())
-							continue
-						}
-						bs := vector.MustFixedCol[bool](vec)
-						if bs[0] {
-							if matched {
-								vec.Free(proc.Mp())
-								return moerr.NewInternalError(proc.Ctx, "scalar subquery returns more than 1 row")
-							}
-							matched = true
-							idx = j
-						}
-						vec.Free(proc.Mp())
-					}
-				} else if len(sels) > 1 {
-					return moerr.NewInternalError(proc.Ctx, "scalar subquery returns more than 1 row")
-				}
-				if ap.Cond != nil && !matched {
-					for j, rp := range ap.Result {
-						if rp.Rel != 0 {
-							if err := ctr.rbat.Vecs[j].UnionNull(proc.Mp()); err != nil {
-								return err
-							}
-						}
-					}
-					continue
-				}
-				sel := sels[idx]
-				for j, rp := range ap.Result {
-					if rp.Rel != 0 {
-						if err := ctr.rbat.Vecs[j].UnionOne(ctr.bat.Vecs[rp.Pos], int64(sel), proc.Mp()); err != nil {
-							return err
-						}
+				continue
+			}
+			sel := sels[idx]
+			for j, rp := range ap.Result {
+				if rp.Rel != 0 {
+					if err := rbat.Vecs[j].UnionOne(ctr.bat.Vecs[rp.Pos], int64(sel), proc.Mp()); err != nil {
+						rbat.Clean(proc.Mp())
+						return err
 					}
 				}
 			}
@@ -307,15 +249,15 @@ func (ctr *container) probe(bat *batch.Batch, ap *Argument, proc *process.Proces
 			// rbat.Vecs[i] = bat.Vecs[rp.Pos]
 			// bat.Vecs[rp.Pos] = nil
 			typ := *bat.Vecs[rp.Pos].GetType()
-			ctr.rbat.Vecs[i] = proc.GetVector(typ)
-			if err := vector.GetUnionAllFunction(typ, proc.Mp())(ctr.rbat.Vecs[i], bat.Vecs[rp.Pos]); err != nil {
+			rbat.Vecs[i] = vector.NewVec(typ)
+			if err := vector.GetUnionAllFunction(typ, proc.Mp())(rbat.Vecs[i], bat.Vecs[rp.Pos]); err != nil {
 				return err
 			}
 		}
 	}
-	ctr.rbat.SetRowCount(ctr.rbat.RowCount() + bat.RowCount())
-	anal.Output(ctr.rbat, isLast)
-	result.Batch = ctr.rbat
+	rbat.SetRowCount(rbat.RowCount() + bat.RowCount())
+	anal.Output(rbat, isLast)
+	proc.SetInputBatch(rbat)
 	return nil
 }
 

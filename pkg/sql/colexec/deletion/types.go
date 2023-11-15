@@ -24,13 +24,10 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
-
-var _ vm.Operator = new(Argument)
 
 const (
 	flushThreshold = 32 * mpool.MB
@@ -66,8 +63,6 @@ type container struct {
 	deleted_length uint32
 	pool           *BatchPool
 	debug_len      uint32
-
-	state vm.CtrState
 }
 type Argument struct {
 	Ts           uint64
@@ -81,19 +76,6 @@ type Argument struct {
 	IBucket      uint32
 	Nbucket      uint32
 	ctr          *container
-
-	info     *vm.OperatorInfo
-	children []vm.Operator
-
-	resBat *batch.Batch
-}
-
-func (arg *Argument) SetInfo(info *vm.OperatorInfo) {
-	arg.info = info
-}
-
-func (arg *Argument) AppendChild(child vm.Operator) {
-	arg.children = append(arg.children, child)
 }
 
 type DeleteCtx struct {
@@ -110,7 +92,7 @@ type DeleteCtx struct {
 }
 
 // delete from t1 using t1 join t2 on t1.a = t2.a;
-func (arg *Argument) Free(proc *process.Process, pipelineFailed bool, err error) {
+func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {
 	if arg.RemoteDelete {
 		for _, blockId_rowIdBatch := range arg.ctr.partitionId_blockId_rowIdBatch {
 			for _, bat := range blockId_rowIdBatch {
@@ -129,10 +111,6 @@ func (arg *Argument) Free(proc *process.Process, pipelineFailed bool, err error)
 		arg.ctr.partitionId_blockId_deltaLoc = nil
 		arg.ctr.blockId_type = nil
 		arg.ctr.pool = nil
-	}
-	if arg.resBat != nil {
-		arg.resBat.Clean(proc.Mp())
-		arg.resBat = nil
 	}
 }
 
@@ -203,7 +181,7 @@ func (ctr *container) flush(proc *process.Process) (uint32, error) {
 			blockId_deltaLoc := ctr.partitionId_blockId_deltaLoc[pidx]
 			if _, ok := blockId_deltaLoc[blkids[i]]; !ok {
 				bat := batch.New(false, []string{catalog.BlockMeta_DeltaLoc})
-				bat.SetVector(0, proc.GetVector(types.T_text.ToType()))
+				bat.SetVector(0, vector.NewVec(types.T_text.ToType()))
 				blockId_deltaLoc[blkids[i]] = bat
 			}
 			bat := blockId_deltaLoc[blkids[i]]
@@ -242,16 +220,16 @@ func collectBatchInfo(proc *process.Process, arg *Argument, destBatch *batch.Bat
 
 		arg.ctr.blockId_type[str] = RawRowIdBatch
 		/* XXX why not only send the batch
-		   // FIXME: string(segid[:]) means heap allocation, just take the id type itself
-		   if arg.SegmentMap[string(segid[:])] == colexec.TxnWorkSpaceIdType {
-		   	arg.ctr.blockId_type[str] = RawBatchOffset
-		   	offsetFlag = true
-		   } else if arg.SegmentMap[string(segid[:])] == colexec.CnBlockIdType {
-		   	arg.ctr.blockId_type[str] = CNBlockOffset
-		   	offsetFlag = true
-		   } else {
-		   	arg.ctr.blockId_type[str] = RawRowIdBatch
-		   }
+		// FIXME: string(segid[:]) means heap allocation, just take the id type itself
+		if arg.SegmentMap[string(segid[:])] == colexec.TxnWorkSpaceIdType {
+			arg.ctr.blockId_type[str] = RawBatchOffset
+			offsetFlag = true
+		} else if arg.SegmentMap[string(segid[:])] == colexec.CnBlockIdType {
+			arg.ctr.blockId_type[str] = CNBlockOffset
+			offsetFlag = true
+		} else {
+			arg.ctr.blockId_type[str] = RawRowIdBatch
+		}
 		*/
 
 		if _, ok := arg.ctr.partitionId_blockId_rowIdBatch[pIdx]; !ok {
@@ -261,13 +239,13 @@ func collectBatchInfo(proc *process.Process, arg *Argument, destBatch *batch.Bat
 				tmpBat = arg.ctr.pool.get()
 				if tmpBat == nil {
 					tmpBat = batch.New(false, []string{catalog.Row_ID, "pk"})
-					tmpBat.SetVector(0, proc.GetVector(types.T_Rowid.ToType()))
-					tmpBat.SetVector(1, proc.GetVector(*destBatch.GetVector(int32(pkIdx)).GetType()))
+					tmpBat.SetVector(0, vector.NewVec(types.T_Rowid.ToType()))
+					tmpBat.SetVector(1, vector.NewVec(*destBatch.GetVector(int32(pkIdx)).GetType()))
 				}
 				blockIdRowIdBatchMap[str] = tmpBat
 			} else {
 				tmpBat := batch.New(false, []string{catalog.BlockMetaOffset})
-				tmpBat.SetVector(0, proc.GetVector(types.T_int64.ToType()))
+				tmpBat.SetVector(0, vector.NewVec(types.T_int64.ToType()))
 				blockIdRowIdBatchMap[str] = tmpBat
 			}
 			arg.ctr.partitionId_blockId_rowIdBatch[pIdx] = blockIdRowIdBatchMap
@@ -279,13 +257,13 @@ func collectBatchInfo(proc *process.Process, arg *Argument, destBatch *batch.Bat
 					bat = arg.ctr.pool.get()
 					if bat == nil {
 						bat = batch.New(false, []string{catalog.Row_ID, "pk"})
-						bat.SetVector(0, proc.GetVector(types.T_Rowid.ToType()))
-						bat.SetVector(1, proc.GetVector(*destBatch.GetVector(int32(pkIdx)).GetType()))
+						bat.SetVector(0, vector.NewVec(types.T_Rowid.ToType()))
+						bat.SetVector(1, vector.NewVec(*destBatch.GetVector(int32(pkIdx)).GetType()))
 					}
 					blockIdRowIdBatchMap[str] = bat
 				} else {
 					bat := batch.New(false, []string{catalog.BlockMetaOffset})
-					bat.SetVector(0, proc.GetVector(types.T_int64.ToType()))
+					bat.SetVector(0, vector.NewVec(types.T_int64.ToType()))
 					blockIdRowIdBatchMap[str] = bat
 				}
 			}
@@ -304,12 +282,8 @@ func collectBatchInfo(proc *process.Process, arg *Argument, destBatch *batch.Bat
 		if offsetFlag {
 			continue
 		}
+		arg.ctr.batch_size += 24
 	}
-	var batchSize int
-	for _, bat := range arg.ctr.partitionId_blockId_rowIdBatch[pIdx] {
-		batchSize += bat.Size()
-	}
-	arg.ctr.batch_size = uint32(batchSize)
 }
 
 func getNonNullValue(col *vector.Vector, row uint32) any {

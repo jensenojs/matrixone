@@ -16,38 +16,33 @@ package output
 
 import (
 	"bytes"
-
-	"github.com/matrixorigin/matrixone/pkg/vm"
+	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(arg any, buf *bytes.Buffer) {
 	buf.WriteString("sql output")
 }
 
-func (arg *Argument) Prepare(_ *process.Process) error {
+func Prepare(_ *process.Process, _ any) error {
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	ap := arg
-	result, err := arg.children[0].Call(proc)
-	if err != nil {
-		return result, err
+func Call(_ int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	ap := arg.(*Argument)
+	bat := proc.InputBatch()
+	if bat == nil {
+		return process.ExecStop, nil
 	}
-	if result.Batch == nil {
-		result.Status = vm.ExecStop
-		return result, nil
+	if bat.IsEmpty() {
+		proc.PutBatch(bat)
+		proc.SetInputBatch(batch.EmptyBatch)
+		return process.ExecNext, nil
 	}
-
-	if result.Batch.IsEmpty() {
-		return result, nil
-	}
-	bat := result.Batch
-
 	if err := ap.Func(ap.Data, bat); err != nil {
-		result.Status = vm.ExecStop
-		return result, err
+		bat.Clean(proc.Mp())
+		return process.ExecStop, err
 	}
-	return result, nil
+	proc.PutBatch(bat)
+	return process.ExecNext, nil
 }

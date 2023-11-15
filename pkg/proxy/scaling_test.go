@@ -70,7 +70,8 @@ func TestDoScalingIn(t *testing.T) {
 	defer func() {
 		require.NoError(t, stopFn12())
 	}()
-	tp.mc.ForceRefresh(true)
+	tp.mc.ForceRefresh()
+	time.Sleep(time.Millisecond * 200)
 
 	ctx, cancel := context.WithTimeout(tp.ctx, 10*time.Second)
 	defer cancel()

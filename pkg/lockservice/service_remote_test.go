@@ -297,6 +297,7 @@ func TestLockWithBindIsStale(t *testing.T) {
 			alloc *lockTableAllocator,
 			l1, l2 *service,
 			table uint64) {
+
 			txnID2 := []byte("txn2")
 			_, err := l2.Lock(ctx, table, [][]byte{{3}}, txnID2, pb.LockOptions{
 				Granularity: pb.Granularity_Row,
@@ -309,7 +310,7 @@ func TestLockWithBindIsStale(t *testing.T) {
 
 			checkBind(
 				t,
-				pb.LockTable{ServiceID: l1.serviceID, Version: 2, Table: table, Valid: true},
+				pb.LockTable{ServiceID: "s1", Version: 2, Table: table, Valid: true},
 				l2)
 		},
 	)
@@ -330,7 +331,7 @@ func TestUnlockWithBindIsStable(t *testing.T) {
 
 			checkBind(
 				t,
-				pb.LockTable{ServiceID: l1.serviceID, Version: 2, Table: table, Valid: true},
+				pb.LockTable{ServiceID: "s1", Version: 2, Table: table, Valid: true},
 				l2)
 		},
 	)
@@ -353,7 +354,7 @@ func TestGetLockWithBindIsStable(t *testing.T) {
 
 			checkBind(
 				t,
-				pb.LockTable{ServiceID: l1.serviceID, Version: 2, Table: table, Valid: true},
+				pb.LockTable{ServiceID: "s1", Version: 2, Table: table, Valid: true},
 				l2)
 		},
 	)
@@ -371,7 +372,7 @@ func TestLockWithBindTimeout(t *testing.T) {
 			// stop l1 let old bind invalid
 			require.NoError(t, l1.Close())
 
-			waitBindDisabled(t, alloc, l1.serviceID)
+			waitBindDisabled(t, alloc, "s1")
 
 			txnID2 := []byte("txn2")
 			// l2 hold the old bind, and can not connect to s1, and wait bind changed
@@ -386,7 +387,7 @@ func TestLockWithBindTimeout(t *testing.T) {
 					v, ok := l2.tables.Load(table)
 					assert.True(t, ok)
 					l := v.(lockTable)
-					assert.Equal(t, l2.serviceID, l.getBind().ServiceID)
+					assert.Equal(t, "s2", l.getBind().ServiceID)
 					return
 				}
 				time.Sleep(time.Millisecond * 100)
@@ -407,7 +408,7 @@ func TestUnlockWithBindTimeout(t *testing.T) {
 			// stop l1 let old bind invalid
 			require.NoError(t, l1.Close())
 
-			waitBindDisabled(t, alloc, l1.serviceID)
+			waitBindDisabled(t, alloc, "s1")
 
 			txnID2 := []byte("txn2")
 			assert.NoError(t, l2.Unlock(ctx, txnID2, timestamp.Timestamp{}))
@@ -415,7 +416,7 @@ func TestUnlockWithBindTimeout(t *testing.T) {
 			v, ok := l2.tables.Load(table)
 			assert.True(t, ok)
 			l := v.(lockTable)
-			assert.Equal(t, l2.serviceID, l.getBind().ServiceID)
+			assert.Equal(t, "s2", l.getBind().ServiceID)
 		},
 	)
 }
@@ -432,7 +433,7 @@ func TestGetLockWithBindTimeout(t *testing.T) {
 			// stop l1 let old bind invalid
 			require.NoError(t, l1.Close())
 
-			waitBindDisabled(t, alloc, l1.serviceID)
+			waitBindDisabled(t, alloc, "s1")
 
 			txnID2 := []byte("txn2")
 			lt, err := l2.getLockTable(table)
@@ -442,7 +443,7 @@ func TestGetLockWithBindTimeout(t *testing.T) {
 			v, ok := l2.tables.Load(table)
 			assert.True(t, ok)
 			l := v.(lockTable)
-			assert.Equal(t, l2.serviceID, l.getBind().ServiceID)
+			assert.Equal(t, "s2", l.getBind().ServiceID)
 		},
 	)
 }
@@ -470,7 +471,7 @@ func TestLockWithBindNotFound(t *testing.T) {
 
 			checkBind(
 				t,
-				pb.LockTable{ServiceID: l1.serviceID, Version: 1, Table: table, Valid: true},
+				pb.LockTable{ServiceID: "s1", Version: 1, Table: table, Valid: true},
 				l2)
 		},
 	)
@@ -494,7 +495,7 @@ func TestUnlockWithBindNotFound(t *testing.T) {
 
 			checkBind(
 				t,
-				pb.LockTable{ServiceID: l1.serviceID, Version: 1, Table: table, Valid: true},
+				pb.LockTable{ServiceID: "s1", Version: 1, Table: table, Valid: true},
 				l2)
 		},
 	)
@@ -520,7 +521,7 @@ func TestGetLockWithBindNotFound(t *testing.T) {
 
 			checkBind(
 				t,
-				pb.LockTable{ServiceID: l1.serviceID, Version: 1, Table: table, Valid: true},
+				pb.LockTable{ServiceID: "s1", Version: 1, Table: table, Valid: true},
 				l2)
 		},
 	)
@@ -555,7 +556,7 @@ func runBindChangedTests(
 			mustAddTestLock(t, ctx, l2, table1, txnID2, [][]byte{{2}}, pb.Granularity_Row)
 			v, err := l2.getLockTable(table1)
 			require.NoError(t, err)
-			require.Equal(t, l1.serviceID, v.getBind().ServiceID)
+			require.Equal(t, "s1", v.getBind().ServiceID)
 
 			if makeBindChanged {
 				// stop l1 keep lock bind
@@ -563,7 +564,7 @@ func runBindChangedTests(
 				lt, err := l1.getLockTable(table1)
 				require.NoError(t, err)
 				old := lt.getBind()
-				waitBindDisabled(t, alloc, l1.serviceID)
+				waitBindDisabled(t, alloc, "s1")
 				skip.Store(false)
 
 				// make l1 get bind again, but version is changed
@@ -579,7 +580,7 @@ func runBindChangedTests(
 			c.RPC.BackendOptions = append(c.RPC.BackendOptions,
 				morpc.WithBackendFilter(func(m morpc.Message, s string) bool {
 					if req, ok := m.(*pb.Request); ok && req.Method == pb.Method_KeepLockTableBind &&
-						getUUIDFromServiceIdentifier(req.KeepLockTableBind.ServiceID) == "s1" {
+						req.KeepLockTableBind.ServiceID == "s1" {
 						return !skip.Load()
 					}
 					return true
@@ -609,7 +610,7 @@ func waitBindChanged(
 	old pb.LockTable,
 	l *service) {
 	for {
-		lt, err := l.getLockTableWithCreate(old.Table, true)
+		lt, err := l.getLockTable(old.Table)
 		require.NoError(t, err)
 		new := lt.getBind()
 		if new.Changed(old) {

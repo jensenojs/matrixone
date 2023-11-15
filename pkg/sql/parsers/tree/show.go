@@ -512,21 +512,13 @@ func NewShowStatus(g bool, l *ComparisonExpr, w *Where) *ShowStatus {
 // show index statement
 type ShowIndex struct {
 	showImpl
-	TableName *UnresolvedObjectName
-	DbName    string
+	TableName TableName
 	Where     *Where
 }
 
 func (node *ShowIndex) Format(ctx *FmtCtx) {
-	ctx.WriteString("show index")
-	if node.TableName != nil {
-		ctx.WriteString(" from ")
-		node.TableName.Format(ctx)
-	}
-	if node.DbName != "" {
-		ctx.WriteString(" from ")
-		ctx.WriteString(node.DbName)
-	}
+	ctx.WriteString("show index from ")
+	node.TableName.Format(ctx)
 	if node.Where != nil {
 		ctx.WriteByte(' ')
 		node.Where.Format(ctx)
@@ -535,7 +527,7 @@ func (node *ShowIndex) Format(ctx *FmtCtx) {
 func (node *ShowIndex) GetStatementType() string { return "Show Index" }
 func (node *ShowIndex) GetQueryType() string     { return QueryTypeOth }
 
-func NewShowIndex(t *UnresolvedObjectName, w *Where) *ShowIndex {
+func NewShowIndex(t TableName, w *Where) *ShowIndex {
 	return &ShowIndex{
 		TableName: t,
 		Where:     w,

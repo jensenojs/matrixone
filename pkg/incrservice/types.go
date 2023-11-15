@@ -19,35 +19,17 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/common/runtime"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/defines"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/txn/client"
 )
 
 // GetAutoIncrementService get increment service from process level runtime
-func GetAutoIncrementService(ctx context.Context) AutoIncrementService {
+func GetAutoIncrementService() AutoIncrementService {
 	v, ok := runtime.ProcessLevelRuntime().GetGlobalVariables(runtime.AutoIncrmentService)
 	if !ok {
 		return nil
 	}
-	s := v.(AutoIncrementService)
-	uuid, ok := ctx.Value(defines.NodeIDKey{}).(string)
-	if !ok || uuid == "" {
-		return s
-	}
-	if s.UUID() != uuid {
-		v, ok := runtime.ProcessLevelRuntime().GetGlobalVariables(runtime.AutoIncrmentService + "_" + uuid)
-		if !ok {
-			panic("cannot get the appropriate AutoIncrementService")
-		}
-		s = v.(AutoIncrementService)
-	}
-	return s
-}
-
-// SetAutoIncrementServiceByID set auto increment service instance into process level runtime.
-func SetAutoIncrementServiceByID(id string, v AutoIncrementService) {
-	runtime.ProcessLevelRuntime().SetGlobalVariables(runtime.AutoIncrmentService+"_"+id, v)
+	return v.(AutoIncrementService)
 }
 
 // AutoIncrementService provides data service for the columns of auto-increment.
@@ -56,8 +38,6 @@ func SetAutoIncrementServiceByID(id string, v AutoIncrementService) {
 // column to avoid updating the sequence values of these auto-increment columns each
 // time data is inserted.
 type AutoIncrementService interface {
-	// UUID returns the uuid of this increment service, which comes from CN service.
-	UUID() string
 	// Create a separate transaction is used to create the cache service and insert records
 	// into catalog.AutoIncrTableName before the transaction that created the table is committed.
 	// When the transaction that created the table is rolled back, the corresponding records in

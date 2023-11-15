@@ -18,8 +18,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"syscall"
 )
 
 // errorCode indicates the errors.
@@ -80,19 +78,6 @@ func isEOFErr(err error) bool {
 	}
 	e, ok := err.(*errWithCode)
 	if ok && errors.Is(e.cause, io.EOF) {
-		return true
-	}
-	return false
-}
-
-func isConnEndErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, net.ErrClosed) {
-		return true
-	}
-	if errors.Is(err, syscall.ECONNRESET) {
 		return true
 	}
 	return false

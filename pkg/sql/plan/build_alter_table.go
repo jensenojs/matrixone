@@ -19,9 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
-	"strings"
-
 	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
@@ -29,6 +26,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 	"github.com/matrixorigin/matrixone/pkg/sql/util"
+	"math"
+	"strings"
 )
 
 func buildAlterTableCopy(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, error) {
@@ -174,9 +173,7 @@ func buildAlterTableCopy(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, err
 	}, nil
 }
 
-// restoreDDL Get the DDL statement for the corresponding table based on tableDef,
-// skipConstraint: Skip foreign key and index constraints
-func restoreDDL(ctx CompilerContext, tableDef *TableDef, schemaName string, tblName string, skipConstraint bool) (string, error) {
+func restoreDDL(ctx CompilerContext, tableDef *TableDef, schemaName string, tblName string, skipFkey bool) (string, error) {
 	var createStr string
 	if tableDef.TableType == catalog.SystemOrdinaryRel {
 		createStr = fmt.Sprintf("CREATE TABLE `%s`.`%s` (", formatStr(schemaName), formatStr(tblName))
@@ -275,58 +272,35 @@ func restoreDDL(ctx CompilerContext, tableDef *TableDef, schemaName string, tblN
 		createStr += pkStr
 	}
 
-	if !skipConstraint {
-		if tableDef.Indexes != nil {
-			for _, indexdef := range tableDef.Indexes {
-				var indexStr string
-				if indexdef.Unique {
-					indexStr = "UNIQUE KEY "
-				} else {
-					indexStr = "KEY "
-				}
-				indexStr += fmt.Sprintf("`%s` ", formatStr(indexdef.IndexName))
-				if !catalog.IsNullIndexAlgo(indexdef.IndexAlgo) {
-					indexStr += fmt.Sprintf("USING `%s` ", formatStr(indexdef.IndexAlgo))
-				}
-				indexStr += "("
-				i := 0
-				for _, part := range indexdef.Parts {
-					// NOTE: we skip the alias PK column from the secondary keys list here.
-					// The final SQL string will be similar to the output of "show create table"
-					// (ie buildShowCreateTable) and we should avoid
-					// showing the alias column in the secondary keys list.
-					if catalog.IsAlias(part) {
-						continue
-					}
-					if i > 0 {
-						indexStr += ","
-					}
-					indexStr += fmt.Sprintf("`%s`", formatStr(part))
-					i++
-				}
-				indexStr += ")"
-				if indexdef.Comment != "" {
-					indexdef.Comment = strings.Replace(indexdef.Comment, "'", "\\'", -1)
-					indexStr += fmt.Sprintf(" COMMENT '%s'", formatStr(indexdef.Comment))
-				}
-				if indexdef.IndexAlgoParams != "" {
-					var paramList string
-					var err error
-					paramList, err = indexParamsToStringList(indexdef.IndexAlgoParams)
-					if err != nil {
-						return "", err
-					}
-					indexStr += paramList
-				}
-				if rowCount != 0 {
-					createStr += ",\n"
-				}
-				createStr += indexStr
+	if tableDef.Indexes != nil {
+		for _, indexdef := range tableDef.Indexes {
+			var indexStr string
+			if indexdef.Unique {
+				indexStr = "UNIQUE KEY "
+			} else {
+				indexStr = "KEY "
 			}
+			indexStr += fmt.Sprintf("`%s` (", formatStr(indexdef.IndexName))
+			for num, part := range indexdef.Parts {
+				if num == len(indexdef.Parts)-1 {
+					indexStr += fmt.Sprintf("`%s`", formatStr(part))
+				} else {
+					indexStr += fmt.Sprintf("`%s`,", formatStr(part))
+				}
+			}
+			indexStr += ")"
+			if indexdef.Comment != "" {
+				indexdef.Comment = strings.Replace(indexdef.Comment, "'", "\\'", -1)
+				indexStr += fmt.Sprintf(" COMMENT '%s'", formatStr(indexdef.Comment))
+			}
+			if rowCount != 0 {
+				createStr += ",\n"
+			}
+			createStr += indexStr
 		}
 	}
 
-	if !skipConstraint {
+	if !skipFkey {
 		for _, fk := range tableDef.Fkeys {
 			colNames := make([]string, len(fk.Cols))
 			for i, colId := range fk.Cols {
@@ -550,7 +524,7 @@ func initAlterTableContext(originTableDef *TableDef, copyTableDef *TableDef, sch
 }
 
 func buildCopyTableDef(ctx context.Context, tableDef *TableDef) (*TableDef, error) {
-	replicaTableDef := DeepCopyTableDef(tableDef, true)
+	replicaTableDef := DeepCopyTableDef(tableDef)
 
 	id, err := uuid.NewUUID()
 	if err != nil {

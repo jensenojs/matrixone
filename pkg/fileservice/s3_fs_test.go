@@ -31,11 +31,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/perfcounter"
 	"github.com/matrixorigin/matrixone/pkg/util/toml"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 )
 
 type _TestS3Config struct {
@@ -83,21 +81,7 @@ func loadS3TestConfig() (config _TestS3Config, err error) {
 	return
 }
 
-func TestS3FS(
-	t *testing.T,
-) {
-	t.Run("default policy", func(t *testing.T) {
-		testS3FS(t, 0)
-	})
-	t.Run("skip full file preloads", func(t *testing.T) {
-		testS3FS(t, SkipFullFilePreloads)
-	})
-}
-
-func testS3FS(
-	t *testing.T,
-	policy Policy,
-) {
+func TestS3FS(t *testing.T) {
 	config, err := loadS3TestConfig()
 	assert.Nil(t, err)
 	if config.Endpoint == "" {
@@ -110,16 +94,16 @@ func testS3FS(
 	t.Setenv("AWS_SECRET_ACCESS_KEY", config.APISecret)
 
 	t.Run("file service", func(t *testing.T) {
-		testFileService(t, policy, func(name string) FileService {
+		testFileService(t, func(name string) FileService {
 			ctx := context.Background()
 			fs, err := NewS3FS(
 				ctx,
 				ObjectStorageArguments{
-					Name:          name,
-					Endpoint:      config.Endpoint,
-					Bucket:        config.Bucket,
-					KeyPrefix:     time.Now().Format("2006-01-02.15:04:05.000000"),
-					AssumeRoleARN: config.RoleARN,
+					Name:      name,
+					Endpoint:  config.Endpoint,
+					Bucket:    config.Bucket,
+					KeyPrefix: time.Now().Format("2006-01-02.15:04:05.000000"),
+					RoleARN:   config.RoleARN,
 				},
 				DisabledCacheConfig,
 				nil,
@@ -144,10 +128,10 @@ func testS3FS(
 		fs, err := NewS3FS(
 			ctx,
 			ObjectStorageArguments{
-				Name:          "s3",
-				Endpoint:      config.Endpoint,
-				Bucket:        config.Bucket,
-				AssumeRoleARN: config.RoleARN,
+				Name:     "s3",
+				Endpoint: config.Endpoint,
+				Bucket:   config.Bucket,
+				RoleARN:  config.RoleARN,
 			},
 			DisabledCacheConfig,
 			nil,
@@ -170,11 +154,11 @@ func testS3FS(
 			fs, err := NewS3FS(
 				ctx,
 				ObjectStorageArguments{
-					Name:          "s3",
-					Endpoint:      config.Endpoint,
-					Bucket:        config.Bucket,
-					KeyPrefix:     time.Now().Format("2006-01-02.15:04:05.000000"),
-					AssumeRoleARN: config.RoleARN,
+					Name:      "s3",
+					Endpoint:  config.Endpoint,
+					Bucket:    config.Bucket,
+					KeyPrefix: time.Now().Format("2006-01-02.15:04:05.000000"),
+					RoleARN:   config.RoleARN,
 				},
 				CacheConfig{
 					MemoryCapacity: ptrTo[toml.ByteSize](128 * 1024),
@@ -193,11 +177,11 @@ func testS3FS(
 			fs, err := NewS3FS(
 				ctx,
 				ObjectStorageArguments{
-					Name:          "s3",
-					Endpoint:      config.Endpoint,
-					Bucket:        config.Bucket,
-					KeyPrefix:     time.Now().Format("2006-01-02.15:04:05.000000"),
-					AssumeRoleARN: config.RoleARN,
+					Name:      "s3",
+					Endpoint:  config.Endpoint,
+					Bucket:    config.Bucket,
+					KeyPrefix: time.Now().Format("2006-01-02.15:04:05.000000"),
+					RoleARN:   config.RoleARN,
 				},
 				CacheConfig{
 					MemoryCapacity: ptrTo[toml.ByteSize](1),
@@ -222,7 +206,7 @@ func TestDynamicS3(t *testing.T) {
 		// no config
 		t.Skip()
 	}
-	testFileService(t, 0, func(name string) FileService {
+	testFileService(t, func(name string) FileService {
 		buf := new(strings.Builder)
 		w := csv.NewWriter(buf)
 		err := w.Write([]string{
@@ -258,7 +242,7 @@ func TestDynamicS3NoKey(t *testing.T) {
 	t.Setenv("AWS_REGION", config.Region)
 	t.Setenv("AWS_ACCESS_KEY_ID", config.APIKey)
 	t.Setenv("AWS_SECRET_ACCESS_KEY", config.APISecret)
-	testFileService(t, 0, func(name string) FileService {
+	testFileService(t, func(name string) FileService {
 		buf := new(strings.Builder)
 		w := csv.NewWriter(buf)
 		err := w.Write([]string{
@@ -292,7 +276,7 @@ func TestDynamicS3Opts(t *testing.T) {
 	t.Setenv("AWS_REGION", config.Region)
 	t.Setenv("AWS_ACCESS_KEY_ID", config.APIKey)
 	t.Setenv("AWS_SECRET_ACCESS_KEY", config.APISecret)
-	testFileService(t, 0, func(name string) FileService {
+	testFileService(t, func(name string) FileService {
 		buf := new(strings.Builder)
 		w := csv.NewWriter(buf)
 		err := w.Write([]string{
@@ -326,7 +310,7 @@ func TestDynamicS3OptsRoleARN(t *testing.T) {
 	t.Setenv("AWS_REGION", config.Region)
 	t.Setenv("AWS_ACCESS_KEY_ID", config.APIKey)
 	t.Setenv("AWS_SECRET_ACCESS_KEY", config.APISecret)
-	testFileService(t, 0, func(name string) FileService {
+	testFileService(t, func(name string) FileService {
 		buf := new(strings.Builder)
 		w := csv.NewWriter(buf)
 		err := w.Write([]string{
@@ -362,7 +346,7 @@ func TestDynamicS3OptsNoRegion(t *testing.T) {
 	t.Setenv("AWS_REGION", "")
 	t.Setenv("AWS_ACCESS_KEY_ID", config.APIKey)
 	t.Setenv("AWS_SECRET_ACCESS_KEY", config.APISecret)
-	testFileService(t, 0, func(name string) FileService {
+	testFileService(t, func(name string) FileService {
 		buf := new(strings.Builder)
 		w := csv.NewWriter(buf)
 		err := w.Write([]string{
@@ -453,7 +437,7 @@ func TestS3FSMinioServer(t *testing.T) {
 	// run test
 	t.Run("file service", func(t *testing.T) {
 		cacheDir := t.TempDir()
-		testFileService(t, 0, func(name string) FileService {
+		testFileService(t, func(name string) FileService {
 			ctx := context.Background()
 			fs, err := NewS3FSOnMinio(
 				ctx,
@@ -497,11 +481,11 @@ func BenchmarkS3FS(b *testing.B) {
 		fs, err := NewS3FS(
 			ctx,
 			ObjectStorageArguments{
-				Name:          "s3",
-				Endpoint:      config.Endpoint,
-				Bucket:        config.Bucket,
-				KeyPrefix:     time.Now().Format("2006-01-02.15:04:05.000000"),
-				AssumeRoleARN: config.RoleARN,
+				Name:      "s3",
+				Endpoint:  config.Endpoint,
+				Bucket:    config.Bucket,
+				KeyPrefix: time.Now().Format("2006-01-02.15:04:05.000000"),
+				RoleARN:   config.RoleARN,
 			},
 			CacheConfig{
 				DiskPath: ptrTo(cacheDir),
@@ -526,16 +510,16 @@ func TestS3FSWithSubPath(t *testing.T) {
 	t.Setenv("AWS_ACCESS_KEY_ID", config.APIKey)
 	t.Setenv("AWS_SECRET_ACCESS_KEY", config.APISecret)
 
-	testFileService(t, 0, func(name string) FileService {
+	testFileService(t, func(name string) FileService {
 		ctx := context.Background()
 		fs, err := NewS3FS(
 			ctx,
 			ObjectStorageArguments{
-				Name:          name,
-				Endpoint:      config.Endpoint,
-				Bucket:        config.Bucket,
-				KeyPrefix:     time.Now().Format("2006-01-02.15:04:05.000000"),
-				AssumeRoleARN: config.RoleARN,
+				Name:      name,
+				Endpoint:  config.Endpoint,
+				Bucket:    config.Bucket,
+				KeyPrefix: time.Now().Format("2006-01-02.15:04:05.000000"),
+				RoleARN:   config.RoleARN,
 			},
 			DisabledCacheConfig,
 			nil,
@@ -608,11 +592,11 @@ func BenchmarkS3ConcurrentRead(b *testing.B) {
 	fs, err := NewS3FS(
 		ctx,
 		ObjectStorageArguments{
-			Name:          "bench",
-			Endpoint:      config.Endpoint,
-			Bucket:        config.Bucket,
-			KeyPrefix:     time.Now().Format("2006-01-02.15:04:05.000000"),
-			AssumeRoleARN: config.RoleARN,
+			Name:      "bench",
+			Endpoint:  config.Endpoint,
+			Bucket:    config.Bucket,
+			KeyPrefix: time.Now().Format("2006-01-02.15:04:05.000000"),
+			RoleARN:   config.RoleARN,
 		},
 		DisabledCacheConfig,
 		nil,
@@ -735,11 +719,11 @@ func TestSequentialS3Read(t *testing.T) {
 	fs, err := NewS3FS(
 		ctx,
 		ObjectStorageArguments{
-			Name:          "bench",
-			Endpoint:      config.Endpoint,
-			Bucket:        config.Bucket,
-			KeyPrefix:     time.Now().Format("2006-01-02.15:04:05.000000"),
-			AssumeRoleARN: config.RoleARN,
+			Name:      "bench",
+			Endpoint:  config.Endpoint,
+			Bucket:    config.Bucket,
+			KeyPrefix: time.Now().Format("2006-01-02.15:04:05.000000"),
+			RoleARN:   config.RoleARN,
 		},
 		DisabledCacheConfig,
 		nil,
@@ -780,98 +764,5 @@ func TestSequentialS3Read(t *testing.T) {
 		}
 		numRead.Add(1)
 	}
-
-}
-
-func TestS3RestoreFromCache(t *testing.T) {
-	ctx := context.Background()
-
-	config, err := loadS3TestConfig()
-	assert.Nil(t, err)
-	if config.Endpoint == "" {
-		// no config
-		t.Skip()
-	}
-
-	t.Setenv("AWS_REGION", config.Region)
-	t.Setenv("AWS_ACCESS_KEY_ID", config.APIKey)
-	t.Setenv("AWS_SECRET_ACCESS_KEY", config.APISecret)
-
-	cacheDir := t.TempDir()
-	fs, err := NewS3FS(
-		ctx,
-		ObjectStorageArguments{
-			Name:          "s3",
-			Endpoint:      config.Endpoint,
-			Bucket:        config.Bucket,
-			KeyPrefix:     time.Now().Format("2006-01-02.15:04:05.000000"),
-			AssumeRoleARN: config.RoleARN,
-		},
-		CacheConfig{
-			DiskPath: ptrTo(cacheDir),
-		},
-		nil,
-		false,
-	)
-	assert.Nil(t, err)
-
-	// write file
-	err = fs.Write(ctx, IOVector{
-		FilePath: "foo/bar",
-		Entries: []IOEntry{
-			{
-				Size: 3,
-				Data: []byte("foo"),
-			},
-		},
-	})
-	assert.Nil(t, err)
-
-	// write file without full file cache
-	err = fs.Write(ctx, IOVector{
-		FilePath: "quux",
-		Entries: []IOEntry{
-			{
-				Size: 3,
-				Data: []byte("foo"),
-			},
-		},
-		Policy: SkipFullFilePreloads,
-	})
-	assert.Nil(t, err)
-	err = fs.Read(ctx, &IOVector{
-		FilePath: "quux",
-		Entries: []IOEntry{
-			{
-				Size: 3,
-			},
-		},
-	})
-	assert.Nil(t, err)
-
-	err = fs.Delete(ctx, "foo/bar")
-	assert.Nil(t, err)
-
-	logutil.Info("cache dir", zap.Any("dir", cacheDir))
-
-	counterSet := new(perfcounter.CounterSet)
-	ctx = perfcounter.WithCounterSet(ctx, counterSet)
-	fs.restoreFromDiskCache(ctx)
-
-	if counterSet.FileService.S3.Put.Load() != 1 {
-		t.Fatal()
-	}
-
-	vec := &IOVector{
-		FilePath: "foo/bar",
-		Entries: []IOEntry{
-			{
-				Size: -1,
-			},
-		},
-	}
-	err = fs.Read(ctx, vec)
-	assert.Nil(t, err)
-	assert.Equal(t, []byte("foo"), vec.Entries[0].Data)
 
 }

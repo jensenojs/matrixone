@@ -438,10 +438,6 @@ func (p *Packer) EncodeFloat64(e float64) {
 	p.encodeFloat64(e)
 }
 
-func (p *Packer) EncodeNull() {
-	p.putByte(nilCode)
-}
-
 func (p *Packer) EncodeBool(e bool) {
 	if e {
 		p.putByte(trueCode)

@@ -17,7 +17,6 @@ package txnimpl
 import (
 	"context"
 
-	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
@@ -70,13 +69,13 @@ func (n *pnode) GetSpace() uint32 {
 }
 
 func (n *pnode) FillBlockView(
-	*containers.BlockView, []int, *mpool.MPool,
-) (err error) {
+	view *containers.BlockView,
+	colIdxes []int) (err error) {
 	//TODO::
 	panic("not implemented yet ")
 }
 
-func (n *pnode) FillColumnView(*containers.ColumnView, *mpool.MPool) error {
+func (n *pnode) FillColumnView(*containers.ColumnView) error {
 	//TODO::
 	panic("not implemented yet ")
 }
@@ -113,14 +112,14 @@ func (n *pnode) MakeCommand(_ uint32) (txnif.TxnCmd, error) {
 	return nil, nil
 }
 
-func (n *pnode) GetColumnDataByIds([]int, *mpool.MPool) (*containers.BlockView, error) {
+func (n *pnode) GetColumnDataByIds([]int) (*containers.BlockView, error) {
 	//TODO::
 	panic("not implemented yet ")
 }
 
-func (n *pnode) GetColumnDataById(ctx context.Context, idx int, mp *mpool.MPool) (view *containers.ColumnView, err error) {
+func (n *pnode) GetColumnDataById(ctx context.Context, idx int) (view *containers.ColumnView, err error) {
 	view = containers.NewColumnView(idx)
-	vec, err := n.LoadPersistedColumnData(ctx, idx, mp)
+	vec, err := n.LoadPersistedColumnData(ctx, idx)
 	if err != nil {
 		return
 	}

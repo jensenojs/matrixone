@@ -45,8 +45,6 @@ type objectWriterV1 struct {
 	name              ObjectName
 	compressBuf       []byte
 	bloomFilter       []byte
-	objStats          ObjectStats
-	pkColIdx          uint16
 }
 
 type blockData struct {
@@ -113,22 +111,6 @@ func newObjectWriterV1(name ObjectName, fs fileservice.FileService, schemaVersio
 	return writer, nil
 }
 
-func (w *objectWriterV1) DescribeObject() (ObjectStats, error) {
-	stats := newObjectStats()
-	copy(stats[objectNameOffset:], w.name)
-	copy(stats[extentOffset:], Header(w.buffer.vector.Entries[0].Data).Extent())
-	blkCnt := uint32(len(w.blocks))
-	copy(stats[rowCntOffset:], types.EncodeUint32(&w.totalRow))
-	copy(stats[blkCntOffset:], types.EncodeUint32(&blkCnt))
-	copy(stats[sortKeyIdxOffset:], types.EncodeUint16(&w.pkColIdx))
-
-	if len(w.blocks[SchemaData]) != 0 && len(w.colmeta) > int(w.pkColIdx) {
-		copy(stats[dataZoneMapOffset:], w.colmeta[w.pkColIdx].ZoneMap())
-	}
-
-	return stats, nil
-}
-
 func (w *objectWriterV1) GetSeqnums() []uint16 {
 	return w.seqnums.Seqs
 }
@@ -156,12 +138,12 @@ func (w *objectWriterV1) WriteTombstone(batch *batch.Batch) (BlockObject, error)
 	return block, nil
 }
 
-func (w *objectWriterV1) WriteSubBlock(batch *batch.Batch, dataType DataMetaType) (BlockObject, int, error) {
+func (w *objectWriterV1) WriteSubBlock(batch *batch.Batch, dataType DataMetaType) (BlockObject, error) {
 	denseSeqnums := NewSeqnums(nil)
 	denseSeqnums.InitWithColCnt(len(batch.Vecs))
 	block := NewBlock(denseSeqnums)
-	size, err := w.AddSubBlock(block, batch, denseSeqnums, dataType)
-	return block, size, err
+	w.AddSubBlock(block, batch, denseSeqnums, dataType)
+	return block, nil
 }
 
 func (w *objectWriterV1) WriteWithoutSeqnum(batch *batch.Batch) (BlockObject, error) {
@@ -178,7 +160,6 @@ func (w *objectWriterV1) UpdateBlockZM(blkIdx int, seqnum uint16, zm ZoneMap) {
 
 func (w *objectWriterV1) WriteBF(blkIdx int, seqnum uint16, buf []byte) (err error) {
 	w.blocks[SchemaData][blkIdx].bloomFilter = buf
-	w.pkColIdx = seqnum
 	return
 }
 
@@ -198,7 +179,9 @@ func (w *objectWriterV1) prepareDataMeta(objectMeta objectDataMetaV1, blocks []b
 	metaColCnt := uint16(0)
 	maxSeqnum := uint16(0)
 	var seqnums *Seqnums
-	if len(blocks) != 0 {
+	if len(blocks) == 0 {
+		logutil.Warn("object io: no block needs to be written")
+	} else {
 		columnCount = blocks[0].meta.GetColumnCount()
 		metaColCnt = blocks[0].meta.GetMetaColumnCount()
 		maxSeqnum = blocks[0].meta.GetMaxSeqnum()
@@ -502,14 +485,8 @@ func (w *objectWriterV1) Sync(ctx context.Context, items ...WriteOptions) error 
 		if err = w.object.fs.Delete(ctx, w.fileName); err != nil {
 			return err
 		}
-		err = w.object.fs.Write(ctx, w.buffer.GetData())
+		return w.object.fs.Write(ctx, w.buffer.GetData())
 	}
-
-	if err != nil {
-		return err
-	}
-
-	w.objStats, err = w.DescribeObject()
 	return err
 }
 
@@ -530,7 +507,7 @@ func (w *objectWriterV1) WriteWithCompress(offset uint32, buf []byte) (data []by
 	return
 }
 
-func (w *objectWriterV1) addBlock(blocks *[]blockData, blockMeta BlockObject, bat *batch.Batch, seqnums *Seqnums) (int, error) {
+func (w *objectWriterV1) addBlock(blocks *[]blockData, blockMeta BlockObject, bat *batch.Batch, seqnums *Seqnums) error {
 	// CHANGE ME
 	// block.BlockHeader()return w.WriteWithCompress(offset, buf.Bytes()).SetBlockID(w.lastId)
 	blockMeta.BlockHeader().SetSequence(uint16(w.lastId))
@@ -539,7 +516,6 @@ func (w *objectWriterV1) addBlock(blocks *[]blockData, blockMeta BlockObject, ba
 	var data []byte
 	var buf bytes.Buffer
 	var rows int
-	var size int
 	for i, vec := range bat.Vecs {
 		if i == 0 {
 			rows = vec.Length()
@@ -555,13 +531,12 @@ func (w *objectWriterV1) addBlock(blocks *[]blockData, blockMeta BlockObject, ba
 		buf.Write(EncodeIOEntryHeader(&h))
 		err := vec.MarshalBinaryWithBuffer(&buf)
 		if err != nil {
-			return 0, err
+			return err
 		}
 		var ext Extent
 		if data, ext, err = w.WriteWithCompress(0, buf.Bytes()); err != nil {
-			return 0, err
+			return err
 		}
-		size += len(data)
 		block.data = append(block.data, data)
 		blockMeta.ColumnMeta(seqnums.Seqs[i]).setLocation(ext)
 		blockMeta.ColumnMeta(seqnums.Seqs[i]).setDataType(uint8(vec.GetType().Oid))
@@ -573,17 +548,17 @@ func (w *objectWriterV1) addBlock(blocks *[]blockData, blockMeta BlockObject, ba
 	blockMeta.BlockHeader().SetRows(uint32(rows))
 	*blocks = append(*blocks, block)
 	w.lastId++
-	return size, nil
+	return nil
 }
 
-func (w *objectWriterV1) AddBlock(blockMeta BlockObject, bat *batch.Batch, seqnums *Seqnums) (int, error) {
+func (w *objectWriterV1) AddBlock(blockMeta BlockObject, bat *batch.Batch, seqnums *Seqnums) error {
 	w.Lock()
 	defer w.Unlock()
 
 	return w.addBlock(&w.blocks[SchemaData], blockMeta, bat, seqnums)
 }
 
-func (w *objectWriterV1) AddTombstone(blockMeta BlockObject, bat *batch.Batch, seqnums *Seqnums) (int, error) {
+func (w *objectWriterV1) AddTombstone(blockMeta BlockObject, bat *batch.Batch, seqnums *Seqnums) error {
 	w.Lock()
 	defer w.Unlock()
 	if w.tombstonesColmeta == nil {
@@ -595,19 +570,20 @@ func (w *objectWriterV1) AddTombstone(blockMeta BlockObject, bat *batch.Batch, s
 	return w.addBlock(&w.blocks[SchemaTombstone], blockMeta, bat, seqnums)
 }
 
-func (w *objectWriterV1) AddSubBlock(blockMeta BlockObject, bat *batch.Batch, seqnums *Seqnums, dataType DataMetaType) (int, error) {
+func (w *objectWriterV1) AddSubBlock(blockMeta BlockObject, bat *batch.Batch, seqnums *Seqnums, dataType DataMetaType) error {
 	w.Lock()
 	defer w.Unlock()
 	if dataType < CkpMetaStart {
 		panic("invalid data type")
 	}
-	for i := int(CkpMetaStart); i <= int(CkpMetaEnd); i++ {
+	for i := int(CkpMetaStart); i <= int(dataType); i++ {
 		if len(w.blocks) <= i {
 			blocks := make([]blockData, 0)
 			w.blocks = append(w.blocks, blocks)
 		}
 	}
-	return w.addBlock(&w.blocks[dataType], blockMeta, bat, seqnums)
+	err := w.addBlock(&w.blocks[dataType], blockMeta, bat, seqnums)
+	return err
 }
 
 func (w *objectWriterV1) GetBlock(id uint32) BlockObject {

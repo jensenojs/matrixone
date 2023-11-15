@@ -22,9 +22,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/value_scan"
 	"github.com/matrixorigin/matrixone/pkg/testutil"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 	"github.com/stretchr/testify/require"
 )
@@ -54,27 +52,23 @@ func init() {
 func TestString(t *testing.T) {
 	buf := new(bytes.Buffer)
 	for _, tc := range tcs {
-		tc.arg.String(buf)
+		String(tc.arg, buf)
 	}
 }
 
 func TestPrepare(t *testing.T) {
 	for _, tc := range tcs {
-		err := tc.arg.Prepare(tc.proc)
+		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
 	}
 }
 
 func TestConnector(t *testing.T) {
 	for _, tc := range tcs {
-		err := tc.arg.Prepare(tc.proc)
+		err := Prepare(tc.proc, tc.arg)
 		require.NoError(t, err)
-
-		bats := []*batch.Batch{
-			newBatch(t, tc.types, tc.proc, Rows),
-			batch.EmptyBatch,
-		}
-		resetChildren(tc.arg, bats)
+		bat := newBatch(t, tc.types, tc.proc, Rows)
+		tc.proc.Reg.InputBatch = bat
 		/*{
 			for _, vec := range bat.Vecs {
 				if vec.IsOriginal() {
@@ -82,7 +76,11 @@ func TestConnector(t *testing.T) {
 				}
 			}
 		}*/
-		_, _ = tc.arg.Call(tc.proc)
+		_, _ = Call(0, tc.proc, tc.arg, false, false)
+		tc.proc.Reg.InputBatch = batch.EmptyBatch
+		_, _ = Call(0, tc.proc, tc.arg, false, false)
+		tc.proc.Reg.InputBatch = nil
+		_, _ = Call(0, tc.proc, tc.arg, false, false)
 		for len(tc.arg.Reg.Ch) > 0 {
 			bat := <-tc.arg.Reg.Ch
 			if bat == nil {
@@ -93,8 +91,7 @@ func TestConnector(t *testing.T) {
 			}
 			bat.Clean(tc.proc.Mp())
 		}
-		tc.arg.Free(tc.proc, false, nil)
-		tc.arg.Children[0].Free(tc.proc, false, nil)
+		tc.arg.Free(tc.proc, false)
 		tc.proc.FreeVectors()
 		require.Equal(t, int64(0), tc.proc.Mp().CurrNB())
 	}
@@ -112,11 +109,6 @@ func newTestCase() connectorTestCase {
 				Ctx: ctx,
 				Ch:  make(chan *batch.Batch, 3),
 			},
-			info: &vm.OperatorInfo{
-				Idx:     0,
-				IsFirst: false,
-				IsLast:  false,
-			},
 		},
 		cancel: cancel,
 	}
@@ -126,18 +118,4 @@ func newTestCase() connectorTestCase {
 // create a new block based on the type information
 func newBatch(t *testing.T, ts []types.Type, proc *process.Process, rows int64) *batch.Batch {
 	return testutil.NewBatch(ts, false, int(rows), proc.Mp())
-}
-
-func resetChildren(arg *Argument, bats []*batch.Batch) {
-	if len(arg.Children) == 0 {
-		arg.AppendChild(&value_scan.Argument{
-			Batchs: bats,
-		})
-
-	} else {
-		arg.Children = arg.Children[:0]
-		arg.AppendChild(&value_scan.Argument{
-			Batchs: bats,
-		})
-	}
 }

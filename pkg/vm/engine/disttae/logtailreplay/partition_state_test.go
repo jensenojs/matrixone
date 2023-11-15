@@ -17,6 +17,7 @@ package logtailreplay
 import (
 	"testing"
 
+	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/stretchr/testify/assert"
@@ -56,39 +57,50 @@ func BenchmarkPartitionStateConcurrentWriteAndIter(b *testing.B) {
 
 func TestTruncate(t *testing.T) {
 	partition := NewPartitionState(true)
-	addObject(partition, types.BuildTS(1, 0), types.BuildTS(2, 0))
-	addObject(partition, types.BuildTS(1, 0), types.BuildTS(3, 0))
-	addObject(partition, types.BuildTS(1, 0), types.TS{})
+	addBlock(partition, types.BuildTS(1, 0), types.BuildTS(2, 0))
+	addBlock(partition, types.BuildTS(1, 0), types.BuildTS(3, 0))
+	addBlock(partition, types.BuildTS(1, 0), types.TS{})
 
 	partition.truncate([2]uint64{0, 0}, types.BuildTS(1, 0))
-	assert.Equal(t, 5, partition.objectIndexByTS.Len())
+	assert.Equal(t, 3, partition.blocks.Len())
+	assert.Equal(t, 5, partition.blockIndexByTS.Len())
 
 	partition.truncate([2]uint64{0, 0}, types.BuildTS(2, 0))
-	assert.Equal(t, 3, partition.objectIndexByTS.Len())
+	assert.Equal(t, 2, partition.blocks.Len())
+	assert.Equal(t, 3, partition.blockIndexByTS.Len())
 
 	partition.truncate([2]uint64{0, 0}, types.BuildTS(3, 0))
-	assert.Equal(t, 1, partition.objectIndexByTS.Len())
+	assert.Equal(t, 1, partition.blocks.Len())
+	assert.Equal(t, 1, partition.blockIndexByTS.Len())
 
 	partition.truncate([2]uint64{0, 0}, types.BuildTS(4, 0))
-	assert.Equal(t, 1, partition.objectIndexByTS.Len())
+	assert.Equal(t, 1, partition.blocks.Len())
+	assert.Equal(t, 1, partition.blockIndexByTS.Len())
 }
 
-func addObject(p *PartitionState, create, delete types.TS) {
+func addBlock(p *PartitionState, create, delete types.TS) {
 	blkID := objectio.NewBlockid(objectio.NewSegmentid(), 0, 0)
-	objShortName := objectio.ShortName(blkID)
-	objIndex1 := ObjectIndexByTSEntry{
-		Time:         create,
-		ShortObjName: *objShortName,
-		IsDelete:     false,
+	blk1 := BlockEntry{
+		BlockInfo: catalog.BlockInfo{
+			BlockID: *blkID,
+		},
+		CreateTime: create,
+		DeleteTime: delete,
 	}
-	p.objectIndexByTS.Set(objIndex1)
+	p.blocks.Set(blk1)
+	blkIndex1 := BlockIndexByTSEntry{
+		Time:     create,
+		BlockID:  *blkID,
+		IsDelete: false,
+	}
+	p.blockIndexByTS.Set(blkIndex1)
 	if !delete.IsEmpty() {
-		objIndex2 := ObjectIndexByTSEntry{
-			Time:         delete,
-			ShortObjName: *objShortName,
-			IsDelete:     true,
+		blkIndex2 := BlockIndexByTSEntry{
+			Time:     delete,
+			BlockID:  *blkID,
+			IsDelete: true,
 		}
-		p.objectIndexByTS.Set(objIndex2)
+		p.blockIndexByTS.Set(blkIndex2)
 	}
 
 }

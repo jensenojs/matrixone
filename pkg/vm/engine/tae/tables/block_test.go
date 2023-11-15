@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/indexwrapper"
@@ -62,7 +61,7 @@ func TestGetActiveRow(t *testing.T) {
 	an2.End = ts1
 
 	// index uint8(1)-0,1
-	vec := containers.MakeVector(types.T_int8.ToType(), common.DefaultAllocator)
+	vec := containers.MakeVector(types.T_int8.ToType())
 	vec.Append(int8(1), false)
 	vec.Append(int8(1), false)
 	idx := indexwrapper.NewMutIndex(types.T_int8.ToType())
@@ -72,18 +71,14 @@ func TestGetActiveRow(t *testing.T) {
 
 	node := blk.node.Load().MustMNode()
 	// row, err := blk.GetActiveRow(int8(1), ts2)
-	row, err := node.GetRowByFilter(
-		context.Background(), updates.MockTxnWithStartTS(ts2), handle.NewEQFilter(int8(1)), common.DefaultAllocator,
-	)
+	row, err := node.GetRowByFilter(context.Background(), updates.MockTxnWithStartTS(ts2), handle.NewEQFilter(int8(1)))
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(1), row)
 
 	//abort appendnode2
 	an2.Aborted = true
 
-	row, err = node.GetRowByFilter(
-		context.Background(), updates.MockTxnWithStartTS(ts2), handle.NewEQFilter(int8(1)), common.DefaultAllocator,
-	)
+	row, err = node.GetRowByFilter(context.Background(), updates.MockTxnWithStartTS(ts2), handle.NewEQFilter(int8(1)))
 	// row, err = blk.GetActiveRow(int8(1), ts2)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(0), row)

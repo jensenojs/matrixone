@@ -53,8 +53,6 @@ const (
 	DefaultListenHost     = "0.0.0.0"
 	DefaultServiceHost    = "127.0.0.1"
 	DefaultLogServicePort = 32001
-
-	defaultRestoreFilePath = "hk_data"
 )
 
 var (
@@ -192,9 +190,6 @@ type Config struct {
 			// FilePath is the path of the file, which contains the backup data.
 			// If is not set, nothing will be done for restore.
 			FilePath string `toml:"file-path"`
-			// Force means that we force to do restore even if RESTORED tag file
-			// already exists.
-			Force bool `toml:"force"`
 		} `toml:"restore"`
 	}
 
@@ -412,7 +407,6 @@ func DefaultConfig() Config {
 			InitHAKeeperMembers   []string `toml:"init-hakeeper-members" user_setting:"advanced"`
 			Restore               struct {
 				FilePath string `toml:"file-path"`
-				Force    bool   `toml:"force"`
 			} `toml:"restore"`
 		}(struct {
 			BootstrapCluster      bool
@@ -422,7 +416,6 @@ func DefaultConfig() Config {
 			InitHAKeeperMembers   []string
 			Restore               struct {
 				FilePath string
-				Force    bool
 			}
 		}{
 			BootstrapCluster:      true,
@@ -430,13 +423,7 @@ func DefaultConfig() Config {
 			NumOfTNShards:         1,
 			NumOfLogShardReplicas: 1,
 			InitHAKeeperMembers:   []string{"131072:" + uid},
-			Restore: struct {
-				FilePath string
-				Force    bool
-			}{
-				FilePath: defaultRestoreFilePath,
-				Force:    false,
-			},
+			Restore:               struct{ FilePath string }{FilePath: ""},
 		}),
 		HAKeeperConfig: struct {
 			TickPerSecond   int           `toml:"tick-per-second"`

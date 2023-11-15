@@ -16,54 +16,44 @@ package connector
 
 import (
 	"bytes"
-
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(arg any, buf *bytes.Buffer) {
 	buf.WriteString("pipe connector")
 }
 
-func (arg *Argument) Prepare(_ *process.Process) error {
+func Prepare(_ *process.Process, _ any) error {
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	reg := arg.Reg
-
-	result, err := arg.Children[0].Call(proc)
-	if err != nil {
-		return result, err
+func Call(_ int, proc *process.Process, arg any, _ bool, _ bool) (process.ExecStatus, error) {
+	ap := arg.(*Argument)
+	reg := ap.Reg
+	bat := proc.InputBatch()
+	if bat == nil {
+		return process.ExecStop, nil
 	}
-
-	if result.Batch == nil {
-		result.Status = vm.ExecStop
-		return result, nil
-	}
-
-	bat := result.Batch
 	if bat.IsEmpty() {
-		result.Batch = batch.EmptyBatch
-		return result, nil
+		proc.PutBatch(bat)
+		proc.SetInputBatch(batch.EmptyBatch)
+		return process.ExecNext, nil
 	}
-	bat.AddCnt(1)
 
 	// there is no need to log anything here.
 	// because the context is already canceled means the pipeline closed normally.
 	select {
 	case <-proc.Ctx.Done():
 		proc.PutBatch(bat)
-		result.Status = vm.ExecStop
-		return result, nil
+		return process.ExecStop, nil
 
 	case <-reg.Ctx.Done():
 		proc.PutBatch(bat)
-		result.Status = vm.ExecStop
-		return result, nil
+		return process.ExecStop, nil
 
 	case reg.Ch <- bat:
-		return result, nil
+		proc.SetInputBatch(nil)
+		return process.ExecNext, nil
 	}
 }

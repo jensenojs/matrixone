@@ -43,8 +43,6 @@ type Config struct {
 	Cache CacheConfig `toml:"cache"`
 	// DataDir used to create fileservice using DISK as the backend
 	DataDir string `toml:"data-dir"`
-	// FixMissing inidicates the file service to try its best to fix missing files
-	FixMissing bool `toml:"fix-missing"`
 }
 
 // NewFileServicesFunc creates a new *FileServices
@@ -138,7 +136,6 @@ func newMinioFileService(
 func newS3FileService(
 	ctx context.Context, cfg Config, perfCounters []*perfcounter.CounterSet,
 ) (FileService, error) {
-
 	fs, err := NewS3FS(
 		ctx,
 		ObjectStorageArguments{
@@ -155,11 +152,5 @@ func newS3FileService(
 	if err != nil {
 		return nil, err
 	}
-
-	if cfg.FixMissing || *fixMissingFlag || fixMissingFromEnv {
-		//TODO use context.WithoutCancel(ctx)
-		go fs.restoreFromDiskCache(context.Background())
-	}
-
 	return fs, nil
 }

@@ -22,7 +22,6 @@ const (
 	LogtailService
 	LockService
 	CtlService
-	QueryService
 	MaxService
 )
 
@@ -37,8 +36,6 @@ func (s PortSlot) String() string {
 		return "Lock service"
 	case CtlService:
 		return "Ctl service"
-	case QueryService:
-		return "Query service"
 	default:
 		return "Unknown service"
 	}
@@ -112,18 +109,4 @@ func (s *store) ctlServiceListenAddr() string {
 		return s.addressMgr.ListenAddress(int(CtlService))
 	}
 	return s.cfg.Ctl.Address.ListenAddress
-}
-
-func (s *store) queryServiceServiceAddr() string {
-	if s.newPortStrategy() {
-		return s.addressMgr.ServiceAddress(int(QueryService))
-	}
-	return ""
-}
-
-func (s *store) queryServiceListenAddr() string {
-	if s.newPortStrategy() {
-		return s.addressMgr.ListenAddress(int(QueryService))
-	}
-	return ""
 }

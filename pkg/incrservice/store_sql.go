@@ -17,7 +17,6 @@ package incrservice
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/defines"
@@ -55,7 +54,7 @@ func (s *sqlStore) Create(
 	tableID uint64,
 	cols []AutoColumn,
 	txnOp client.TxnOperator) error {
-	opts := executor.Options{}.WithDatabase(database).WithTxn(txnOp).WithWaitCommittedLogApplied()
+	opts := executor.Options{}.WithDatabase(database).WithTxn(txnOp)
 	if txnOp != nil {
 		opts = opts.WithDisableIncrStatement()
 	}
@@ -95,19 +94,10 @@ func (s *sqlStore) Allocate(
 	if txnOp != nil {
 		opts = opts.WithDisableIncrStatement()
 	}
-	ctxDone := func() bool {
-		select {
-		case <-ctx.Done():
-			return true
-		default:
-			return false
-		}
-	}
 	for {
 		err := s.exec.ExecTxn(
 			ctx,
 			func(te executor.TxnExecutor) error {
-				start := time.Now()
 				res, err := te.Exec(fetchSQL)
 				if err != nil {
 					return err
@@ -127,9 +117,7 @@ func (s *sqlStore) Allocate(
 						zap.Any("account", ctx.Value(defines.TenantIDKey{})),
 						zap.Uint64("table", tableID),
 						zap.String("col", colName),
-						zap.Int("rows", rows),
-						zap.Duration("cost", time.Since(start)),
-						zap.Bool("ctx-done", ctxDone()))
+						zap.Int("rows", rows))
 				}
 
 				next = getNext(current, count, int(step))
@@ -140,7 +128,6 @@ func (s *sqlStore) Allocate(
 					tableID,
 					colName,
 					current)
-				start = time.Now()
 				res, err = te.Exec(sql)
 				if err != nil {
 					return err
@@ -154,9 +141,7 @@ func (s *sqlStore) Allocate(
 						zap.Any("account", ctx.Value(defines.TenantIDKey{})),
 						zap.Uint64("table", tableID),
 						zap.String("col", colName),
-						zap.Uint64("affected-rows", res.AffectedRows),
-						zap.Duration("cost", time.Since(start)),
-						zap.Bool("ctx-done", ctxDone()))
+						zap.Uint64("affected-rows", res.AffectedRows))
 				}
 				res.Close()
 				return nil

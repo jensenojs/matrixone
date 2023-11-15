@@ -57,7 +57,7 @@ func TestReadBasic(t *testing.T) {
 	checkReadResponses(t, resp, "")
 }
 
-func TestReadWithTNShardNotMatch(t *testing.T) {
+func TestReadWithTNShartnotMatch(t *testing.T) {
 	sender := NewTestSender()
 	defer func() {
 		assert.NoError(t, sender.Close())
@@ -79,6 +79,7 @@ func TestReadWithTNShardNotMatch(t *testing.T) {
 	resp := readTestData(t, sender, 1, rTxn, 1)
 	checkResponses(t, resp,
 		txn.WrapError(moerr.NewTNShardNotFound(context.TODO(), "", 1), 0))
+	// newTxnError(moerr.ErrDNShardNotFound, "txn not active"))
 }
 
 func TestReadWithSelfWrite(t *testing.T) {
@@ -127,7 +128,7 @@ func TestReadBlockWithClock(t *testing.T) {
 	assert.Equal(t, int64(3), ts)
 }
 
-func TestReadCannotBlockByUncommitted(t *testing.T) {
+func TestReadCannotBlockByUncomitted(t *testing.T) {
 	sender := NewTestSender()
 	defer func() {
 		assert.NoError(t, sender.Close())
@@ -427,7 +428,7 @@ func TestWriteBasic(t *testing.T) {
 	assert.Equal(t, GetTestValue(1, wTxn), v)
 }
 
-func TestWriteWithTNShardNotMatch(t *testing.T) {
+func TestWriteWithTNShartnotMatch(t *testing.T) {
 	sender := NewTestSender()
 	defer func() {
 		assert.NoError(t, sender.Close())
@@ -470,6 +471,7 @@ func TestWriteWithWWConflict(t *testing.T) {
 	wTxn2 := NewTestTxn(2, 1)
 	checkResponses(t, writeTestData(t, sender, 1, wTxn2, 1),
 		txn.WrapError(moerr.NewTAEWrite(context.TODO()), 0))
+	// newTxnError(moerr.ErrTAEWrite, "write conlict"))
 }
 
 func TestCommitWithSingleTNShard(t *testing.T) {
@@ -507,7 +509,7 @@ func TestCommitWithSingleTNShard(t *testing.T) {
 	}
 }
 
-func TestCommitWithTNShardNotMatch(t *testing.T) {
+func TestCommitWithTNShartnotMatch(t *testing.T) {
 	sender := NewTestSender()
 	defer func() {
 		assert.NoError(t, sender.Close())
@@ -737,7 +739,7 @@ func TestRollback(t *testing.T) {
 	checkData(t, wTxn, s2, 2, 0, false)
 }
 
-func TestRollbackWithTNShardNotFound(t *testing.T) {
+func TestRollbackWithTNShartnotFound(t *testing.T) {
 	sender := NewTestSender()
 	defer func() {
 		assert.NoError(t, sender.Close())

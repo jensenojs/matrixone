@@ -17,40 +17,46 @@ import (
 	"bytes"
 
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(_ any, buf *bytes.Buffer) {
 	buf.WriteString(" MergeS3BlocksMetaLoc ")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) error {
-	ap := arg
+func Prepare(proc *process.Process, arg any) error {
+	ap := arg.(*Argument)
 	ap.container = new(Container)
 	ap.container.mp = make(map[int]*batch.Batch)
 	ap.container.mp2 = make(map[int][]*batch.Batch)
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
 	var err error
-	ap := arg
-	result, err := arg.children[0].Call(proc)
-	if err != nil {
-		return result, err
+	ap := arg.(*Argument)
+	bat := proc.InputBatch()
+	if bat == nil {
+		return process.ExecStop, nil
 	}
-	if result.Batch == nil {
-		result.Status = vm.ExecStop
-		return result, nil
+
+	if bat.IsEmpty() {
+		proc.PutBatch(bat)
+		proc.SetInputBatch(batch.EmptyBatch)
+		return process.ExecNext, nil
 	}
-	if result.Batch.IsEmpty() {
-		result.Batch = batch.EmptyBatch
-		return result, nil
-	}
-	bat := result.Batch
+	defer proc.PutBatch(bat)
+
 	if err := ap.Split(proc, bat); err != nil {
-		return result, err
+		return process.ExecNext, err
+	}
+
+	if !ap.notFreeBatch {
+		defer func() {
+			for k := range ap.container.mp {
+				proc.PutBatch(ap.container.mp[k])
+			}
+		}()
 	}
 
 	// If the target is a partition table
@@ -60,14 +66,14 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 			if ap.container.mp[i].RowCount() > 0 {
 				// batches in mp will be deeply copied into txn's workspace.
 				if err = ap.PartitionSources[i].Write(proc.Ctx, ap.container.mp[i]); err != nil {
-					return result, err
+					return process.ExecNext, err
 				}
 			}
 
 			for _, bat := range ap.container.mp2[i] {
 				// batches in mp2 will be deeply copied into txn's workspace.
 				if err = ap.PartitionSources[i].Write(proc.Ctx, bat); err != nil {
-					return result, err
+					return process.ExecNext, err
 				}
 
 			}
@@ -78,18 +84,19 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 		if ap.container.mp[0].RowCount() > 0 {
 			//batches in mp will be deeply copied into txn's workspace.
 			if err = ap.Tbl.Write(proc.Ctx, ap.container.mp[0]); err != nil {
-				return result, err
+				return process.ExecNext, err
 			}
 		}
 
 		for _, bat := range ap.container.mp2[0] {
 			//batches in mp2 will be deeply copied into txn's workspace.
 			if err = ap.Tbl.Write(proc.Ctx, bat); err != nil {
-				return result, err
+				return process.ExecNext, err
 			}
 		}
 		ap.container.mp2[0] = ap.container.mp2[0][:0]
 	}
 
-	return result, nil
+	proc.SetInputBatch(nil)
+	return process.ExecNext, nil
 }

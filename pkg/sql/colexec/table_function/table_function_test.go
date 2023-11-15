@@ -19,56 +19,45 @@ import (
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/testutil"
-	"github.com/matrixorigin/matrixone/pkg/vm"
+	"github.com/matrixorigin/matrixone/pkg/vm/process"
 	"github.com/stretchr/testify/require"
 )
 
 func TestString(t *testing.T) {
 	arg := Argument{Name: "unnest"}
-	arg.String(bytes.NewBuffer(nil))
+	String(&arg, bytes.NewBuffer(nil))
 }
 
 func TestCall(t *testing.T) {
-	arg := Argument{Name: "unnest",
-		info: &vm.OperatorInfo{
-			Idx:     0,
-			IsFirst: false,
-			IsLast:  false,
-		}}
-	resetChildren(&arg, nil)
-	end, err := arg.Call(testutil.NewProc())
+	arg := Argument{Name: "unnest"}
+	end, err := Call(0, testutil.NewProc(), &arg, false, false)
 	require.NoError(t, err)
-	require.True(t, end.Status == vm.ExecStop)
-	// arg.Name = "generate_series"
-	// end, err = arg.Call(testutil.NewProc())
-	// require.NoError(t, err)
-	require.True(t, end.Status == vm.ExecStop)
+	require.True(t, end == process.ExecStop)
+	arg.Name = "generate_series"
+	end, err = Call(0, testutil.NewProc(), &arg, false, false)
+	require.NoError(t, err)
+	require.True(t, end == process.ExecStop)
 	arg.Name = "metadata_scan"
-	end, err = arg.Call(testutil.NewProc())
+	end, err = Call(0, testutil.NewProc(), &arg, false, false)
 	require.NoError(t, err)
-	require.True(t, end.Status == vm.ExecStop)
+	require.True(t, end == process.ExecStop)
 	arg.Name = "not_exist"
-	end, err = arg.Call(testutil.NewProc())
+	end, err = Call(0, testutil.NewProc(), &arg, false, false)
 	require.Error(t, err)
-	require.True(t, end.Status == vm.ExecStop)
+	require.True(t, end == process.ExecStop)
 }
 
 func TestPrepare(t *testing.T) {
-	arg := Argument{Name: "unnest",
-		info: &vm.OperatorInfo{
-			Idx:     0,
-			IsFirst: false,
-			IsLast:  false,
-		}}
-	err := arg.Prepare(testutil.NewProc())
+	arg := Argument{Name: "unnest"}
+	err := Prepare(testutil.NewProc(), &arg)
 	require.Error(t, err)
 	arg.Name = "generate_series"
-	err = arg.Prepare(testutil.NewProc())
+	err = Prepare(testutil.NewProc(), &arg)
 	require.NoError(t, err)
 	arg.Name = "metadata_scan"
-	err = arg.Prepare(testutil.NewProc())
+	err = Prepare(testutil.NewProc(), &arg)
 	require.NoError(t, err)
 	arg.Name = "not_exist"
-	err = arg.Prepare(testutil.NewProc())
+	err = Prepare(testutil.NewProc(), &arg)
 	require.Error(t, err)
 }

@@ -22,11 +22,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
-
-var _ vm.Operator = new(Argument)
 
 const (
 	BuildHashMap = iota
@@ -75,20 +72,9 @@ type Argument struct {
 	HashOnPK             bool
 	NeedMergedBatch      bool
 	RuntimeFilterSenders []*colexec.RuntimeFilterChan
-
-	Info     *vm.OperatorInfo
-	children []vm.Operator
 }
 
-func (arg *Argument) SetInfo(info *vm.OperatorInfo) {
-	arg.Info = info
-}
-
-func (arg *Argument) AppendChild(child vm.Operator) {
-	arg.children = append(arg.children, child)
-}
-
-func (arg *Argument) Free(proc *process.Process, pipelineFailed bool, err error) {
+func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {
 	ctr := arg.ctr
 	if ctr != nil {
 		mp := proc.Mp()

@@ -29,7 +29,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/api"
 	"github.com/matrixorigin/matrixone/pkg/pb/logtail"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
-	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 )
 
 type TableState int
@@ -113,7 +112,6 @@ func (sm *SessionManager) ListSession() []*Session {
 
 // message describes response to be sent.
 type message struct {
-	createAt time.Time
 	timeout  time.Duration
 	response *LogtailResponse
 }
@@ -162,10 +160,7 @@ func (s *morpcStream) write(
 
 		s.logger.Debug("real segment proto size", zap.Int("ProtoSize", seg.ProtoSize()))
 
-		st := time.Now()
-		err := s.cs.Write(ctx, seg)
-		v2.LogtailSendNetworkHistogram.Observe(time.Since(st).Seconds())
-		if err != nil {
+		if err := s.cs.Write(ctx, seg); err != nil {
 			return err
 		}
 	}
@@ -253,7 +248,7 @@ func NewSession(
 					ss.logger.Info("session sender channel closed")
 					return
 				}
-				v2.LogTailSendQueueSizeGauge.Set(float64(len(ss.sendChan)))
+
 				sendFunc := func() error {
 					defer ss.responses.Release(msg.response)
 
@@ -261,12 +256,6 @@ func NewSession(
 					defer cancel()
 
 					now := time.Now()
-					v2.LogtailSendLatencyHistogram.Observe(float64(now.Sub(msg.createAt).Seconds()))
-
-					defer func() {
-						v2.LogtailSendTotalHistogram.Observe(time.Since(now).Seconds())
-					}()
-
 					err := ss.stream.write(ctx, msg.response)
 					if sendCost := time.Since(now); sendCost > 10*time.Second {
 						ss.logger.Info("send logtail too much", zap.Int64("sendRound", cnt), zap.Duration("duration", sendCost))
@@ -526,7 +515,7 @@ func (ss *Session) SendResponse(
 			ss.logger.Error("fail to close poision morpc client session", zap.Error(err))
 		}
 		return moerr.NewStreamClosedNoCtx()
-	case ss.sendChan <- message{timeout: ContextTimeout(sendCtx, ss.sendTimeout), response: response, createAt: time.Now()}:
+	case ss.sendChan <- message{timeout: ContextTimeout(sendCtx, ss.sendTimeout), response: response}:
 		return nil
 	}
 }

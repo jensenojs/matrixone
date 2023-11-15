@@ -218,11 +218,6 @@ func (p *PartitionReader) Read(
 			}
 		}
 		if rows == 0 {
-			if vp == nil {
-				b.Clean(mp)
-			} else {
-				vp.PutBatch(b)
-			}
 			return nil, nil
 		}
 		b.SetRowCount(rows)

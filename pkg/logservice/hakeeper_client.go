@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -29,10 +28,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	pb "github.com/matrixorigin/matrixone/pkg/pb/logservice"
 	"github.com/matrixorigin/matrixone/pkg/util/trace"
-)
-
-const (
-	defaultBackendReadTimeout = time.Second * 8
 )
 
 type basicHAKeeperClient interface {
@@ -95,8 +90,6 @@ type ProxyHAKeeperClient interface {
 	PatchCNStore(ctx context.Context, stateLabel pb.CNStateLabel) error
 	// DeleteCNStore deletes a CN store from HAKeeper.
 	DeleteCNStore(ctx context.Context, cnStore pb.DeleteCNStore) error
-	// SendProxyHeartbeat sends the heartbeat of proxy to HAKeeper.
-	SendProxyHeartbeat(ctx context.Context, hb pb.ProxyHeartbeat) (pb.CommandBatch, error)
 }
 
 // BRHAKeeperClient is the HAKeeper client for backup and restore.
@@ -448,23 +441,6 @@ func (c *managedHAKeeperClient) DeleteCNStore(ctx context.Context, cnStore pb.De
 	}
 }
 
-// SendProxyHeartbeat implements the ProxyHAKeeperClient interface.
-func (c *managedHAKeeperClient) SendProxyHeartbeat(ctx context.Context, hb pb.ProxyHeartbeat) (pb.CommandBatch, error) {
-	for {
-		if err := c.prepareClient(ctx); err != nil {
-			return pb.CommandBatch{}, err
-		}
-		cb, err := c.getClient().sendProxyHeartbeat(ctx, hb)
-		if err != nil {
-			c.resetClient()
-		}
-		if c.isRetryableError(err) {
-			continue
-		}
-		return cb, err
-	}
-}
-
 // GetBackupData implements the BRHAKeeperClient interface.
 func (c *managedHAKeeperClient) GetBackupData(ctx context.Context) ([]byte, error) {
 	for {
@@ -595,15 +571,7 @@ func connectToHAKeeper(ctx context.Context,
 		addresses[i], addresses[j] = addresses[j], addresses[i]
 	})
 	for _, addr := range addresses {
-		cc, err := getRPCClient(
-			ctx,
-			addr,
-			c.respPool,
-			defaultMaxMessageSize,
-			cfg.EnableCompress,
-			defaultBackendReadTimeout,
-			"connectToHAKeeper",
-		)
+		cc, err := getRPCClient(ctx, addr, c.respPool, defaultMaxMessageSize, cfg.EnableCompress, "connectToHAKeeper")
 		if err != nil {
 			e = err
 			continue
@@ -772,18 +740,6 @@ func (c *hakeeperClient) deleteCNStore(ctx context.Context, cnStore pb.DeleteCNS
 		return err
 	}
 	return nil
-}
-
-func (c *hakeeperClient) sendProxyHeartbeat(ctx context.Context, hb pb.ProxyHeartbeat) (pb.CommandBatch, error) {
-	req := pb.Request{
-		Method:         pb.PROXY_HEARTBEAT,
-		ProxyHeartbeat: &hb,
-	}
-	cb, err := c.sendHeartbeat(ctx, req)
-	if err != nil {
-		return pb.CommandBatch{}, err
-	}
-	return cb, nil
 }
 
 func (c *hakeeperClient) checkIsHAKeeper(ctx context.Context) (bool, error) {

@@ -18,6 +18,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/matrixorigin/matrixone/pkg/sql/colexec/fuzzyfilter"
+	"github.com/matrixorigin/matrixone/pkg/sql/colexec/shuffle"
+
 	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
@@ -34,8 +37,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/deletion"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/dispatch"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/external"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/fill"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/fuzzyfilter"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/group"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/hashbuild"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/insert"
@@ -65,7 +66,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/onduplicatekey"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/order"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/preinsert"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/preinsertsecondaryindex"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/preinsertunique"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/product"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/projection"
@@ -74,11 +74,9 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/rightanti"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/rightsemi"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/semi"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/shuffle"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/single"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/stream"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/table_function"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/timewin"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/top"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/window"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
@@ -108,7 +106,6 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 			Typs:       t.Typs,
 			Conditions: t.Conditions,
 			Result:     t.Result,
-			HashOnPK:   t.HashOnPK,
 		}
 	case vm.Group:
 		t := sourceIns.Arg.(*group.Argument)
@@ -145,7 +142,6 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 			Typs:               t.Typs,
 			Conditions:         t.Conditions,
 			RuntimeFilterSpecs: t.RuntimeFilterSpecs,
-			HashOnPK:           t.HashOnPK,
 		}
 	case vm.Right:
 		t := sourceIns.Arg.(*right.Argument)
@@ -158,7 +154,6 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 			LeftTypes:          t.LeftTypes,
 			Conditions:         t.Conditions,
 			RuntimeFilterSpecs: t.RuntimeFilterSpecs,
-			HashOnPK:           t.HashOnPK,
 		}
 	case vm.RightSemi:
 		t := sourceIns.Arg.(*rightsemi.Argument)
@@ -170,7 +165,6 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 			RightTypes:         t.RightTypes,
 			Conditions:         t.Conditions,
 			RuntimeFilterSpecs: t.RuntimeFilterSpecs,
-			HashOnPK:           t.HashOnPK,
 		}
 	case vm.RightAnti:
 		t := sourceIns.Arg.(*rightanti.Argument)
@@ -182,7 +176,6 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 			RightTypes:         t.RightTypes,
 			Conditions:         t.Conditions,
 			RuntimeFilterSpecs: t.RuntimeFilterSpecs,
-			HashOnPK:           t.HashOnPK,
 		}
 	case vm.Limit:
 		t := sourceIns.Arg.(*limit.Argument)
@@ -267,7 +260,6 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 			Typs:               t.Typs,
 			Conditions:         t.Conditions,
 			RuntimeFilterSpecs: t.RuntimeFilterSpecs,
-			HashOnPK:           t.HashOnPK,
 		}
 	case vm.Single:
 		t := sourceIns.Arg.(*single.Argument)
@@ -279,7 +271,6 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 			Typs:               t.Typs,
 			Conditions:         t.Conditions,
 			RuntimeFilterSpecs: t.RuntimeFilterSpecs,
-			HashOnPK:           t.HashOnPK,
 		}
 	case vm.Top:
 		t := sourceIns.Arg.(*top.Argument)
@@ -347,7 +338,6 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 			Typs:       t.Typs,
 			Cond:       t.Cond,
 			OnList:     t.OnList,
-			HashOnPK:   t.HashOnPK,
 		}
 	case vm.TableFunction:
 		t := sourceIns.Arg.(*table_function.Argument)
@@ -593,14 +583,6 @@ func constructPreInsertUk(n *plan.Node, proc *process.Process) (*preinsertunique
 	}, nil
 }
 
-func constructPreInsertSk(n *plan.Node, proc *process.Process) (*preinsertsecondaryindex.Argument, error) {
-	preCtx := n.PreInsertSkCtx
-	return &preinsertsecondaryindex.Argument{
-		Ctx:          proc.Ctx,
-		PreInsertCtx: preCtx,
-	}, nil
-}
-
 func constructLockOp(n *plan.Node, proc *process.Process, eng engine.Engine) (*lockop.Argument, error) {
 	arg := lockop.NewArgument(eng)
 	for _, target := range n.LockTargets {
@@ -769,7 +751,6 @@ func constructSemi(n *plan.Node, typs []types.Type, proc *process.Process) *semi
 		Cond:               cond,
 		Conditions:         constructJoinConditions(conds, proc),
 		RuntimeFilterSpecs: n.RuntimeFilterBuildList,
-		HashOnPK:           n.Stats.HashmapStats != nil && n.Stats.HashmapStats.HashOnPK,
 	}
 }
 
@@ -785,7 +766,6 @@ func constructLeft(n *plan.Node, typs []types.Type, proc *process.Process) *left
 		Cond:               cond,
 		Conditions:         constructJoinConditions(conds, proc),
 		RuntimeFilterSpecs: n.RuntimeFilterBuildList,
-		HashOnPK:           n.Stats.HashmapStats != nil && n.Stats.HashmapStats.HashOnPK,
 	}
 }
 
@@ -804,7 +784,6 @@ func constructRight(n *plan.Node, left_typs, right_typs []types.Type, Ibucket, N
 		Cond:               cond,
 		Conditions:         constructJoinConditions(conds, proc),
 		RuntimeFilterSpecs: n.RuntimeFilterBuildList,
-		HashOnPK:           n.Stats.HashmapStats != nil && n.Stats.HashmapStats.HashOnPK,
 	}
 }
 
@@ -822,7 +801,6 @@ func constructRightSemi(n *plan.Node, right_typs []types.Type, Ibucket, Nbucket 
 		Cond:               cond,
 		Conditions:         constructJoinConditions(conds, proc),
 		RuntimeFilterSpecs: n.RuntimeFilterBuildList,
-		HashOnPK:           n.Stats.HashmapStats != nil && n.Stats.HashmapStats.HashOnPK,
 	}
 }
 
@@ -840,7 +818,6 @@ func constructRightAnti(n *plan.Node, right_typs []types.Type, Ibucket, Nbucket 
 		Cond:               cond,
 		Conditions:         constructJoinConditions(conds, proc),
 		RuntimeFilterSpecs: n.RuntimeFilterBuildList,
-		HashOnPK:           n.Stats.HashmapStats != nil && n.Stats.HashmapStats.HashOnPK,
 	}
 }
 
@@ -856,7 +833,6 @@ func constructSingle(n *plan.Node, typs []types.Type, proc *process.Process) *si
 		Cond:               cond,
 		Conditions:         constructJoinConditions(conds, proc),
 		RuntimeFilterSpecs: n.RuntimeFilterBuildList,
-		HashOnPK:           n.Stats.HashmapStats != nil && n.Stats.HashmapStats.HashOnPK,
 	}
 }
 
@@ -883,7 +859,6 @@ func constructAnti(n *plan.Node, typs []types.Type, proc *process.Process) *anti
 		Result:     result,
 		Cond:       cond,
 		Conditions: constructJoinConditions(conds, proc),
-		HashOnPK:   n.Stats.HashmapStats != nil && n.Stats.HashmapStats.HashOnPK,
 	}
 }
 
@@ -917,82 +892,6 @@ func constructOrder(n *plan.Node) *order.Argument {
 	}
 }
 
-func constructFill(n *plan.Node) *fill.Argument {
-	aggIdx := make([]int32, len(n.AggList))
-	for i, expr := range n.AggList {
-		f := expr.Expr.(*plan.Expr_F)
-		obj := int64(uint64(f.F.Func.Obj) & function.DistinctMask)
-		aggIdx[i], _ = function.DecodeOverloadID(obj)
-	}
-	return &fill.Argument{
-		ColLen:   len(n.AggList),
-		FillType: n.FillType,
-		FillVal:  n.FillVal,
-		AggIds:   aggIdx,
-	}
-}
-
-func constructTimeWindow(ctx context.Context, n *plan.Node, proc *process.Process) *timewin.Argument {
-	var aggs []agg.Aggregate
-	var typs []types.Type
-	var wStart, wEnd bool
-	i := 0
-	for _, expr := range n.AggList {
-		if e, ok := expr.Expr.(*plan.Expr_Col); ok {
-			if e.Col.Name == plan2.TimeWindowStart {
-				wStart = true
-			}
-			if e.Col.Name == plan2.TimeWindowEnd {
-				wEnd = true
-			}
-			continue
-		}
-		f := expr.Expr.(*plan.Expr_F)
-		distinct := (uint64(f.F.Func.Obj) & function.Distinct) != 0
-		obj := int64(uint64(f.F.Func.Obj) & function.DistinctMask)
-		e := f.F.Args[0]
-		if e != nil {
-			aggs = append(aggs, agg.Aggregate{
-				E:    e,
-				Dist: distinct,
-				Op:   obj,
-			})
-			typs = append(typs, types.New(types.T(e.Typ.Id), e.Typ.Width, e.Typ.Scale))
-		}
-		i++
-	}
-
-	var err error
-	str := n.Interval.Expr.(*plan.Expr_List).List.List[1].Expr.(*plan.Expr_C).C.Value.(*plan.Const_Sval).Sval
-	itr := &timewin.Interval{}
-	itr.Typ, err = types.IntervalTypeOf(str)
-	if err != nil {
-		panic(err)
-	}
-	itr.Val = n.Interval.Expr.(*plan.Expr_List).List.List[0].Expr.(*plan.Expr_C).C.Value.(*plan.Const_I64Val).I64Val
-
-	var sld *timewin.Interval
-	if n.Sliding != nil {
-		sld = &timewin.Interval{}
-		str = n.Sliding.Expr.(*plan.Expr_List).List.List[1].Expr.(*plan.Expr_C).C.Value.(*plan.Const_Sval).Sval
-		sld.Typ, err = types.IntervalTypeOf(str)
-		if err != nil {
-			panic(err)
-		}
-		sld.Val = n.Sliding.Expr.(*plan.Expr_List).List.List[0].Expr.(*plan.Expr_C).C.Value.(*plan.Const_I64Val).I64Val
-	}
-
-	return &timewin.Argument{
-		Types:    typs,
-		Aggs:     aggs,
-		Ts:       n.OrderBy[0].Expr,
-		WStart:   wStart,
-		WEnd:     wEnd,
-		Interval: itr,
-		Sliding:  sld,
-	}
-}
-
 func constructWindow(ctx context.Context, n *plan.Node, proc *process.Process) *window.Argument {
 	aggs := make([]agg.Aggregate, len(n.WinSpecList))
 	typs := make([]types.Type, len(n.WinSpecList))
@@ -1005,12 +904,10 @@ func constructWindow(ctx context.Context, n *plan.Node, proc *process.Process) *
 
 		if len(f.F.Args) > 0 {
 
-			//for group_concat, the last arg is separator string
-			//for cluster_centers, the last arg is kmeans_args string
-			if (f.F.Func.ObjName == plan2.NameGroupConcat ||
-				f.F.Func.ObjName == plan2.NameClusterCenters) && len(f.F.Args) > 1 {
-				argExpr := f.F.Args[len(f.F.Args)-1]
-				executor, err := colexec.NewExpressionExecutor(proc, argExpr)
+			//for group concat, the last arg is separator string
+			if f.F.Func.ObjName == plan2.NameGroupConcat && len(f.F.Args) > 1 {
+				separatorExpr := f.F.Args[len(f.F.Args)-1]
+				executor, err := colexec.NewExpressionExecutor(proc, separatorExpr)
 				if err != nil {
 					panic(err)
 				}
@@ -1076,12 +973,10 @@ func constructGroup(ctx context.Context, n, cn *plan.Node, ibucket, nbucket int,
 			distinct := (uint64(f.F.Func.Obj) & function.Distinct) != 0
 			obj := int64(uint64(f.F.Func.Obj) & function.DistinctMask)
 			if len(f.F.Args) > 0 {
-				//for group_concat, the last arg is separator string
-				//for cluster_centers, the last arg is kmeans_args string
-				if (f.F.Func.ObjName == plan2.NameGroupConcat ||
-					f.F.Func.ObjName == plan2.NameClusterCenters) && len(f.F.Args) > 1 {
-					argExpr := f.F.Args[len(f.F.Args)-1]
-					executor, err := colexec.NewExpressionExecutor(proc, argExpr)
+				//for group concat, the last arg is separator string
+				if f.F.Func.ObjName == plan2.NameGroupConcat && len(f.F.Args) > 1 {
+					separatorExpr := f.F.Args[len(f.F.Args)-1]
+					executor, err := colexec.NewExpressionExecutor(proc, separatorExpr)
 					if err != nil {
 						panic(err)
 					}
@@ -1522,7 +1417,6 @@ func constructHashBuild(c *Compile, in vm.Instruction, proc *process.Process, sh
 			Conditions:      arg.Conditions[1],
 			IsDup:           isDup,
 			NeedMergedBatch: true,
-			HashOnPK:        arg.HashOnPK,
 		}
 
 	case vm.Mark:
@@ -1533,7 +1427,6 @@ func constructHashBuild(c *Compile, in vm.Instruction, proc *process.Process, sh
 			Conditions:      arg.Conditions[1],
 			IsDup:           isDup,
 			NeedMergedBatch: true,
-			HashOnPK:        arg.HashOnPK,
 		}
 
 	case vm.Join:
@@ -1571,7 +1464,6 @@ func constructHashBuild(c *Compile, in vm.Instruction, proc *process.Process, sh
 			Conditions:      arg.Conditions[1],
 			IsDup:           isDup,
 			NeedMergedBatch: true,
-			HashOnPK:        arg.HashOnPK,
 		}
 
 		registerRuntimeFilters(retArg, c, arg.RuntimeFilterSpecs, shuffleCnt)
@@ -1588,7 +1480,6 @@ func constructHashBuild(c *Compile, in vm.Instruction, proc *process.Process, sh
 			Conditions:      arg.Conditions[1],
 			IsDup:           isDup,
 			NeedMergedBatch: true,
-			HashOnPK:        arg.HashOnPK,
 		}
 
 		registerRuntimeFilters(retArg, c, arg.RuntimeFilterSpecs, shuffleCnt)
@@ -1605,7 +1496,6 @@ func constructHashBuild(c *Compile, in vm.Instruction, proc *process.Process, sh
 			Conditions:      arg.Conditions[1],
 			IsDup:           isDup,
 			NeedMergedBatch: true,
-			HashOnPK:        arg.HashOnPK,
 		}
 
 		registerRuntimeFilters(retArg, c, arg.RuntimeFilterSpecs, shuffleCnt)
@@ -1622,7 +1512,6 @@ func constructHashBuild(c *Compile, in vm.Instruction, proc *process.Process, sh
 			Conditions:      arg.Conditions[1],
 			IsDup:           isDup,
 			NeedMergedBatch: true,
-			HashOnPK:        arg.HashOnPK,
 		}
 
 		registerRuntimeFilters(retArg, c, arg.RuntimeFilterSpecs, shuffleCnt)
@@ -1637,7 +1526,6 @@ func constructHashBuild(c *Compile, in vm.Instruction, proc *process.Process, sh
 			Conditions:      arg.Conditions[1],
 			IsDup:           isDup,
 			NeedMergedBatch: true,
-			HashOnPK:        arg.HashOnPK,
 		}
 
 		registerRuntimeFilters(retArg, c, arg.RuntimeFilterSpecs, shuffleCnt)
@@ -1652,7 +1540,6 @@ func constructHashBuild(c *Compile, in vm.Instruction, proc *process.Process, sh
 			Conditions:      arg.Conditions[1],
 			IsDup:           isDup,
 			NeedMergedBatch: true,
-			HashOnPK:        arg.HashOnPK,
 		}
 
 		registerRuntimeFilters(retArg, c, arg.RuntimeFilterSpecs, shuffleCnt)
@@ -1857,18 +1744,21 @@ func getRel(ctx context.Context, proc *process.Process, eg engine.Engine, ref *p
 		uniqueIndexTables = make([]engine.Relation, 0)
 		if tableDef.Indexes != nil {
 			for _, indexdef := range tableDef.Indexes {
-				var indexTable engine.Relation
-				if indexdef.TableExist {
-					if isTemp {
-						indexTable, err = dbSource.Relation(ctx, engine.GetTempTableName(oldDbName, indexdef.IndexTableName), proc)
-					} else {
-						indexTable, err = dbSource.Relation(ctx, indexdef.IndexTableName, proc)
+				if indexdef.Unique {
+					var indexTable engine.Relation
+					if indexdef.TableExist {
+						if isTemp {
+							indexTable, err = dbSource.Relation(ctx, engine.GetTempTableName(oldDbName, indexdef.IndexTableName), proc)
+						} else {
+							indexTable, err = dbSource.Relation(ctx, indexdef.IndexTableName, proc)
+						}
+						if err != nil {
+							return nil, nil, err
+						}
+						uniqueIndexTables = append(uniqueIndexTables, indexTable)
 					}
-					if err != nil {
-						return nil, nil, err
-					}
-					// NOTE: uniqueIndexTables is not yet used by the callee
-					uniqueIndexTables = append(uniqueIndexTables, indexTable)
+				} else {
+					continue
 				}
 			}
 		}

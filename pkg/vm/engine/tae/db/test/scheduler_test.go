@@ -57,7 +57,7 @@ func TestCheckpoint1(t *testing.T) {
 		rel, _ := database.GetRelationByName(schema.Name)
 		it := rel.MakeBlockIt()
 		blk := it.GetBlock()
-		err := blk.RangeDelete(3, 3, handle.DT_Normal, common.DefaultAllocator)
+		err := blk.RangeDelete(3, 3, handle.DT_Normal)
 		assert.Nil(t, err)
 		assert.Nil(t, txn.Commit(context.Background()))
 	}
@@ -86,6 +86,8 @@ func TestCheckpoint2(t *testing.T) {
 	ctx := context.Background()
 
 	opts := new(options.Options)
+	opts.CacheCfg = new(options.CacheCfg)
+	opts.CacheCfg.IndexCapacity = 1000000
 	// opts.CheckpointCfg = new(options.CheckpointCfg)
 	// opts.CheckpointCfg.ScannerInterval = 10
 	// opts.CheckpointCfg.ExecutionLevels = 2

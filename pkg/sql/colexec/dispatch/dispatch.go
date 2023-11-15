@@ -17,23 +17,21 @@ package dispatch
 import (
 	"bytes"
 	"context"
-
 	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(arg any, buf *bytes.Buffer) {
 	buf.WriteString("dispatch")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) error {
-	ap := arg
+func Prepare(proc *process.Process, arg any) error {
+	ap := arg.(*Argument)
 	ctr := new(container)
 	ap.ctr = ctr
 	ctr.localRegsCnt = len(ap.LocalRegs)
@@ -92,29 +90,14 @@ func (arg *Argument) Prepare(proc *process.Process) error {
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	ap := arg
-
-	result, err := arg.Children[0].Call(proc)
-	if err != nil {
-		return result, err
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	ap := arg.(*Argument)
+	bat := proc.InputBatch()
+	if bat == nil && ap.RecSink {
+		bat = makeEndBatch(proc)
+	} else if bat == nil {
+		return process.ExecStop, nil
 	}
-	bat := result.Batch
-
-	if result.Batch == nil {
-		if ap.RecSink {
-			bat = makeEndBatch(proc)
-			defer func() {
-				if bat != nil {
-					bat.Clean(proc.Mp())
-				}
-			}()
-		} else {
-			result.Status = vm.ExecStop
-			return result, nil
-		}
-	}
-
 	if bat.Last() {
 		if !ap.ctr.hasData {
 			bat.SetEnd()
@@ -122,19 +105,17 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 			ap.ctr.hasData = false
 		}
 	} else if bat.IsEmpty() {
-		result.Batch = batch.EmptyBatch
-		return result, nil
+		proc.PutBatch(bat)
+		proc.SetInputBatch(batch.EmptyBatch)
+		return process.ExecNext, nil
 	} else {
 		ap.ctr.hasData = true
 	}
-	bat.AddCnt(1)
 	ok, err := ap.ctr.sendFunc(bat, ap, proc)
 	if ok {
-		result.Status = vm.ExecStop
-		return result, err
+		return process.ExecStop, err
 	} else {
-		// result.Batch = nil
-		return result, err
+		return process.ExecNext, err
 	}
 }
 
@@ -143,7 +124,7 @@ func makeEndBatch(proc *process.Process) *batch.Batch {
 	b.Attrs = []string{
 		"recursive_col",
 	}
-	b.SetVector(0, proc.GetVector(types.T_varchar.ToType()))
+	b.SetVector(0, vector.NewVec(types.T_varchar.ToType()))
 	vector.AppendBytes(b.GetVector(0), []byte("check recursive status"), false, proc.GetMPool())
 	batch.SetLength(b, 1)
 	b.SetEnd()

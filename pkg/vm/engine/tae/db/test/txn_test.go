@@ -25,6 +25,7 @@ import (
 
 	pkgcatalog "github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
+	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
@@ -247,7 +248,7 @@ func (c *APP1Client) GetGoodRepetory(goodId uint64) (id *common.ID, offset uint3
 	found := false
 	for blockIt.Valid() {
 		blk := blockIt.GetBlock()
-		view, err = blk.GetColumnDataByName(context.Background(), repertory.ColDefs[1].Name, common.DefaultAllocator)
+		view, err = blk.GetColumnDataByName(context.Background(), repertory.ColDefs[1].Name)
 		if err != nil {
 			return
 		}
@@ -433,7 +434,7 @@ func (app1 *APP1) Init(factor int) {
 	if err = userRel.Append(context.Background(), userData); err != nil {
 		panic(err)
 	}
-	price := containers.MakeVector(goods.ColDefs[2].Type, common.DefaultAllocator)
+	price := containers.MakeVector(goods.ColDefs[2].Type)
 	defer price.Close()
 	for i := 0; i < conf.GoodKinds; i++ {
 		goodPrice := float64(rand.Intn(1000)+20) / float64(rand.Intn(10)+1) / float64(20)
@@ -452,7 +453,7 @@ func (app1 *APP1) Init(factor int) {
 	}
 
 	goodIds := goodsData.Vecs[0]
-	count := containers.MakeVector(repertory.ColDefs[2].Type, common.DefaultAllocator)
+	count := containers.MakeVector(repertory.ColDefs[2].Type)
 	defer count.Close()
 	for i := 0; i < conf.GoodKinds; i++ {
 		goodCount := rand.Intn(1000) + 100
@@ -484,6 +485,8 @@ func TestApp1(t *testing.T) {
 	ctx := context.Background()
 
 	opts := new(options.Options)
+	opts.CacheCfg = new(options.CacheCfg)
+	opts.CacheCfg.IndexCapacity = mpool.GB
 	db := testutil.InitTestDB(ctx, ModuleName, t, opts)
 	defer db.Close()
 	mgr := db.TxnMgr
@@ -551,7 +554,7 @@ func TestWarehouse(t *testing.T) {
 		assert.Nil(t, err)
 		it := rel.MakeBlockIt()
 		blk := it.GetBlock()
-		view, _ := blk.GetColumnDataById(context.Background(), 1, common.DefaultAllocator)
+		view, _ := blk.GetColumnDataById(context.Background(), 1)
 		t.Log(view.GetData().String())
 		defer view.Close()
 		testutil.CheckAllColRowsByScan(t, rel, 20, false)
@@ -698,7 +701,7 @@ func TestTxn9(t *testing.T) {
 		it := rel.MakeBlockIt()
 		for it.Valid() {
 			blk := it.GetBlock()
-			view, err := blk.GetColumnDataById(context.Background(), 2, common.DefaultAllocator)
+			view, err := blk.GetColumnDataById(context.Background(), 2)
 			assert.NoError(t, err)
 			defer view.Close()
 			t.Log(view.GetData().String())

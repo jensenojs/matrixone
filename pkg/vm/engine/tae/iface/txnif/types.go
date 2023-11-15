@@ -22,7 +22,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
-	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/entry"
 
 	"github.com/RoaringBitmap/roaring"
@@ -236,7 +235,7 @@ type DeleteNode interface {
 	GetChain() DeleteChain
 	DeletedRows() []uint32
 	DeletedPK() map[uint32]containers.Vector
-	RangeDeleteLocked(start, end uint32, pk containers.Vector, mp *mpool.MPool)
+	RangeDeleteLocked(start, end uint32, pk containers.Vector)
 	GetCardinalityLocked() uint32
 	IsDeletedLocked(row uint32) bool
 	GetRowMaskRefLocked() *roaring.Bitmap
@@ -251,20 +250,15 @@ type TxnStore interface {
 	BindTxn(AsyncTxn)
 	GetLSN() uint64
 	GetContext() context.Context
-	SetContext(context.Context)
 
 	BatchDedup(dbId, id uint64, pk containers.Vector) error
 
 	Append(ctx context.Context, dbId, id uint64, data *containers.Batch) error
 	AddBlksWithMetaLoc(ctx context.Context, dbId, id uint64, metaLocs []objectio.Location) error
 
-	RangeDelete(
-		id *common.ID, start, end uint32, pkVec containers.Vector, dt handle.DeleteType,
-	) error
+	RangeDelete(id *common.ID, start, end uint32, pkVec containers.Vector, dt handle.DeleteType) error
 	TryDeleteByDeltaloc(id *common.ID, deltaloc objectio.Location) (ok bool, err error)
-	GetByFilter(
-		ctx context.Context, dbId uint64, id uint64, filter *handle.Filter,
-	) (*common.ID, uint32, error)
+	GetByFilter(ctx context.Context, dbId uint64, id uint64, filter *handle.Filter) (*common.ID, uint32, error)
 	GetValue(id *common.ID, row uint32, col uint16) (any, bool, error)
 
 	CreateRelation(dbId uint64, def any) (handle.Relation, error)

@@ -64,8 +64,7 @@ func TestComposedCmd(t *testing.T) {
 
 	composed.AddCmd(cmd)
 
-	del := updates.NewDeleteNode(nil, handle.DT_Normal,
-		updates.IOET_WALTxnCommand_DeleteNode_V2)
+	del := updates.NewDeleteNode(nil, handle.DT_Normal)
 	del.AttachTo(controller.GetDeleteChain())
 	cmd2, err := del.MakeCommand(1)
 	assert.Nil(t, err)

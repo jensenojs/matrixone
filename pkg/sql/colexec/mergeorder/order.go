@@ -17,6 +17,7 @@ package mergeorder
 import (
 	"bytes"
 
+	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/compare"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -24,9 +25,65 @@ import (
 	plan2 "github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
+
+const maxBatchSizeToSend = 64 * mpool.MB
+
+const (
+	receiving = iota
+	normalSending
+	pickUpSending
+)
+
+type Argument struct {
+	ctr *container
+
+	OrderBySpecs []*plan.OrderBySpec
+}
+
+type container struct {
+	colexec.ReceiverOperator
+
+	// operator status
+	status int
+
+	// batchList is the data structure to store the all the received batches
+	batchList []*batch.Batch
+	orderCols [][]*vector.Vector
+	// indexList[i] = k means the number of rows before k in batchList[i] has been merged and send.
+	indexList []int64
+
+	// expression executors for order columns.
+	executors []colexec.ExpressionExecutor
+	compares  []compare.Compare
+}
+
+func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {
+	if arg.ctr != nil {
+		mp := proc.Mp()
+		ctr := arg.ctr
+		for i := range ctr.batchList {
+			if ctr.batchList[i] != nil {
+				ctr.batchList[i].Clean(mp)
+			}
+		}
+		for i := range ctr.orderCols {
+			if ctr.orderCols[i] != nil {
+				for j := range ctr.orderCols[i] {
+					if ctr.orderCols[i][j] != nil {
+						ctr.orderCols[i][j].Free(mp)
+					}
+				}
+			}
+		}
+		for i := range ctr.executors {
+			if ctr.executors[i] != nil {
+				ctr.executors[i].Free()
+			}
+		}
+	}
+}
 
 func (ctr *container) mergeAndEvaluateOrderColumn(proc *process.Process, bat *batch.Batch) error {
 	ctr.batchList = append(ctr.batchList, bat)
@@ -74,24 +131,21 @@ func (ctr *container) generateCompares(fs []*plan.OrderBySpec) {
 	}
 }
 
-func (ctr *container) pickAndSend(proc *process.Process, result *vm.CallResult) (sendOver bool, err error) {
-	if ctr.buf != nil {
-		proc.PutBatch(ctr.buf)
-		ctr.buf = nil
-	}
-	ctr.buf = batch.NewWithSize(ctr.batchList[0].VectorCount())
+func (ctr *container) pickAndSend(proc *process.Process) (sendOver bool, err error) {
+	bat := batch.NewWithSize(ctr.batchList[0].VectorCount())
 	mp := proc.Mp()
 
-	for i := range ctr.buf.Vecs {
-		ctr.buf.Vecs[i] = proc.GetVector(*ctr.batchList[0].Vecs[i].GetType())
+	for i := range bat.Vecs {
+		bat.Vecs[i] = proc.GetVector(*ctr.batchList[0].Vecs[i].GetType())
 	}
 
 	wholeLength := 0
 	for {
 		choice := ctr.pickFirstRow()
-		for j := range ctr.buf.Vecs {
-			err = ctr.buf.Vecs[j].UnionOne(ctr.batchList[choice].Vecs[j], ctr.indexList[choice], mp)
+		for j := range bat.Vecs {
+			err = bat.Vecs[j].UnionOne(ctr.batchList[choice].Vecs[j], ctr.indexList[choice], mp)
 			if err != nil {
+				bat.Clean(mp)
 				return false, err
 			}
 		}
@@ -106,12 +160,12 @@ func (ctr *container) pickAndSend(proc *process.Process, result *vm.CallResult) 
 			sendOver = true
 			break
 		}
-		if ctr.buf.Size() >= maxBatchSizeToSend {
+		if bat.Size() >= maxBatchSizeToSend {
 			break
 		}
 	}
-	ctr.buf.SetRowCount(wholeLength)
-	result.Batch = ctr.buf
+	bat.SetRowCount(wholeLength)
+	proc.SetInputBatch(bat)
 	return sendOver, nil
 }
 
@@ -162,8 +216,8 @@ func (ctr *container) removeBatch(proc *process.Process, index int) {
 	ctr.orderCols = append(ctr.orderCols[:index], ctr.orderCols[index+1:]...)
 }
 
-func (arg *Argument) String(buf *bytes.Buffer) {
-	ap := arg
+func String(arg any, buf *bytes.Buffer) {
+	ap := arg.(*Argument)
 	buf.WriteString("mergeorder([")
 	for i, f := range ap.OrderBySpecs {
 		if i > 0 {
@@ -174,8 +228,8 @@ func (arg *Argument) String(buf *bytes.Buffer) {
 	buf.WriteString("])")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) (err error) {
-	ap := arg
+func Prepare(proc *process.Process, arg any) (err error) {
+	ap := arg.(*Argument)
 	ap.ctr = new(container)
 	ctr := ap.ctr
 	ap.ctr.InitReceiver(proc, true)
@@ -194,21 +248,20 @@ func (arg *Argument) Prepare(proc *process.Process) (err error) {
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	ap := arg
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	ap := arg.(*Argument)
 	ctr := ap.ctr
 
-	anal := proc.GetAnalyze(arg.info.Idx)
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
-	result := vm.NewCallResult()
 
 	for {
 		switch ctr.status {
 		case receiving:
 			bat, end, err := ctr.ReceiveFromAllRegs(anal)
 			if err != nil {
-				return result, err
+				return process.ExecNext, err
 			}
 			if end {
 				// if number of block is less than 2, no need to do merge sort.
@@ -219,7 +272,7 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 
 					// evaluate the first batch's order column.
 					if err = ctr.evaluateOrderColumn(proc, 0); err != nil {
-						return result, err
+						return process.ExecNext, err
 					}
 					ctr.generateCompares(ap.OrderBySpecs)
 					ctr.indexList = make([]int64, len(ctr.batchList))
@@ -228,32 +281,28 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 			}
 
 			if err = ctr.mergeAndEvaluateOrderColumn(proc, bat); err != nil {
-				return result, err
+				return process.ExecNext, err
 			}
 
 		case normalSending:
 			if len(ctr.batchList) == 0 {
-				result.Batch = nil
-				result.Status = vm.ExecStop
-				return result, nil
+				proc.SetInputBatch(nil)
+				return process.ExecStop, nil
 			}
 
 			// If only one batch, no need to sort. just send it.
 			if len(ctr.batchList) == 1 {
-				ctr.buf = ctr.batchList[0]
+				proc.SetInputBatch(ctr.batchList[0])
 				ctr.batchList[0] = nil
-				result.Batch = ctr.buf
-				result.Status = vm.ExecStop
-				return result, nil
+				return process.ExecStop, nil
 			}
 
 		case pickUpSending:
-			ok, err := ctr.pickAndSend(proc, &result)
+			ok, err := ctr.pickAndSend(proc)
 			if ok {
-				result.Status = vm.ExecStop
-				return result, err
+				return process.ExecStop, err
 			}
-			return result, err
+			return process.ExecNext, err
 		}
 	}
 }

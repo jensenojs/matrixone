@@ -42,6 +42,12 @@ func WithRuntimeTransientPool(vp *containers.VectorPool) RuntimeOption {
 	}
 }
 
+func WithRuntimeFilterIndexCache(c model.LRUCache) RuntimeOption {
+	return func(r *Runtime) {
+		r.Cache.FilterIndex = c
+	}
+}
+
 func WithRuntimeObjectFS(fs *objectio.ObjectFS) RuntimeOption {
 	return func(r *Runtime) {
 		r.Fs = fs
@@ -77,6 +83,10 @@ type Runtime struct {
 	VectorPool struct {
 		Small     *containers.VectorPool
 		Transient *containers.VectorPool
+	}
+
+	Cache struct {
+		FilterIndex model.LRUCache
 	}
 
 	Throttle *Throttle

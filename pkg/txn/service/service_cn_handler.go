@@ -25,7 +25,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 	"github.com/matrixorigin/matrixone/pkg/pb/txn"
 	"github.com/matrixorigin/matrixone/pkg/txn/util"
-	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 	"go.uber.org/zap"
 )
 
@@ -168,12 +167,6 @@ func (s *service) Write(ctx context.Context, request *txn.TxnRequest, response *
 }
 
 func (s *service) Commit(ctx context.Context, request *txn.TxnRequest, response *txn.TxnResponse) error {
-	v2.TxnTNReceiveCommitCounter.Inc()
-	start := time.Now()
-	defer func() {
-		v2.TxnTNCommitDurationHistogram.Observe(time.Since(start).Seconds())
-	}()
-
 	s.waitRecoveryCompleted()
 
 	st := time.Now()
@@ -198,13 +191,10 @@ func (s *service) Commit(ctx context.Context, request *txn.TxnRequest, response 
 		s.logger.Fatal("commit with empty tn shards")
 	}
 
-	if len(request.Txn.LockTables) > 0 {
-		invalidBinds := s.allocator.Valid(request.Txn.LockTables)
-		if len(invalidBinds) > 0 {
-			response.CommitResponse.InvalidLockTables = invalidBinds
-			response.TxnError = txn.WrapError(moerr.NewLockTableBindChanged(ctx), 0)
-			return nil
-		}
+	if len(request.Txn.LockTables) > 0 &&
+		!s.allocator.Valid(request.Txn.LockTables) {
+		response.TxnError = txn.WrapError(moerr.NewLockTableBindChanged(ctx), 0)
+		return nil
 	}
 
 	txnID := request.Txn.ID
@@ -253,7 +243,6 @@ func (s *service) Commit(ctx context.Context, request *txn.TxnRequest, response 
 		util.LogTxnStart1PCCommit(newTxn)
 
 		commitTS, err := s.storage.Commit(ctx, newTxn)
-		v2.TxnTNCommitHandledCounter.Inc()
 		if err != nil {
 			util.LogTxnStart1PCCommitFailed(newTxn, err)
 			response.TxnError = txn.WrapError(err, moerr.ErrTAECommit)

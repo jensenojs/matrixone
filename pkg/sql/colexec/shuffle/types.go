@@ -16,13 +16,16 @@ package shuffle
 
 import (
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-var _ vm.Operator = new(Argument)
+const shuffleBatchSize = 8192
 
-const shuffleBatchSize = 8192 * 3 / 4
+const (
+	input = iota
+	outPutNotEnding
+	outPutEnding
+)
 
 type Argument struct {
 	ctr           *container
@@ -31,27 +34,15 @@ type Argument struct {
 	ShuffleColMin int64
 	ShuffleColMax int64
 	AliveRegCnt   int32
-
-	info     *vm.OperatorInfo
-	children []vm.Operator
-}
-
-func (arg *Argument) SetInfo(info *vm.OperatorInfo) {
-	arg.info = info
-}
-
-func (arg *Argument) AppendChild(child vm.Operator) {
-	arg.children = append(arg.children, child)
 }
 
 type container struct {
-	ending       bool
+	state        int
 	sels         [][]int32
 	shuffledBats []*batch.Batch
-	lastSentIdx  int
 }
 
-func (arg *Argument) Free(proc *process.Process, pipelineFailed bool, err error) {
+func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {
 	for i := range arg.ctr.shuffledBats {
 		if arg.ctr.shuffledBats[i] != nil {
 			arg.ctr.shuffledBats[i].Clean(proc.Mp())

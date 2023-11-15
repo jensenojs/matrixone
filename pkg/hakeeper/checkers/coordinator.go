@@ -20,7 +20,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/hakeeper/checkers/cnservice"
 	"github.com/matrixorigin/matrixone/pkg/hakeeper/checkers/dnservice"
 	"github.com/matrixorigin/matrixone/pkg/hakeeper/checkers/logservice"
-	"github.com/matrixorigin/matrixone/pkg/hakeeper/checkers/proxy"
 	"github.com/matrixorigin/matrixone/pkg/hakeeper/checkers/syshealth"
 	"github.com/matrixorigin/matrixone/pkg/hakeeper/checkers/util"
 	"github.com/matrixorigin/matrixone/pkg/hakeeper/operator"
@@ -52,7 +51,6 @@ func (c *Coordinator) Check(alloc util.IDAllocator, state pb.CheckerState) []pb.
 	logState := state.LogState
 	tnState := state.TNState
 	cnState := state.CNState
-	proxyState := state.ProxyState
 	cluster := state.ClusterInfo
 	currentTick := state.Tick
 	user := state.TaskTableUser
@@ -70,18 +68,18 @@ func (c *Coordinator) Check(alloc util.IDAllocator, state pb.CheckerState) []pb.
 		}
 	}()
 
-	c.OperatorController.RemoveFinishedOperator(logState, tnState, cnState, proxyState)
+	c.OperatorController.RemoveFinishedOperator(logState, tnState, cnState)
 
 	// if we've discovered unhealthy already, no need to keep alive anymore.
 	if c.teardown {
-		return c.OperatorController.Dispatch(c.teardownOps, logState, tnState, cnState, proxyState)
+		return c.OperatorController.Dispatch(c.teardownOps, logState, tnState, cnState)
 	}
 
 	// check whether system health or not.
 	if operators, health := syshealth.Check(c.cfg, cluster, tnState, logState, currentTick); !health {
 		c.teardown = true
 		c.teardownOps = operators
-		return c.OperatorController.Dispatch(c.teardownOps, logState, tnState, cnState, proxyState)
+		return c.OperatorController.Dispatch(c.teardownOps, logState, tnState, cnState)
 	}
 
 	// system health, try to keep alive.
@@ -91,7 +89,6 @@ func (c *Coordinator) Check(alloc util.IDAllocator, state pb.CheckerState) []pb.
 	operators = append(operators, logservice.Check(alloc, c.cfg, cluster, logState, executing, user, currentTick)...)
 	operators = append(operators, dnservice.Check(alloc, c.cfg, cluster, tnState, user, currentTick)...)
 	operators = append(operators, cnservice.Check(c.cfg, cnState, user, currentTick)...)
-	operators = append(operators, proxy.Check(c.cfg, proxyState, currentTick)...)
 
-	return c.OperatorController.Dispatch(operators, logState, tnState, cnState, proxyState)
+	return c.OperatorController.Dispatch(operators, logState, tnState, cnState)
 }

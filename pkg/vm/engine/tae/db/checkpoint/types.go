@@ -19,7 +19,6 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logtail"
 )
@@ -145,7 +144,7 @@ func makeRespBatchFromSchema(schema *catalog.Schema) *containers.Batch {
 		if attr == catalog.PhyAddrColumnName {
 			continue
 		}
-		bat.AddVector(attr, containers.MakeVector(typs[i], common.CheckpointAllocator))
+		bat.AddVector(attr, containers.MakeVector(typs[i]))
 	}
 	return bat
 }

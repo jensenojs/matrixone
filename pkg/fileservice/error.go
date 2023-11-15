@@ -47,9 +47,3 @@ func isRetryableError(err error) bool {
 	}
 	return false
 }
-
-type errorStr string
-
-func (e errorStr) Error() string {
-	return string(e)
-}

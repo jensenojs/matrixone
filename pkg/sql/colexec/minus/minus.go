@@ -19,16 +19,17 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/common/hashmap"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/vm"
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(_ any, buf *bytes.Buffer) {
 	buf.WriteString(" minus ")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) error {
+func Prepare(proc *process.Process, argument any) error {
 	var err error
+	arg := argument.(*Argument)
 	{
 		arg.ctr = new(container)
 		arg.ctr.InitReceiver(proc, false)
@@ -45,21 +46,21 @@ func (arg *Argument) Prepare(proc *process.Process) error {
 // it built a hash table for right relation first.
 // use values from left relation to probe and update the hash table.
 // and preserve values that do not exist in the hash table.
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
+func Call(idx int, proc *process.Process, argument any, isFirst bool, isLast bool) (process.ExecStatus, error) {
 	var err error
+	arg := argument.(*Argument)
 
 	// prepare the analysis work.
-	analyze := proc.GetAnalyze(arg.info.Idx)
+	analyze := proc.GetAnalyze(idx)
 	analyze.Start()
 	defer analyze.Stop()
-	result := vm.NewCallResult()
 
 	for {
 		switch arg.ctr.state {
 		case buildingHashMap:
 			// step 1: build the hash table by all right batches.
-			if err = arg.ctr.buildHashTable(proc, analyze, 1, arg.info.IsFirst); err != nil {
-				return result, err
+			if err = arg.ctr.buildHashTable(proc, analyze, 1, isFirst); err != nil {
+				return process.ExecNext, err
 			}
 			if arg.ctr.hashTable != nil {
 				analyze.Alloc(arg.ctr.hashTable.Size())
@@ -72,21 +73,20 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 			// only one batch is processed during each loop, and the batch will be sent to
 			// next operator immediately after successful processing.
 			last := false
-			last, err = arg.ctr.probeHashTable(proc, analyze, 0, arg.info.IsFirst, arg.info.IsLast, &result)
+			last, err = arg.ctr.probeHashTable(proc, analyze, 0, isFirst, isLast)
 			if err != nil {
-				return result, err
+				return process.ExecNext, err
 			}
 			if last {
 				arg.ctr.state = operatorEnd
 				continue
 			}
-			return result, nil
+			return process.ExecNext, nil
 
 		case operatorEnd:
 			// operator over.
-			result.Batch = nil
-			result.Status = vm.ExecStop
-			return result, nil
+			proc.SetInputBatch(nil)
+			return process.ExecStop, nil
 		}
 	}
 }
@@ -132,7 +132,7 @@ func (ctr *container) buildHashTable(proc *process.Process, ana process.Analyze,
 // probeHashTable use a batch from proc.Reg.MergeReceivers[index] to probe and update the hash map.
 // If a row of data never appears in the hash table, add it into hath table and send it to the next operator.
 // if batch is the last one, return true, else return false.
-func (ctr *container) probeHashTable(proc *process.Process, ana process.Analyze, index int, isFirst bool, isLast bool, result *vm.CallResult) (bool, error) {
+func (ctr *container) probeHashTable(proc *process.Process, ana process.Analyze, index int, isFirst bool, isLast bool) (bool, error) {
 	inserted := make([]uint8, hashmap.UnitLimit)
 	restoreInserted := make([]uint8, hashmap.UnitLimit)
 
@@ -147,8 +147,7 @@ func (ctr *container) probeHashTable(proc *process.Process, ana process.Analyze,
 			return true, nil
 		}
 		if bat.Last() {
-			ctr.bat = bat
-			result.Batch = ctr.bat
+			proc.SetInputBatch(bat)
 			return false, nil
 		}
 		// just an empty batch.
@@ -158,13 +157,9 @@ func (ctr *container) probeHashTable(proc *process.Process, ana process.Analyze,
 		}
 		ana.Input(bat, isFirst)
 
-		if ctr.bat != nil {
-			proc.PutBatch(ctr.bat)
-			ctr.bat = nil
-		}
 		ctr.bat = batch.NewWithSize(len(bat.Vecs))
 		for i := range bat.Vecs {
-			ctr.bat.Vecs[i] = proc.GetVector(*bat.Vecs[i].GetType())
+			ctr.bat.Vecs[i] = vector.NewVec(*bat.Vecs[i].GetType())
 		}
 
 		count := bat.Vecs[0].Length()
@@ -204,7 +199,8 @@ func (ctr *container) probeHashTable(proc *process.Process, ana process.Analyze,
 			}
 		}
 		ana.Output(ctr.bat, isLast)
-		result.Batch = ctr.bat
+		proc.SetInputBatch(ctr.bat)
+		ctr.bat = nil
 		proc.PutBatch(bat)
 		return false, nil
 	}

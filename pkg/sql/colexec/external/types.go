@@ -18,19 +18,14 @@ import (
 	"bufio"
 	"context"
 	"encoding/csv"
-	"io"
-
-	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/pb/pipeline"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
+	"io"
 )
-
-var _ vm.Operator = new(Argument)
 
 const (
 	ColumnCntLargerErrorInfo = "the table column is larger than input data column"
@@ -97,26 +92,9 @@ type FilterParam struct {
 
 type Argument struct {
 	Es *ExternalParam
-
-	info     *vm.OperatorInfo
-	children []vm.Operator
-	buf      *batch.Batch
 }
 
-func (arg *Argument) SetInfo(info *vm.OperatorInfo) {
-	arg.info = info
-}
-
-func (arg *Argument) AppendChild(child vm.Operator) {
-	arg.children = append(arg.children, child)
-}
-
-func (arg *Argument) Free(proc *process.Process, pipelineFailed bool, err error) {
-	if arg.buf != nil {
-		arg.buf.Clean(proc.Mp())
-		arg.buf = nil
-	}
-}
+func (arg *Argument) Free(*process.Process, bool) {}
 
 type ParseLineHandler struct {
 	csvReader *csv.Reader

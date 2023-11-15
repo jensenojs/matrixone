@@ -171,7 +171,6 @@ func CalculateStorageUsage(ctx context.Context, sqlExecutor func() ie.InternalEx
 				return err
 			}
 			logger.Debug("storage_usage", zap.String("account", account), zap.Float64("sizeMB", sizeMB))
-
 			metric.StorageUsage(account).Set(sizeMB)
 		}
 
@@ -194,7 +193,7 @@ func checkNewAccountSize(ctx context.Context, logger *log.MOLogger, sqlExecutor 
 	ctx, span := trace.Start(ctx, "checkNewAccountSize")
 	defer span.End()
 	logger = logger.WithContext(ctx)
-	logger.Info("checkNewAccountSize started")
+	logger.Info("started")
 	defer func() {
 		logger.Info("checkNewAccountSize exit", zap.Error(err))
 	}()
@@ -209,7 +208,6 @@ func checkNewAccountSize(ctx context.Context, logger *log.MOLogger, sqlExecutor 
 	var interval = GetStorageUsageCheckNewInterval()
 	var next = time.NewTicker(interval)
 	var lastCheckTime = time.Now().Add(-time.Second)
-	var newAccountCnt uint64
 	for {
 		select {
 		case <-ctx.Done():
@@ -236,22 +234,22 @@ func checkNewAccountSize(ctx context.Context, logger *log.MOLogger, sqlExecutor 
 			spanQ.AddExtraFields(zap.Time("last_check_time", lastCheckTime))
 			spanQ.AddExtraFields(zap.Time("now", now))
 			logger.Debug("query new account", zap.String("sql", sql))
-			return executor.Query(ctx, sql, opts)
+			return executor.Query(ctx, ShowAllAccountSQL, opts)
 		}
 		result := getNewAccounts(ctx, sql, lastCheckTime, now)
 		lastCheckTime = now
 		err = result.Error()
 		if err != nil {
 			logger.Error("failed to fetch new created account", zap.Error(err), zap.String("sql", sql))
-			goto nextL
+			continue
 		}
 
-		newAccountCnt = result.RowCount()
-		if newAccountCnt == 0 {
+		cnt := result.RowCount()
+		if cnt == 0 {
 			logger.Debug("got empty new account info, wait next round")
-			goto nextL
+			continue
 		}
-		logger.Debug("collect new account cnt", zap.Uint64("cnt", newAccountCnt))
+		logger.Debug("collect new account cnt", zap.Uint64("cnt", cnt))
 		for rowIdx := uint64(0); rowIdx < result.RowCount(); rowIdx++ {
 
 			account, err := result.StringValueByName(ctx, rowIdx, ColumnAccountName)
@@ -271,7 +269,7 @@ func checkNewAccountSize(ctx context.Context, logger *log.MOLogger, sqlExecutor 
 				defer spanQ.End()
 				spanQ.AddExtraFields(zap.String("account", account))
 				logger.Debug("query one account", zap.String("sql", sql))
-				return executor.Query(ctx, sql, opts)
+				return executor.Query(ctx, ShowAllAccountSQL, opts)
 			}
 			showRet := getOneAccount(ctx, showSql)
 			err = showRet.Error()
@@ -293,13 +291,11 @@ func checkNewAccountSize(ctx context.Context, logger *log.MOLogger, sqlExecutor 
 			// done query.
 
 			// update new accounts metric
-			logger.Info("new account storage_usage", zap.String("account", account), zap.Float64("sizeMB", sizeMB),
+			logger.Debug("storage_usage", zap.String("account", account), zap.Float64("sizeMB", sizeMB),
 				zap.String("created_time", createdTime))
-
 			metric.StorageUsage(account).Set(sizeMB)
 		}
 
-	nextL:
 		// reset next Round
 		next.Reset(GetStorageUsageCheckNewInterval())
 		logger.Debug("wait next round, check new account")

@@ -36,7 +36,6 @@ var (
 )
 
 type service struct {
-	uuid      string
 	logger    *log.MOLogger
 	cfg       Config
 	store     IncrValueStore
@@ -54,13 +53,11 @@ type service struct {
 }
 
 func NewIncrService(
-	uuid string,
 	store IncrValueStore,
 	cfg Config) AutoIncrementService {
 	logger := getLogger()
 	cfg.adjust()
 	s := &service{
-		uuid:      uuid,
 		logger:    logger,
 		cfg:       cfg,
 		store:     store,
@@ -75,10 +72,6 @@ func NewIncrService(
 		panic(err)
 	}
 	return s
-}
-
-func (s *service) UUID() string {
-	return s.uuid
 }
 
 func (s *service) Create(

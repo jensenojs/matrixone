@@ -15,58 +15,47 @@
 package logtailreplay
 
 import (
-	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
-	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/tidwall/btree"
 )
 
-type ObjectsIter interface {
+type BlocksIter interface {
 	Next() bool
 	Close() error
-	Entry() ObjectEntry
+	Entry() BlockEntry
 }
 
-type objectsIter struct {
+type blocksIter struct {
 	ts          types.TS
-	iter        btree.IterG[ObjectIndexByCreateTSEntry]
+	iter        btree.IterG[BlockEntry]
 	firstCalled bool
 }
 
-// not accurate!  only used by stats
-func (p *PartitionState) ApproxObjectsNum() int {
-	return p.dataObjects.Len()
-}
-
-func (p *PartitionState) NewObjectsIter(ts types.TS) (*objectsIter, error) {
+func (p *PartitionState) NewBlocksIter(ts types.TS) (*blocksIter, error) {
 	if ts.Less(p.minTS) {
 		return nil, moerr.NewTxnStaleNoCtx()
 	}
-	iter := p.dataObjectsByCreateTS.Copy().Iter()
-	ret := &objectsIter{
+	iter := p.blocks.Copy().Iter()
+	ret := &blocksIter{
 		ts:   ts,
 		iter: iter,
 	}
 	return ret, nil
 }
 
-var _ ObjectsIter = new(objectsIter)
+var _ BlocksIter = new(blocksIter)
 
-func (b *objectsIter) Next() bool {
+func (b *blocksIter) Next() bool {
 	for {
 
 		if !b.firstCalled {
-			if !b.iter.Seek(ObjectIndexByCreateTSEntry{
-				CreateTime: b.ts.Next(),
-			}) {
-				if !b.iter.Last() {
-					return false
-				}
+			if !b.iter.First() {
+				return false
 			}
 			b.firstCalled = true
 		} else {
-			if !b.iter.Prev() {
+			if !b.iter.Next() {
 				return false
 			}
 		}
@@ -82,26 +71,17 @@ func (b *objectsIter) Next() bool {
 	}
 }
 
-func (b *objectsIter) Entry() ObjectEntry {
-	return ObjectEntry{
-		ShortObjName: b.iter.Item().ShortObjName,
-		ObjectInfo:   b.iter.Item().ObjectInfo,
-	}
+func (b *blocksIter) Entry() BlockEntry {
+	return b.iter.Item()
 }
 
-func (b *objectsIter) Close() error {
+func (b *blocksIter) Close() error {
 	b.iter.Release()
 	return nil
 }
 
-type BlocksIter interface {
-	Next() bool
-	Close() error
-	Entry() types.Blockid
-}
-
 type dirtyBlocksIter struct {
-	iter        btree.IterG[types.Blockid]
+	iter        btree.IterG[BlockEntry]
 	firstCalled bool
 }
 
@@ -126,7 +106,7 @@ func (b *dirtyBlocksIter) Next() bool {
 	return b.iter.Next()
 }
 
-func (b *dirtyBlocksIter) Entry() types.Blockid {
+func (b *dirtyBlocksIter) Entry() BlockEntry {
 	return b.iter.Item()
 }
 
@@ -135,19 +115,19 @@ func (b *dirtyBlocksIter) Close() error {
 	return nil
 }
 
-// GetChangedObjsBetween get changed objects between [begin, end]
-func (p *PartitionState) GetChangedObjsBetween(
+// GetChangedBlocksBetween get changed blocks between two timestamps
+func (p *PartitionState) GetChangedBlocksBetween(
 	begin types.TS,
 	end types.TS,
 ) (
-	deleted []objectio.ObjectNameShort,
-	inserted []objectio.ObjectNameShort,
+	deleted []types.Blockid,
+	inserted []types.Blockid,
 ) {
 
-	iter := p.objectIndexByTS.Copy().Iter()
+	iter := p.blockIndexByTS.Copy().Iter()
 	defer iter.Release()
 
-	for ok := iter.Seek(ObjectIndexByTSEntry{
+	for ok := iter.Seek(BlockIndexByTSEntry{
 		Time: begin,
 	}); ok; ok = iter.Next() {
 		entry := iter.Item()
@@ -157,51 +137,14 @@ func (p *PartitionState) GetChangedObjsBetween(
 		}
 
 		if entry.IsDelete {
-			deleted = append(deleted, entry.ShortObjName)
+			deleted = append(deleted, entry.BlockID)
 		} else {
 			if !entry.IsAppendable {
-				inserted = append(inserted, entry.ShortObjName)
+				inserted = append(inserted, entry.BlockID)
 			}
 		}
 
 	}
 
 	return
-}
-
-func (p *PartitionState) GetBockDeltaLoc(bid types.Blockid) (catalog.ObjectLocation, types.TS, bool) {
-	iter := p.blockDeltas.Copy().Iter()
-	defer iter.Release()
-
-	if ok := iter.Seek(BlockDeltaEntry{
-		BlockID: bid,
-	}); ok {
-		e := iter.Item()
-		return e.DeltaLoc, e.CommitTs, true
-	}
-	return catalog.ObjectLocation{}, types.TS{}, false
-}
-
-func (p *PartitionState) BlockPersisted(blockID types.Blockid) bool {
-	iter := p.dataObjects.Copy().Iter()
-	defer iter.Release()
-
-	if ok := iter.Seek(ObjectEntry{
-		ShortObjName: *objectio.ShortName(&blockID),
-	}); ok {
-		return true
-	}
-	return false
-}
-
-func (p *PartitionState) GetObject(name objectio.ObjectNameShort) (ObjectInfo, bool) {
-	iter := p.dataObjects.Copy().Iter()
-	defer iter.Release()
-
-	if ok := iter.Seek(ObjectEntry{
-		ShortObjName: name,
-	}); ok {
-		return iter.Item().ObjectInfo, true
-	}
-	return ObjectInfo{}, false
 }

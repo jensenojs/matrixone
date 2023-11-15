@@ -90,8 +90,6 @@ func (s *scheduler) StopScheduleCronTask() {
 func (s *scheduler) queryTasks(status task.TaskStatus) []task.AsyncTask {
 	ts := s.taskServiceGetter()
 	if ts == nil {
-		runtime.ProcessLevelRuntime().Logger().Error("task service is nil",
-			zap.String("status", status.String()))
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), taskSchedulerDefaultTimeout)
@@ -131,14 +129,9 @@ func (s *scheduler) allocateTask(ts taskservice.TaskService, t task.AsyncTask, o
 		runtime.ProcessLevelRuntime().Logger().Error("failed to allocate task",
 			zap.Uint64("task-id", t.ID),
 			zap.String("task-metadata-id", t.Metadata.ID),
-			zap.String("task-runner", runner),
-			zap.Error(err))
+			zap.String("task-runner", runner))
 		return
 	}
-	runtime.ProcessLevelRuntime().Logger().Info("task allocated",
-		zap.Uint64("task-id", t.ID),
-		zap.String("task-metadata-id", t.Metadata.ID),
-		zap.String("task-runner", runner))
 	orderedCN.inc(t.TaskRunner)
 }
 

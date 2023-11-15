@@ -14,10 +14,7 @@
 
 package fileservice
 
-import (
-	"io"
-	"sync/atomic"
-)
+import "io"
 
 type readCloser struct {
 	r         io.Reader
@@ -36,14 +33,14 @@ func (r *readCloser) Close() error {
 
 type countingReader struct {
 	R io.Reader
-	C *atomic.Int64
+	N int64
 }
 
 var _ io.Reader = new(countingReader)
 
 func (c *countingReader) Read(data []byte) (int, error) {
 	n, err := c.R.Read(data)
-	c.C.Add(int64(n))
+	c.N += int64(n)
 	return n, err
 }
 

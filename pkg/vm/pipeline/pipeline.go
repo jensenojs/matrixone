@@ -16,11 +16,8 @@ package pipeline
 
 import (
 	"bytes"
-
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/perfcounter"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/table_scan"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/value_scan"
 	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -56,7 +53,7 @@ func (p *Pipeline) Run(r engine.Reader, proc *process.Process) (end bool, err er
 		_ = perfCounterSet //TODO
 	}()
 
-	// var bat *batch.Batch
+	var bat *batch.Batch
 	// used to handle some push-down request
 	if p.reg != nil {
 		select {
@@ -64,30 +61,31 @@ func (p *Pipeline) Run(r engine.Reader, proc *process.Process) (end bool, err er
 		case <-p.reg.Ch:
 		}
 	}
-
-	for _, ins := range p.instructions {
-		ins.Idx += 1
-		ins.IsFirst = false
-	}
-
-	tableScanOperator := table_scan.Argument{
-		Reader: r,
-		Attrs:  p.attrs,
-	}
-	p.instructions = append([]vm.Instruction{
-		{
-			Op:      vm.TableScan,
-			Idx:     0,
-			Arg:     &tableScanOperator,
-			IsFirst: true,
-			IsLast:  false,
-		},
-	}, p.instructions...)
-
 	if err = vm.Prepare(p.instructions, proc); err != nil {
 		return false, err
 	}
+
+	analyzeIdx := p.instructions[0].Idx
+	a := proc.GetAnalyze(analyzeIdx)
 	for {
+		select {
+		case <-proc.Ctx.Done():
+			proc.SetInputBatch(nil)
+			return true, nil
+		default:
+		}
+		// read data from storage engine
+		if bat, err = r.Read(proc.Ctx, p.attrs, nil, proc.Mp(), proc); err != nil {
+			return false, err
+		}
+		if bat != nil {
+			bat.Cnt = 1
+
+			a.S3IOByte(bat)
+			a.Alloc(int64(bat.Size()))
+		}
+
+		proc.SetInputBatch(bat)
 		end, err = vm.Run(p.instructions, proc)
 		if err != nil {
 			return end, err
@@ -107,37 +105,21 @@ func (p *Pipeline) ConstRun(bat *batch.Batch, proc *process.Process) (end bool, 
 		case <-p.reg.Ch:
 		}
 	}
-	pipelineInputBatches := []*batch.Batch{bat, nil}
-
-	for _, ins := range p.instructions {
-		ins.Idx += 1
-		ins.IsFirst = false
-	}
-
-	valueScanOperator := value_scan.Argument{
-		Batchs: pipelineInputBatches,
-	}
-	p.instructions = append([]vm.Instruction{
-		{
-			Op:      vm.ValueScan,
-			Idx:     0,
-			Arg:     &valueScanOperator,
-			IsFirst: true,
-			IsLast:  false,
-		},
-	}, p.instructions...)
 
 	if err = vm.Prepare(p.instructions, proc); err != nil {
 		return false, err
 	}
-
+	pipelineInputBatches := []*batch.Batch{bat, nil}
 	for {
-		end, err = vm.Run(p.instructions, proc)
-		if err != nil {
-			return end, err
-		}
-		if end {
-			return end, nil
+		for i := range pipelineInputBatches {
+			proc.SetInputBatch(pipelineInputBatches[i])
+			end, err = vm.Run(p.instructions, proc)
+			if err != nil {
+				return end, err
+			}
+			if end {
+				return end, nil
+			}
 		}
 	}
 }

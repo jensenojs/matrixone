@@ -16,20 +16,18 @@ package mergecte
 
 import (
 	"bytes"
-
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(_ any, buf *bytes.Buffer) {
 	buf.WriteString(" merge cte ")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) error {
-	ap := arg
+func Prepare(proc *process.Process, arg any) error {
+	ap := arg.(*Argument)
 	ap.ctr = new(container)
 	ap.ctr.InitReceiver(proc, true)
 	ap.ctr.nodeCnt = int32(len(proc.Reg.MergeReceivers)) - 1
@@ -38,61 +36,58 @@ func (arg *Argument) Prepare(proc *process.Process) error {
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	anal := proc.GetAnalyze(arg.info.Idx)
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
+	ap := arg.(*Argument)
+	ctr := ap.ctr
+	var sb *batch.Batch
 	var end bool
 	var err error
-	result := vm.NewCallResult()
-	if arg.buf != nil {
-		proc.PutBatch(arg.buf)
-		arg.buf = nil
-	}
-	switch arg.ctr.status {
+
+	switch ctr.status {
 	case sendInitial:
-		arg.buf, _, err = arg.ctr.ReceiveFromSingleReg(0, anal)
+		sb, _, err = ctr.ReceiveFromSingleReg(0, anal)
 		if err != nil {
-			result.Status = vm.ExecStop
-			return result, err
+			return process.ExecStop, err
 		}
-		if arg.buf == nil {
-			arg.ctr.status = sendLastTag
+		if sb == nil {
+			ctr.status = sendLastTag
 		}
 		fallthrough
 	case sendLastTag:
-		if arg.ctr.status == sendLastTag {
-			arg.ctr.status = sendRecursive
-			arg.buf = makeRecursiveBatch(proc)
-			arg.ctr.RemoveChosen(1)
+		if ctr.status == sendLastTag {
+			ctr.status = sendRecursive
+			sb = makeRecursiveBatch(proc)
+			ctr.RemoveChosen(1)
 		}
 	case sendRecursive:
 		for {
-			arg.buf, end, _ = arg.ctr.ReceiveFromAllRegs(anal)
-			if arg.buf == nil || end {
-				result.Batch = nil
-				result.Status = vm.ExecStop
-				return result, nil
+			sb, end, _ = ctr.ReceiveFromAllRegs(anal)
+			if sb == nil || end {
+				proc.SetInputBatch(nil)
+				return process.ExecStop, nil
 			}
-			if !arg.buf.Last() {
+			if !sb.Last() {
 				break
 			}
 
-			arg.buf.SetLast()
-			arg.ctr.curNodeCnt--
-			if arg.ctr.curNodeCnt == 0 {
-				arg.ctr.curNodeCnt = arg.ctr.nodeCnt
+			sb.SetLast()
+			ap.ctr.curNodeCnt--
+			if ap.ctr.curNodeCnt == 0 {
+				ap.ctr.curNodeCnt = ap.ctr.nodeCnt
 				break
 			} else {
-				proc.PutBatch(arg.buf)
+				proc.PutBatch(sb)
 			}
 		}
 	}
 
-	anal.Input(arg.buf, arg.info.IsFirst)
-	anal.Output(arg.buf, arg.info.IsLast)
-	result.Batch = arg.buf
-	return result, nil
+	anal.Input(sb, isFirst)
+	anal.Output(sb, isLast)
+	proc.SetInputBatch(sb)
+	return process.ExecNext, nil
 }
 
 func makeRecursiveBatch(proc *process.Process) *batch.Batch {
@@ -100,7 +95,7 @@ func makeRecursiveBatch(proc *process.Process) *batch.Batch {
 	b.Attrs = []string{
 		"recursive_col",
 	}
-	b.SetVector(0, proc.GetVector(types.T_varchar.ToType()))
+	b.SetVector(0, vector.NewVec(types.T_varchar.ToType()))
 	vector.AppendBytes(b.GetVector(0), []byte("check recursive status"), false, proc.GetMPool())
 	batch.SetLength(b, 1)
 	b.SetLast()

@@ -29,7 +29,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/pipeline"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 	"go.uber.org/zap"
@@ -40,7 +39,8 @@ var (
 	retryWithDefChangedError = moerr.NewTxnNeedRetryWithDefChangedNoCtx()
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(v any, buf *bytes.Buffer) {
+	arg := v.(*Argument)
 	buf.WriteString("lock-op(")
 	n := len(arg.targets) - 1
 	for idx, target := range arg.targets {
@@ -55,7 +55,8 @@ func (arg *Argument) String(buf *bytes.Buffer) {
 	buf.WriteString(")")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) error {
+func Prepare(proc *process.Process, v any) error {
+	arg := v.(*Argument)
 	arg.rt = &state{}
 	arg.rt.fetchers = make([]FetchLockRowsFunc, 0, len(arg.targets))
 	for idx := range arg.targets {
@@ -78,46 +79,57 @@ func (arg *Argument) Prepare(proc *process.Process) error {
 // concurrently modified by other transactions, a Timestamp column will be put on the output
 // vectors for querying the latest data, and subsequent op needs to check this column to check
 // whether the latest data needs to be read.
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
+func Call(
+	idx int,
+	proc *process.Process,
+	v any,
+	isFirst bool,
+	isLast bool) (process.ExecStatus, error) {
+	arg, ok := v.(*Argument)
+	if !ok {
+		getLogger().Fatal("invalid argument",
+			zap.Any("argument", arg))
+	}
+
 	txnOp := proc.TxnOperator
 	if !txnOp.Txn().IsPessimistic() {
-		return arg.children[0].Call(proc)
+		return process.ExecNext, nil
 	}
 
 	if !arg.block {
-		return callNonBlocking(arg.info.Idx, proc, arg)
+		ok, err := callNonBlocking(idx, proc, arg)
+		if ok {
+			return process.ExecStop, err
+		}
+		return process.ExecNext, err
 	}
-
-	return callBlocking(arg.info.Idx, proc, arg, arg.info.IsFirst, arg.info.IsLast)
-	// if ok {
-	// 	result.Status = vm.ExecStop
-	// 	return result, err
-	// }
-	// return result, err
+	ok, err := callBlocking(idx, proc, arg, isFirst, isLast)
+	if ok {
+		return process.ExecStop, err
+	}
+	return process.ExecNext, err
 }
 
 func callNonBlocking(
 	idx int,
 	proc *process.Process,
-	arg *Argument) (vm.CallResult, error) {
+	arg *Argument) (bool, error) {
+	bat := proc.InputBatch()
 
-	result, err := arg.children[0].Call(proc)
-	if err != nil {
-		return result, err
+	if bat == nil {
+		return true, arg.rt.retryError
 	}
-	if result.Batch == nil {
-		return result, arg.rt.retryError
-	}
-	bat := result.Batch
 	if bat.IsEmpty() {
-		return result, err
+		proc.PutBatch(bat)
+		proc.SetInputBatch(batch.EmptyBatch)
+		return false, nil
 	}
 
 	if err := performLock(bat, proc, arg); err != nil {
-		return result, err
+		bat.Clean(proc.Mp())
+		return true, err
 	}
-
-	return result, nil
+	return false, nil
 }
 
 func callBlocking(
@@ -125,67 +137,65 @@ func callBlocking(
 	proc *process.Process,
 	arg *Argument,
 	isFirst bool,
-	isLast bool) (vm.CallResult, error) {
+	isLast bool) (bool, error) {
 
-	anal := proc.GetAnalyze(arg.info.Idx)
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
 
-	result := vm.NewCallResult()
-	if arg.rt.step == stepLock {
-		for {
-			bat, err := arg.getBatch(proc, anal, isFirst)
-			if err != nil {
-				return result, err
-			}
+	proc.SetInputBatch(batch.EmptyBatch)
 
-			// no input batch any more, means all lock performed.
-			if bat == nil {
-				arg.rt.step = stepDownstream
-				if len(arg.rt.cachedBatches) == 0 {
-					arg.rt.step = stepEnd
-				}
-				break
-			}
-
-			// skip empty batch
-			if bat.IsEmpty() {
-				continue
-			}
-
-			if err := performLock(bat, proc, arg); err != nil {
-				return result, err
-			}
-
-			// blocking lock node. Never pass the input batch into downstream operators before
-			// all lock are performed.
-			arg.rt.cachedBatches = append(arg.rt.cachedBatches, bat)
+	switch arg.rt.step {
+	case stepLock:
+		bat, err := arg.getBatch(proc, anal, isFirst)
+		if err != nil {
+			return false, err
 		}
-	}
 
-	if arg.rt.step == stepDownstream {
+		// no input batch any more, means all lock performed.
+		if bat == nil {
+			arg.rt.step = stepDownstream
+			if len(arg.rt.cachedBatches) == 0 {
+				arg.rt.step = stepEnd
+			}
+			return false, nil
+		}
+
+		// skip empty batch
+		if bat.IsEmpty() {
+			proc.PutBatch(bat)
+			return false, nil
+		}
+
+		if err := performLock(bat, proc, arg); err != nil {
+			bat.Clean(proc.Mp())
+			return false, err
+		}
+		// blocking lock node. Never pass the input batch into downstream operators before
+		// all lock are performed.
+		arg.rt.cachedBatches = append(arg.rt.cachedBatches, bat)
+		return false, nil
+	case stepDownstream:
 		if arg.rt.retryError != nil {
 			arg.rt.step = stepEnd
-			return result, arg.rt.retryError
+			return false, nil
 		}
 
+		bat := arg.rt.cachedBatches[0]
+		arg.rt.cachedBatches = arg.rt.cachedBatches[1:]
 		if len(arg.rt.cachedBatches) == 0 {
 			arg.rt.step = stepEnd
-		} else {
-			bat := arg.rt.cachedBatches[0]
-			arg.rt.cachedBatches = arg.rt.cachedBatches[1:]
-			result.Batch = bat
-			return result, nil
 		}
-	}
 
-	if arg.rt.step == stepEnd {
-		result.Status = vm.ExecStop
+		proc.SetInputBatch(bat)
+		return false, nil
+	case stepEnd:
 		arg.cleanCachedBatch(proc)
-		return result, arg.rt.retryError
+		proc.SetInputBatch(nil)
+		return true, arg.rt.retryError
+	default:
+		panic("BUG")
 	}
-
-	panic("BUG")
 }
 
 func performLock(
@@ -315,7 +325,6 @@ func LockRows(
 	tableID uint64,
 	vec *vector.Vector,
 	pkType types.Type,
-	lockMode lock.LockMode,
 ) error {
 	if !proc.TxnOperator.Txn().IsPessimistic() {
 		return nil
@@ -326,7 +335,6 @@ func LockRows(
 
 	opts := DefaultLockOptions(parker).
 		WithLockTable(false, false).
-		WithLockMode(lockMode).
 		WithFetchLockRowsFunc(GetFetchRowsFunc(pkType))
 	_, defChanged, refreshTS, err := doLock(
 		proc.Ctx,
@@ -405,7 +413,7 @@ func doLock(
 		}
 	} else {
 		// FIXME: in launch model, multi-cn will use same process level runtime. So lockservice will be wrong.
-		if txn.LockService != lockService.GetServiceID() {
+		if txn.LockService != lockService.GetConfig().ServiceID {
 			lockService = lockservice.GetLockServiceByServiceID(txn.LockService)
 		}
 	}
@@ -707,7 +715,9 @@ func (arg *Argument) AddLockTargetWithPartitionAndMode(
 }
 
 // Free free mem
-func (arg *Argument) Free(proc *process.Process, pipelineFailed bool, err error) {
+func (arg *Argument) Free(
+	proc *process.Process,
+	pipelineFailed bool) {
 	if arg.rt == nil {
 		return
 	}
@@ -720,10 +730,9 @@ func (arg *Argument) Free(proc *process.Process, pipelineFailed bool, err error)
 }
 
 func (arg *Argument) cleanCachedBatch(proc *process.Process) {
-	// do not need clean,  only set nil
-	// for _, bat := range arg.rt.cachedBatches {
-	// 	bat.Clean(proc.Mp())
-	// }
+	for _, bat := range arg.rt.cachedBatches {
+		bat.Clean(proc.Mp())
+	}
 	arg.rt.cachedBatches = nil
 }
 

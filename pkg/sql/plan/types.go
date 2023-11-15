@@ -22,7 +22,6 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
-	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 )
 
 const (
@@ -85,7 +84,7 @@ type CompilerContext interface {
 	// get the list of the account id
 	ResolveAccountIds(accountNames []string) ([]uint32, error)
 	// get the relevant information of udf
-	ResolveUdf(name string, args []*Expr) (*function.Udf, error)
+	ResolveUdf(name string, args []*Expr) (string, error)
 	// get the definition of primary key
 	GetPrimaryKeyDef(dbName string, tableName string) []*ColDef
 	// get needed info for stats by table
@@ -208,22 +207,17 @@ type BindContext struct {
 	resultTag    int32
 	sinkTag      int32
 	windowTag    int32
-	timeTag      int32
 
 	groups     []*plan.Expr
 	aggregates []*plan.Expr
 	projects   []*plan.Expr
 	results    []*plan.Expr
 	windows    []*plan.Expr
-	times      []*plan.Expr
 
 	groupByAst     map[string]int32
 	aggregateByAst map[string]int32
 	windowByAst    map[string]int32
 	projectByExpr  map[string]int32
-	timeByAst      map[string]int32
-
-	timeAsts []tree.Expr
 
 	aliasMap map[string]*aliasItem
 
@@ -268,7 +262,6 @@ type Binder interface {
 	BindAggFunc(string, *tree.FuncExpr, int32, bool) (*plan.Expr, error)
 	BindWinFunc(string, *tree.FuncExpr, int32, bool) (*plan.Expr, error)
 	BindSubquery(*tree.Subquery, bool) (*plan.Expr, error)
-	BindTimeWindowFunc(string, *tree.FuncExpr, int32, bool) (*plan.Expr, error)
 	GetContext() context.Context
 }
 

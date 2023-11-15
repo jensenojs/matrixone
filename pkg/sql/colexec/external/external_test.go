@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -74,11 +73,6 @@ func newTestCase(all bool, format, jsondata string) externalTestCase {
 					Filter:    &FilterParam{},
 				},
 			},
-			info: &vm.OperatorInfo{
-				Idx:     1,
-				IsFirst: false,
-				IsLast:  false,
-			},
 		},
 		cancel:   cancel,
 		format:   format,
@@ -96,7 +90,7 @@ func init() {
 
 func Test_String(t *testing.T) {
 	buf := new(bytes.Buffer)
-	cases[0].arg.String(buf)
+	String(cases[0].arg, buf)
 }
 
 func Test_Prepare(t *testing.T) {
@@ -124,7 +118,7 @@ func Test_Prepare(t *testing.T) {
 			}
 			param.CreateSql = string(json_byte)
 			tcs.arg.Es.Extern = extern
-			err = tcs.arg.Prepare(tcs.proc)
+			err = Prepare(tcs.proc, tcs.arg)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(param.FileList, convey.ShouldBeNil)
 			convey.So(param.Fileparam.FileCnt, convey.ShouldEqual, 0)
@@ -133,7 +127,7 @@ func Test_Prepare(t *testing.T) {
 			json_byte, err = json.Marshal(extern)
 			convey.So(err, convey.ShouldBeNil)
 			param.CreateSql = string(json_byte)
-			err = tcs.arg.Prepare(tcs.proc)
+			err = Prepare(tcs.proc, tcs.arg)
 			convey.So(err, convey.ShouldBeNil)
 
 			if tcs.format == tree.JSONLINE {
@@ -151,7 +145,7 @@ func Test_Prepare(t *testing.T) {
 				json_byte, err = json.Marshal(extern)
 				convey.So(err, convey.ShouldBeNil)
 				param.CreateSql = string(json_byte)
-				err = tcs.arg.Prepare(tcs.proc)
+				err = Prepare(tcs.proc, tcs.arg)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(param.FileList, convey.ShouldResemble, []string(nil))
 				convey.So(param.Fileparam.FileCnt, convey.ShouldEqual, 0)
@@ -161,7 +155,7 @@ func Test_Prepare(t *testing.T) {
 				convey.So(err, convey.ShouldBeNil)
 				param.CreateSql = string(json_byte)
 
-				err = tcs.arg.Prepare(tcs.proc)
+				err = Prepare(tcs.proc, tcs.arg)
 				convey.So(err, convey.ShouldBeNil)
 			}
 		}
@@ -195,19 +189,19 @@ func Test_Call(t *testing.T) {
 				},
 			}
 			param.FileSize = []int64{1}
-			end, err := tcs.arg.Call(tcs.proc)
+			end, err := Call(1, tcs.proc, tcs.arg, false, false)
 			convey.So(err, convey.ShouldNotBeNil)
-			convey.So(end.Status == vm.ExecStop, convey.ShouldBeFalse)
+			convey.So(end == process.ExecStop, convey.ShouldBeFalse)
 
 			param.Fileparam.End = false
-			end, err = tcs.arg.Call(tcs.proc)
+			end, err = Call(1, tcs.proc, tcs.arg, false, false)
 			convey.So(err, convey.ShouldBeNil)
-			convey.So(end.Status == vm.ExecStop, convey.ShouldBeTrue)
+			convey.So(end == process.ExecStop, convey.ShouldBeTrue)
 
 			param.Fileparam.End = true
-			end, err = tcs.arg.Call(tcs.proc)
+			end, err = Call(1, tcs.proc, tcs.arg, false, false)
 			convey.So(err, convey.ShouldBeNil)
-			convey.So(end.Status == vm.ExecStop, convey.ShouldBeTrue)
+			convey.So(end == process.ExecStop, convey.ShouldBeTrue)
 		}
 	})
 }

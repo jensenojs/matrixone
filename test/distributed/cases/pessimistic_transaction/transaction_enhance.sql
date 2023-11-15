@@ -118,6 +118,7 @@ rollback;
 show create table atomic_table_12_1;
 show index from atomic_table_12_1;
 
+-- @bvt:issue#11498
 drop table if exists atomic_table_12_2;
 drop table if exists atomic_table_13;
 create table atomic_table_12_2(c1 int primary key,c2 varchar(25));
@@ -187,6 +188,7 @@ select * from atomic_table_12_5;
 -- @session}
 commit;
 show index from atomic_table_12_5;
+-- @bvt:issue
 
 -- w-w conflict
 drop table if exists atomic_table_14;
@@ -369,6 +371,7 @@ select * from atomic_table_12_5;
 show create table atomic_table_12_5;
 
 -- alter table change primary key column
+-- @bvt:issue#11774
 drop table if exists alter01;
 create table alter01(col1 int primary key,col2 varchar(25));
 insert into alter01 values (3,"a"),(4,"b"),(5,"c");
@@ -382,6 +385,7 @@ select * from alter01;
 -- @session
 insert into alter01 values (6,"h");
 select * from alter01;
+-- @bvt:issue
 
 -- alter table rename column
 drop table if exists atomic_table_12_5;
@@ -400,6 +404,7 @@ select * from atomic_table_12_5;
 show create table atomic_table_12_5;
 
 -- alter table rename primary key column
+-- @bvt:issue#11774
 drop table if exists alter01;
 create table alter01(col1 int primary key,col2 varchar(25));
 insert into alter01 values (3,"a"),(4,"b"),(5,"c");
@@ -413,6 +418,7 @@ select * from alter01;
 -- @session
 insert into alter01 values (6,"h");
 select * from alter01;
+-- @bvt:issue
 
 ----------------------------------------------------------
 -- alter table add primary key column
@@ -432,6 +438,7 @@ select * from alter01;
 
 ----------------------------------------------------------
 -- alter table drop primary key column
+-- @bvt:issue#11213
 drop table if exists alter01;
 create table alter01(col1 int primary key,col2 varchar(25));
 insert into alter01 values (3,"a"),(4,"b"),(5,"c");
@@ -445,3 +452,4 @@ select * from alter01;
 -- @session
 insert into alter01 values (6,"h");
 select * from alter01;
+-- @bvt:issue

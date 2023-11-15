@@ -15,6 +15,7 @@
 package table_function
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -27,7 +28,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -42,9 +42,9 @@ func genFilterMap(filters []string) map[string]struct{} {
 	return filterMap
 }
 
-// func unnestString(buf *bytes.Buffer) {
-// 	buf.WriteString("unnest")
-// }
+func unnestString(arg any, buf *bytes.Buffer) {
+	buf.WriteString("unnest")
+}
 
 func unnestPrepare(proc *process.Process, arg *Argument) error {
 	param := unnestParam{}
@@ -89,7 +89,7 @@ func unnestPrepare(proc *process.Process, arg *Argument) error {
 	return err
 }
 
-func unnestCall(_ int, proc *process.Process, arg *Argument, result *vm.CallResult) (bool, error) {
+func unnestCall(_ int, proc *process.Process, arg *Argument) (bool, error) {
 	var (
 		err      error
 		rbat     *batch.Batch
@@ -99,7 +99,6 @@ func unnestCall(_ int, proc *process.Process, arg *Argument, result *vm.CallResu
 		path     bytejson.Path
 		outer    bool
 	)
-	bat := result.Batch
 	defer func() {
 		if err != nil && rbat != nil {
 			rbat.Clean(proc.Mp())
@@ -114,12 +113,13 @@ func unnestCall(_ int, proc *process.Process, arg *Argument, result *vm.CallResu
 			outerVec.Free(proc.Mp())
 		}
 	}()
+	bat := proc.InputBatch()
 	if bat == nil {
 		return true, nil
 	}
 	if bat.IsEmpty() {
 		proc.PutBatch(bat)
-		result.Batch = batch.EmptyBatch
+		proc.SetInputBatch(batch.EmptyBatch)
 		return false, nil
 	}
 	jsonVec, err = arg.ctr.executorsForArgs[0].Eval(proc, []*batch.Batch{bat})
@@ -164,7 +164,7 @@ func unnestCall(_ int, proc *process.Process, arg *Argument, result *vm.CallResu
 	if err != nil {
 		return false, err
 	}
-	result.Batch = rbat
+	proc.SetInputBatch(rbat)
 	return false, nil
 }
 
@@ -180,7 +180,7 @@ func handle(jsonVec *vector.Vector, path *bytejson.Path, outer bool, param *unne
 	rbat.Attrs = arg.Attrs
 	rbat.Cnt = 1
 	for i := range arg.retSchema {
-		rbat.Vecs[i] = proc.GetVector(arg.retSchema[i])
+		rbat.Vecs[i] = vector.NewVec(arg.retSchema[i])
 	}
 
 	if jsonVec.IsConst() {

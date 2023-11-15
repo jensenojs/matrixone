@@ -17,8 +17,7 @@ package table_function
 import (
 	"bytes"
 	"fmt"
-
-	"github.com/matrixorigin/matrixone/pkg/vm"
+	"github.com/matrixorigin/matrixone/pkg/container/batch"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -26,89 +25,71 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	tblArg := arg
+func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	tblArg := arg.(*Argument)
 	var (
 		f bool
 		e error
 	)
-	idx := arg.info.Idx
-
-	result, err := arg.children[0].Call(proc)
-	if err != nil {
-		return result, err
-	}
 
 	switch tblArg.Name {
 	case "unnest":
-		f, e = unnestCall(idx, proc, tblArg, &result)
+		f, e = unnestCall(idx, proc, tblArg)
 	case "generate_series":
-		f, e = generateSeriesCall(idx, proc, tblArg, &result)
+		f, e = generateSeriesCall(idx, proc, tblArg)
 	case "meta_scan":
-		f, e = metaScanCall(idx, proc, tblArg, &result)
+		f, e = metaScanCall(idx, proc, tblArg)
 	case "current_account":
-		f, e = currentAccountCall(idx, proc, tblArg, &result)
+		f, e = currentAccountCall(idx, proc, tblArg)
 	case "metadata_scan":
-		f, e = metadataScan(idx, proc, tblArg, &result)
+		f, e = metadataScan(idx, proc, tblArg)
 	case "processlist":
-		f, e = processlist(idx, proc, tblArg, &result)
+		f, e = processlist(idx, proc, tblArg)
 	case "mo_locks":
-		f, e = moLocksCall(idx, proc, tblArg, &result)
+		f, e = moLocksCall(idx, proc, tblArg)
 	case "mo_configurations":
-		f, e = moConfigurationsCall(idx, proc, tblArg, &result)
-	case "mo_transactions":
-		f, e = moTransactionsCall(idx, proc, tblArg, &result)
-	case "mo_cache":
-		f, e = moCacheCall(idx, proc, tblArg, &result)
+		f, e = moConfigurationsCall(idx, proc, tblArg)
 	default:
-		result.Status = vm.ExecStop
-		return result, moerr.NewNotSupported(proc.Ctx, fmt.Sprintf("table function %s is not supported", tblArg.Name))
+		return process.ExecStop, moerr.NewNotSupported(proc.Ctx, fmt.Sprintf("table function %s is not supported", tblArg.Name))
 	}
 	if e != nil || f {
 		if f {
-			result.Status = vm.ExecStop
-			return result, e
+			return process.ExecStop, e
 		}
-		return result, e
+		return process.ExecNext, e
 	}
 
-	if arg.buf != nil {
-		proc.PutBatch(arg.buf)
-		arg.buf = nil
+	bat := proc.InputBatch()
+	if bat == nil {
+		return process.ExecStop, e
 	}
-	arg.buf = result.Batch
-	if arg.buf == nil {
-		result.Status = vm.ExecStop
-		return result, e
-	}
-	if arg.buf.IsEmpty() {
-		return result, e
+	if bat.IsEmpty() {
+		proc.PutBatch(bat)
+		proc.SetInputBatch(batch.EmptyBatch)
+		return process.ExecNext, e
 	}
 
-	if arg.buf.VectorCount() != len(tblArg.retSchema) {
-		result.Status = vm.ExecStop
-		return result, moerr.NewInternalError(proc.Ctx, "table function %s return length mismatch", tblArg.Name)
+	if bat.VectorCount() != len(tblArg.retSchema) {
+		return process.ExecStop, moerr.NewInternalError(proc.Ctx, "table function %s return length mismatch", tblArg.Name)
 	}
 	for i := range tblArg.retSchema {
-		if arg.buf.GetVector(int32(i)).GetType().Oid != tblArg.retSchema[i].Oid {
-			result.Status = vm.ExecStop
-			return result, moerr.NewInternalError(proc.Ctx, "table function %s return type mismatch", tblArg.Name)
+		if proc.InputBatch().GetVector(int32(i)).GetType().Oid != tblArg.retSchema[i].Oid {
+			return process.ExecStop, moerr.NewInternalError(proc.Ctx, "table function %s return type mismatch", tblArg.Name)
 		}
 	}
 
 	if f {
-		result.Status = vm.ExecStop
-		return result, e
+		return process.ExecStop, e
 	}
-	return result, e
+	return process.ExecNext, e
 }
 
-func (arg *Argument) String(buf *bytes.Buffer) {
-	buf.WriteString(arg.Name)
+func String(arg any, buf *bytes.Buffer) {
+	buf.WriteString(arg.(*Argument).Name)
 }
 
-func (arg *Argument) Prepare(proc *process.Process) error {
-	tblArg := arg
+func Prepare(proc *process.Process, arg any) error {
+	tblArg := arg.(*Argument)
 	tblArg.ctr = new(container)
 
 	retSchema := make([]types.Type, len(tblArg.Rets))
@@ -134,10 +115,6 @@ func (arg *Argument) Prepare(proc *process.Process) error {
 		return moLocksPrepare(proc, tblArg)
 	case "mo_configurations":
 		return moConfigurationsPrepare(proc, tblArg)
-	case "mo_transactions":
-		return moTransactionsPrepare(proc, tblArg)
-	case "mo_cache":
-		return moCachePrepare(proc, tblArg)
 	default:
 		return moerr.NewNotSupported(proc.Ctx, fmt.Sprintf("table function %s is not supported", tblArg.Name))
 	}

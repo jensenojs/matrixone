@@ -16,10 +16,11 @@ package checkpoint
 
 import (
 	"context"
+	"time"
+
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
-	"time"
 )
 
 type RunnerReader interface {

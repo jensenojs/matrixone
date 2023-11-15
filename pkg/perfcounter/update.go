@@ -14,23 +14,17 @@
 
 package perfcounter
 
-import (
-	"context"
-)
+import "context"
 
 func Update(ctx context.Context, fn func(*CounterSet), extraCounterSets ...*CounterSet) {
-	var counterSets CounterSets
-
-	// from context
 	v := ctx.Value(CtxKeyCounters)
+	var counterSets CounterSets
 	if v != nil {
 		counterSets = v.(CounterSets)
 		for set := range counterSets {
 			fn(set)
 		}
 	}
-
-	// extra
 	for _, set := range extraCounterSets {
 		if set == nil {
 			continue
@@ -42,11 +36,4 @@ func Update(ctx context.Context, fn func(*CounterSet), extraCounterSets ...*Coun
 		}
 		fn(set)
 	}
-
-	// global
-	if _, ok := counterSets[globalCounterSet]; !ok {
-		fn(globalCounterSet)
-	}
-
-	// per table TODO
 }

@@ -18,14 +18,13 @@ import (
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 )
 
 func BenchmarkFunctions(b *testing.B) {
 	vec := containers.MockVector2(types.T_int64.ToType(), 10000, 0)
 	defer vec.Close()
-	vec2 := containers.MakeVector(*vec.GetType(), common.DefaultAllocator)
+	vec2 := containers.MakeVector(*vec.GetType())
 	defer vec2.Close()
 	for i := 9999999; i < 9999999+1000; i++ {
 		vec2.Append(int64(i), false)

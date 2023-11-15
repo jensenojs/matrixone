@@ -19,16 +19,15 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/common/hashmap"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(_ interface{}, buf *bytes.Buffer) {
 	buf.WriteString("mergeroup()")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) error {
-	ap := arg
+func Prepare(proc *process.Process, arg interface{}) error {
+	ap := arg.(*Argument)
 	ap.ctr = new(container)
 	ap.ctr.InitReceiver(proc, true)
 	ap.ctr.inserted = make([]uint8, hashmap.UnitLimit)
@@ -36,30 +35,29 @@ func (arg *Argument) Prepare(proc *process.Process) error {
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	ap := arg
+func Call(idx int, proc *process.Process, arg interface{}, isFirst bool, isLast bool) (process.ExecStatus, error) {
+	ap := arg.(*Argument)
 	ctr := ap.ctr
-	anal := proc.GetAnalyze(arg.info.Idx)
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
-	result := vm.NewCallResult()
+
 	for {
 		switch ctr.state {
 		case Build:
 			for {
 				bat, end, err := ctr.ReceiveFromAllRegs(anal)
 				if err != nil {
-					result.Status = vm.ExecStop
-					return result, nil
+					return process.ExecStop, nil
 				}
 
 				if end {
 					break
 				}
-				anal.Input(bat, arg.info.IsFirst)
+				anal.Input(bat, isFirst)
 				if err = ctr.process(bat, proc); err != nil {
 					bat.Clean(proc.Mp())
-					return result, err
+					return process.ExecNext, err
 				}
 			}
 			ctr.state = Eval
@@ -71,7 +69,7 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 						vec, err := agg.Eval(proc.Mp())
 						if err != nil {
 							ctr.state = End
-							return result, err
+							return process.ExecNext, err
 						}
 						ctr.bat.Aggs[i] = nil
 						ctr.bat.Vecs = append(ctr.bat.Vecs, vec)
@@ -83,16 +81,17 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 					}
 					ctr.bat.Aggs = nil
 				}
-				anal.Output(ctr.bat, arg.info.IsLast)
-				result.Batch = ctr.bat
+				anal.Output(ctr.bat, isLast)
+				proc.SetInputBatch(ctr.bat)
+				ctr.bat = nil
+				ctr.state = End
+				return process.ExecNext, nil
 			}
 			ctr.state = End
-			return result, nil
 
 		case End:
-			result.Batch = nil
-			result.Status = vm.ExecStop
-			return result, nil
+			proc.SetInputBatch(nil)
+			return process.ExecStop, nil
 		}
 	}
 }

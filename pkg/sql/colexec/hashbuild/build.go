@@ -25,18 +25,17 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/pipeline"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
 const batchSize = 8192
 
-func (arg *Argument) String(buf *bytes.Buffer) {
+func String(_ any, buf *bytes.Buffer) {
 	buf.WriteString(" hash build ")
 }
 
-func (arg *Argument) Prepare(proc *process.Process) (err error) {
-	ap := arg
+func Prepare(proc *process.Process, arg any) (err error) {
+	ap := arg.(*Argument)
 	ap.ctr = new(container)
 	if len(proc.Reg.MergeReceivers) > 1 {
 		ap.ctr.InitReceiver(proc, true)
@@ -78,25 +77,24 @@ func (arg *Argument) Prepare(proc *process.Process) (err error) {
 
 	ap.ctr.bat = batch.NewWithSize(len(ap.Typs))
 	for i, typ := range ap.Typs {
-		ap.ctr.bat.Vecs[i] = proc.GetVector(typ)
+		ap.ctr.bat.Vecs[i] = vector.NewVec(typ)
 	}
 
 	return nil
 }
 
-func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
-	anal := proc.GetAnalyze(arg.Info.Idx)
+func Call(idx int, proc *process.Process, arg any, isFirst bool, _ bool) (process.ExecStatus, error) {
+	anal := proc.GetAnalyze(idx)
 	anal.Start()
 	defer anal.Stop()
-	result := vm.NewCallResult()
-	ap := arg
+	ap := arg.(*Argument)
 	ctr := ap.ctr
 	for {
 		switch ctr.state {
 		case BuildHashMap:
-			if err := ctr.build(ap, proc, anal, arg.Info.IsFirst); err != nil {
+			if err := ctr.build(ap, proc, anal, isFirst); err != nil {
 				ctr.cleanHashMap()
-				return result, err
+				return process.ExecNext, err
 			}
 			if ap.ctr.intHashMap != nil {
 				anal.Alloc(ap.ctr.intHashMap.Size())
@@ -107,7 +105,7 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 
 		case HandleRuntimeFilter:
 			if err := ctr.handleRuntimeFilter(ap, proc); err != nil {
-				return result, err
+				return process.ExecNext, err
 			}
 
 		case Eval:
@@ -119,21 +117,22 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 						ctr.bat.AuxData = hashmap.NewJoinMap(ctr.multiSels, nil, nil, ctr.strHashMap, ctr.hasNull, ap.IsDup)
 					}
 				}
-				result.Batch = ctr.bat
+
+				proc.SetInputBatch(ctr.bat)
 				ctr.intHashMap = nil
 				ctr.strHashMap = nil
+				ctr.bat = nil
 				ctr.multiSels = nil
 			} else {
 				ctr.cleanHashMap()
-				result.Batch = nil
+				proc.SetInputBatch(nil)
 			}
 			ctr.state = End
-			return result, nil
+			return process.ExecNext, nil
 
 		default:
-			result.Batch = nil
-			result.Status = vm.ExecStop
-			return result, nil
+			proc.SetInputBatch(nil)
+			return process.ExecStop, nil
 		}
 	}
 }
@@ -298,7 +297,7 @@ func (ctr *container) buildHashmapByMergedBatch(ap *Argument, proc *process.Proc
 			if len(ap.ctr.uniqueJoinKeys) == 0 {
 				ap.ctr.uniqueJoinKeys = make([]*vector.Vector, len(ctr.vecs))
 				for j, vec := range ctr.vecs {
-					ap.ctr.uniqueJoinKeys[j] = proc.GetVector(*vec.GetType())
+					ap.ctr.uniqueJoinKeys[j] = vector.NewVec(*vec.GetType())
 				}
 			}
 

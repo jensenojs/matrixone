@@ -34,7 +34,7 @@ import (
 )
 
 const derivedTableName = "_t"
-const maxRowThenUnusePkFilterExpr = 1024
+const maxRowThenUnusePkFilterExpr = 20
 
 type dmlSelectInfo struct {
 	typ string
@@ -566,7 +566,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 			stmt.OnDuplicateUpdate = nil
 		}
 
-		rightTableDef := DeepCopyTableDef(tableDef, true)
+		rightTableDef := DeepCopyTableDef(tableDef)
 		rightObjRef := DeepCopyObjectRef(tableObjRef)
 		uniqueCols := GetUniqueColAndIdxFromTableDef(rightTableDef)
 		if rightTableDef.Pkey != nil && rightTableDef.Pkey.PkeyColName == catalog.CPrimaryKeyColName {

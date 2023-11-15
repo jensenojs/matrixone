@@ -387,9 +387,6 @@ DROP USER `user_name`;
 DROP DATABASE `test06`;
 
 -- create view
-drop database if exists `test10`;
-create database `test10`;
-use `test10`;
 DROP TABLE IF EXISTS `t20`;
 DROP TABLE IF EXISTS `t21`;
 DROP VIEW IF EXISTS `view1`;
@@ -424,13 +421,12 @@ ALTER VIEW `VIEW01` AS SELECT * FROM `t22` WHERE a=1;
 SELECT * FROM `view01`;
 SELECT * FROM `view01` WHERE A = 1;
 DROP view `vieW01`;
-drop database if exists `test10`;
 
 -- TEMPORARY table
 DROP DATABASE IF EXISTS `test07`;
 DROP TABLE IF EXISTS `t1`;
 CREATE DATABASE `test07`;
-USE `test07`;
+USE `test03`;
 CREATE TEMPORARY TABLE `t1`(a float);
 INSERT INTO `T1` VALUES(213823.12);
 INSERT INTO `t1` VALUES(-45412.38920);
@@ -439,9 +435,6 @@ DROP TABLE `t1`;
 DROP DATABASE `TEST07`;
 
 -- foreign key
-drop database if exists `test11`;
-create database `test11`;
-use `test11`;
 DROP TABLE IF EXISTS `t4`;
 DROP TABLE IF EXISTS `t5`;
 CREATE TABLE `t4`(a int primary key,b varchar(5));
@@ -452,7 +445,6 @@ show CREATE TABLE `t4`;
 show CREATE TABLE `T5`;
 DROP table `t5`;
 DROP table `t4`;
-drop database if exists `test11`;
 
 -- external table
 DROP DATABASE IF EXISTS `test08`;

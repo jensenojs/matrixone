@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	pkgcatalog "github.com/matrixorigin/matrixone/pkg/catalog"
-	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
@@ -62,11 +61,11 @@ func (blk *txnSysBlock) GetTotalChanges() int {
 	return blk.txnBlock.GetTotalChanges()
 }
 
-func (blk *txnSysBlock) RangeDelete(start, end uint32, dt handle.DeleteType, mp *mpool.MPool) (err error) {
+func (blk *txnSysBlock) RangeDelete(start, end uint32, dt handle.DeleteType) (err error) {
 	if blk.isSysTable() {
 		panic("not supported")
 	}
-	return blk.txnBlock.RangeDelete(start, end, dt, mp)
+	return blk.txnBlock.RangeDelete(start, end, dt)
 }
 
 func (blk *txnSysBlock) Update(row uint32, col uint16, v any) (err error) {
@@ -222,11 +221,9 @@ func (blk *txnSysBlock) GetDeltaPersistedTS() types.TS {
 	return types.TS{}
 }
 
-func (blk *txnSysBlock) getColumnTableVec(
-	ts types.TS, colIdx int, mp *mpool.MPool,
-) (colData containers.Vector, err error) {
+func (blk *txnSysBlock) getColumnTableVec(ts types.TS, colIdx int) (colData containers.Vector, err error) {
 	col := catalog.SystemColumnSchema.ColDefs[colIdx]
-	colData = containers.MakeVector(col.Type, mp)
+	colData = containers.MakeVector(col.Type)
 	tableFn := func(table *catalog.TableEntry) error {
 		table.RLock()
 		node := table.GetVisibleNode(blk.Txn)
@@ -243,12 +240,10 @@ func (blk *txnSysBlock) getColumnTableVec(
 	}
 	return
 }
-func (blk *txnSysBlock) getColumnTableData(
-	colIdx int, mp *mpool.MPool,
-) (view *containers.ColumnView, err error) {
+func (blk *txnSysBlock) getColumnTableData(colIdx int) (view *containers.ColumnView, err error) {
 	ts := blk.Txn.GetStartTS()
 	view = containers.NewColumnView(colIdx)
-	colData, err := blk.getColumnTableVec(ts, colIdx, mp)
+	colData, err := blk.getColumnTableVec(ts, colIdx)
 	view.SetData(colData)
 	return
 }
@@ -292,21 +287,14 @@ func FillTableRow(table *catalog.TableEntry, node *catalog.MVCCNode[*catalog.Tab
 		colData.Append(schema.Version, false)
 	case pkgcatalog.SystemRelAttr_CatalogVersion:
 		colData.Append(schema.CatalogVersion, false)
-	case catalog.AccountIDDbNameTblName:
-		packer := types.NewPacker(common.WorkspaceAllocator)
-		packer.EncodeUint32(schema.AcInfo.TenantID)
-		packer.EncodeStringType([]byte(table.GetDB().GetName()))
-		packer.EncodeStringType([]byte(schema.Name))
-		colData.Append(packer.Bytes(), false)
-		packer.FreeMem()
 	default:
 		panic("unexpected colname. if add new catalog def, fill it in this switch")
 	}
 }
 
-func (blk *txnSysBlock) getRelTableVec(ts types.TS, colIdx int, mp *mpool.MPool) (colData containers.Vector, err error) {
+func (blk *txnSysBlock) getRelTableVec(ts types.TS, colIdx int) (colData containers.Vector, err error) {
 	colDef := catalog.SystemTableSchema.ColDefs[colIdx]
-	colData = containers.MakeVector(colDef.Type, mp)
+	colData = containers.MakeVector(colDef.Type)
 	tableFn := func(table *catalog.TableEntry) error {
 		table.RLock()
 		node := table.GetVisibleNode(blk.Txn)
@@ -323,10 +311,10 @@ func (blk *txnSysBlock) getRelTableVec(ts types.TS, colIdx int, mp *mpool.MPool)
 	return
 }
 
-func (blk *txnSysBlock) getRelTableData(colIdx int, mp *mpool.MPool) (view *containers.ColumnView, err error) {
+func (blk *txnSysBlock) getRelTableData(colIdx int) (view *containers.ColumnView, err error) {
 	ts := blk.Txn.GetStartTS()
 	view = containers.NewColumnView(colIdx)
-	colData, err := blk.getRelTableVec(ts, colIdx, mp)
+	colData, err := blk.getRelTableVec(ts, colIdx)
 	view.SetData(colData)
 	return
 }
@@ -351,19 +339,13 @@ func FillDBRow(db *catalog.DBEntry, _ *catalog.MVCCNode[*catalog.EmptyMVCCNode],
 		colData.Append(db.GetTenantID(), false)
 	case pkgcatalog.SystemDBAttr_Type:
 		colData.Append([]byte(db.GetDatType()), false)
-	case catalog.AccountIDDbName:
-		packer := types.NewPacker(common.WorkspaceAllocator)
-		packer.EncodeUint32(db.GetTenantID())
-		packer.EncodeStringType([]byte(db.GetName()))
-		colData.Append(packer.Bytes(), false)
-		packer.FreeMem()
 	default:
 		panic("unexpected colname. if add new catalog def, fill it in this switch")
 	}
 }
-func (blk *txnSysBlock) getDBTableVec(colIdx int, mp *mpool.MPool) (colData containers.Vector, err error) {
+func (blk *txnSysBlock) getDBTableVec(colIdx int) (colData containers.Vector, err error) {
 	colDef := catalog.SystemDBSchema.ColDefs[colIdx]
-	colData = containers.MakeVector(colDef.Type, mp)
+	colData = containers.MakeVector(colDef.Type)
 	fn := func(db *catalog.DBEntry) error {
 		FillDBRow(db, nil, colDef.Name, colData)
 		return nil
@@ -373,27 +355,23 @@ func (blk *txnSysBlock) getDBTableVec(colIdx int, mp *mpool.MPool) (colData cont
 	}
 	return
 }
-func (blk *txnSysBlock) getDBTableData(
-	colIdx int, mp *mpool.MPool,
-) (view *containers.ColumnView, err error) {
+func (blk *txnSysBlock) getDBTableData(colIdx int) (view *containers.ColumnView, err error) {
 	view = containers.NewColumnView(colIdx)
-	colData, err := blk.getDBTableVec(colIdx, mp)
+	colData, err := blk.getDBTableVec(colIdx)
 	view.SetData(colData)
 	return
 }
 
-func (blk *txnSysBlock) GetColumnDataById(
-	ctx context.Context, colIdx int, mp *mpool.MPool,
-) (view *containers.ColumnView, err error) {
+func (blk *txnSysBlock) GetColumnDataById(ctx context.Context, colIdx int) (view *containers.ColumnView, err error) {
 	if !blk.isSysTable() {
-		return blk.txnBlock.GetColumnDataById(ctx, colIdx, mp)
+		return blk.txnBlock.GetColumnDataById(ctx, colIdx)
 	}
 	if blk.table.GetID() == pkgcatalog.MO_DATABASE_ID {
-		return blk.getDBTableData(colIdx, mp)
+		return blk.getDBTableData(colIdx)
 	} else if blk.table.GetID() == pkgcatalog.MO_TABLES_ID {
-		return blk.getRelTableData(colIdx, mp)
+		return blk.getRelTableData(colIdx)
 	} else if blk.table.GetID() == pkgcatalog.MO_COLUMNS_ID {
-		return blk.getColumnTableData(colIdx, mp)
+		return blk.getColumnTableData(colIdx)
 	} else {
 		panic("not supported")
 	}
@@ -403,18 +381,14 @@ func (blk *txnSysBlock) Prefetch(idxes []int) error {
 	return nil
 }
 
-func (blk *txnSysBlock) GetColumnDataByName(
-	ctx context.Context, attr string, mp *mpool.MPool,
-) (view *containers.ColumnView, err error) {
+func (blk *txnSysBlock) GetColumnDataByName(ctx context.Context, attr string) (view *containers.ColumnView, err error) {
 	colIdx := blk.entry.GetSchema().GetColIdx(attr)
-	return blk.GetColumnDataById(ctx, colIdx, mp)
+	return blk.GetColumnDataById(ctx, colIdx)
 }
 
-func (blk *txnSysBlock) GetColumnDataByNames(
-	ctx context.Context, attrs []string, mp *mpool.MPool,
-) (view *containers.BlockView, err error) {
+func (blk *txnSysBlock) GetColumnDataByNames(ctx context.Context, attrs []string) (view *containers.BlockView, err error) {
 	if !blk.isSysTable() {
-		return blk.txnBlock.GetColumnDataByNames(ctx, attrs, mp)
+		return blk.txnBlock.GetColumnDataByNames(ctx, attrs)
 	}
 	view = containers.NewBlockView()
 	ts := blk.Txn.GetStartTS()
@@ -422,7 +396,7 @@ func (blk *txnSysBlock) GetColumnDataByNames(
 	case pkgcatalog.MO_DATABASE_ID:
 		for _, attr := range attrs {
 			colIdx := blk.entry.GetSchema().GetColIdx(attr)
-			vec, err := blk.getDBTableVec(colIdx, mp)
+			vec, err := blk.getDBTableVec(colIdx)
 			view.SetData(colIdx, vec)
 			if err != nil {
 				return view, err
@@ -431,7 +405,7 @@ func (blk *txnSysBlock) GetColumnDataByNames(
 	case pkgcatalog.MO_TABLES_ID:
 		for _, attr := range attrs {
 			colIdx := blk.entry.GetSchema().GetColIdx(attr)
-			vec, err := blk.getRelTableVec(ts, colIdx, mp)
+			vec, err := blk.getRelTableVec(ts, colIdx)
 			view.SetData(colIdx, vec)
 			if err != nil {
 				return view, err
@@ -440,7 +414,7 @@ func (blk *txnSysBlock) GetColumnDataByNames(
 	case pkgcatalog.MO_COLUMNS_ID:
 		for _, attr := range attrs {
 			colIdx := blk.entry.GetSchema().GetColIdx(attr)
-			vec, err := blk.getColumnTableVec(ts, colIdx, mp)
+			vec, err := blk.getColumnTableVec(ts, colIdx)
 			view.SetData(colIdx, vec)
 			if err != nil {
 				return view, err

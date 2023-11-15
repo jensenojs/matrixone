@@ -37,14 +37,11 @@ const INFORMATION_SCHEMA = "information_schema"
 
 func buildShowCreateDatabase(stmt *tree.ShowCreateDatabase,
 	ctx CompilerContext) (*Plan, error) {
-	var err error
-	var name string
-	name, err = databaseIsValid(getSuitableDBName("", stmt.Name), ctx)
-	if err != nil {
-		return nil, err
+	if !ctx.DatabaseExists(stmt.Name) {
+		return nil, moerr.NewBadDB(ctx.GetContext(), stmt.Name)
 	}
 
-	if sub, err := ctx.GetSubscriptionMeta(name); err != nil {
+	if sub, err := ctx.GetSubscriptionMeta(stmt.Name); err != nil {
 		return nil, err
 	} else if sub != nil {
 		accountId := ctx.GetAccountId()
@@ -55,8 +52,9 @@ func buildShowCreateDatabase(stmt *tree.ShowCreateDatabase,
 	}
 
 	sqlStr := "select \"%s\" as `Database`, \"%s\" as `Create Database`"
-	createSql := fmt.Sprintf("CREATE DATABASE `%s`", name)
-	sqlStr = fmt.Sprintf(sqlStr, name, createSql)
+	createSql := fmt.Sprintf("CREATE DATABASE `%s`", stmt.Name)
+	sqlStr = fmt.Sprintf(sqlStr, stmt.Name, createSql)
+	// logutil.Info(sqlStr)
 
 	return returnByRewriteSQL(ctx, sqlStr, plan.DataDefinition_SHOW_CREATEDATABASE)
 }
@@ -74,12 +72,10 @@ func formatStr(str string) string {
 }
 
 func buildShowCreateTable(stmt *tree.ShowCreateTable, ctx CompilerContext) (*Plan, error) {
-	var err error
-	tblName := stmt.Name.GetTableName()
-	dbName := stmt.Name.GetDBName()
-	dbName, err = databaseIsValid(getSuitableDBName(dbName, ""), ctx)
-	if err != nil {
-		return nil, err
+	tblName := stmt.Name.Parts[0]
+	dbName := ctx.DefaultDatabase()
+	if stmt.Name.NumParts == 2 {
+		dbName = stmt.Name.Parts[1]
 	}
 
 	_, tableDef := ctx.Resolve(dbName, tblName)
@@ -140,9 +136,7 @@ func buildShowCreateTable(stmt *tree.ShowCreateTable, ctx CompilerContext) (*Pla
 		nullOrNot := "NOT NULL"
 		// col.Default must be not nil
 		if len(col.Default.OriginString) > 0 {
-			if !col.Primary {
-				nullOrNot = "DEFAULT " + formatStr(col.Default.OriginString)
-			}
+			nullOrNot = "DEFAULT " + formatStr(col.Default.OriginString)
 		} else if col.Default.NullAbility {
 			nullOrNot = "DEFAULT NULL"
 		}
@@ -214,33 +208,15 @@ func buildShowCreateTable(stmt *tree.ShowCreateTable, ctx CompilerContext) (*Pla
 			} else {
 				indexStr = "KEY "
 			}
-			indexStr += fmt.Sprintf("`%s` ", formatStr(indexdef.IndexName))
-			if !catalog.IsNullIndexAlgo(indexdef.IndexAlgo) {
-				indexStr += fmt.Sprintf("USING `%s` ", formatStr(indexdef.IndexAlgo))
-			}
-			indexStr += "("
-			i := 0
-			for _, part := range indexdef.Parts {
-				if catalog.IsAlias(part) {
-					continue
+			indexStr += fmt.Sprintf("`%s` (", formatStr(indexdef.IndexName))
+			for num, part := range indexdef.Parts {
+				if num == len(indexdef.Parts)-1 {
+					indexStr += fmt.Sprintf("`%s`", formatStr(part))
+				} else {
+					indexStr += fmt.Sprintf("`%s`,", formatStr(part))
 				}
-				if i > 0 {
-					indexStr += ","
-				}
-
-				indexStr += fmt.Sprintf("`%s`", formatStr(part))
-				i++
 			}
-
 			indexStr += ")"
-			if indexdef.IndexAlgoParams != "" {
-				var paramList string
-				paramList, err = indexParamsToStringList(indexdef.IndexAlgoParams)
-				if err != nil {
-					return nil, err
-				}
-				indexStr += paramList
-			}
 			if indexdef.Comment != "" {
 				indexdef.Comment = strings.Replace(indexdef.Comment, "'", "\\'", -1)
 				indexStr += fmt.Sprintf(" COMMENT '%s'", formatStr(indexdef.Comment))
@@ -376,12 +352,10 @@ func buildShowCreateTable(stmt *tree.ShowCreateTable, ctx CompilerContext) (*Pla
 
 // buildShowCreateView
 func buildShowCreateView(stmt *tree.ShowCreateView, ctx CompilerContext) (*Plan, error) {
-	var err error
-	tblName := stmt.Name.GetTableName()
-	dbName := stmt.Name.GetDBName()
-	dbName, err = databaseIsValid(getSuitableDBName(dbName, ""), ctx)
-	if err != nil {
-		return nil, err
+	tblName := stmt.Name.Parts[0]
+	dbName := ctx.DefaultDatabase()
+	if stmt.Name.NumParts == 2 {
+		dbName = stmt.Name.Parts[1]
 	}
 
 	_, tableDef := ctx.Resolve(dbName, tblName)
@@ -395,7 +369,7 @@ func buildShowCreateView(stmt *tree.ShowCreateView, ctx CompilerContext) (*Plan,
 	}
 
 	var viewData ViewData
-	err = json.Unmarshal([]byte(viewStr), &viewData)
+	err := json.Unmarshal([]byte(viewStr), &viewData)
 	if err != nil {
 		return nil, err
 	}
@@ -584,7 +558,7 @@ func buildShowTableNumber(stmt *tree.ShowTableNumber, ctx CompilerContext) (*Pla
 
 func buildShowColumnNumber(stmt *tree.ShowColumnNumber, ctx CompilerContext) (*Plan, error) {
 	accountId := ctx.GetAccountId()
-	dbName, err := databaseIsValid(getSuitableDBName(stmt.Table.GetDBName(), stmt.DbName), ctx)
+	dbName, err := databaseIsValid(stmt.Table.GetDBName(), ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -629,7 +603,7 @@ func buildShowColumnNumber(stmt *tree.ShowColumnNumber, ctx CompilerContext) (*P
 }
 
 func buildShowTableValues(stmt *tree.ShowTableValues, ctx CompilerContext) (*Plan, error) {
-	dbName, err := databaseIsValid(getSuitableDBName(stmt.Table.GetDBName(), stmt.DbName), ctx)
+	dbName, err := databaseIsValid(stmt.Table.GetDBName(), ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -685,7 +659,7 @@ func buildShowColumns(stmt *tree.ShowColumns, ctx CompilerContext) (*Plan, error
 	}
 
 	accountId := ctx.GetAccountId()
-	dbName, err := databaseIsValid(getSuitableDBName(stmt.Table.GetDBName(), stmt.DBName), ctx)
+	dbName, err := databaseIsValid(stmt.Table.GetDBName(), ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -715,7 +689,7 @@ func buildShowColumns(stmt *tree.ShowColumns, ctx CompilerContext) (*Plan, error
 	} else if dbName == catalog.MO_CATALOG && tblName == catalog.MO_COLUMNS {
 		keyStr = "case when attname = '" + catalog.SystemColAttr_UniqName + "' then 'PRI' else '' END as `Key`"
 	} else {
-		if tableDef.Pkey != nil || len(tableDef.Fkeys) != 0 || tableDef.Indexes != nil {
+		if tableDef.Pkey != nil || len(tableDef.Fkeys) != 0 {
 			keyStr += "case"
 			if tableDef.Pkey != nil {
 				for _, name := range tableDef.Pkey.Names {
@@ -725,36 +699,10 @@ func buildShowColumns(stmt *tree.ShowColumns, ctx CompilerContext) (*Plan, error
 				}
 			}
 			if len(tableDef.Fkeys) != 0 {
-				colIdToName := make(map[uint64]string)
-				for _, col := range tableDef.Cols {
-					if col.Hidden {
-						continue
-					}
-					colIdToName[col.ColId] = col.Name
-				}
 				for _, fk := range tableDef.Fkeys {
-					for _, colId := range fk.Cols {
-						keyStr += " when attname = "
-						keyStr += "'" + colIdToName[colId] + "'"
-						keyStr += " then 'MUL'"
-					}
-				}
-			}
-			if tableDef.Indexes != nil {
-				for _, indexdef := range tableDef.Indexes {
-					if indexdef.Unique {
-						for _, name := range indexdef.Parts {
-							keyStr += " when attname = "
-							keyStr += "'" + name + "'"
-							keyStr += " then 'UNI'"
-						}
-					} else {
-						for _, name := range indexdef.Parts {
-							keyStr += " when attname = "
-							keyStr += "'" + name + "'"
-							keyStr += " then 'MUL'"
-						}
-					}
+					keyStr += " when attname = "
+					keyStr += "'" + tableDef.Cols[fk.Cols[0]].GetName() + "'"
+					keyStr += " then 'MUL'"
 				}
 			}
 			keyStr += " else '' END as `Key`"
@@ -932,11 +880,12 @@ func buildShowTriggers(stmt *tree.ShowTarget, ctx CompilerContext) (*Plan, error
 }
 
 func buildShowIndex(stmt *tree.ShowIndex, ctx CompilerContext) (*Plan, error) {
-	dbName, err := databaseIsValid(getSuitableDBName(stmt.TableName.GetDBName(), stmt.DbName), ctx)
+	dbName, err := databaseIsValid(string(stmt.TableName.Schema()), ctx)
 	if err != nil {
 		return nil, err
 	}
-	tblName := stmt.TableName.GetTableName()
+
+	tblName := string(stmt.TableName.Name())
 	obj, tableDef := ctx.Resolve(dbName, tblName)
 	if tableDef == nil {
 		return nil, moerr.NewNoSuchTable(ctx.GetContext(), dbName, tblName)
@@ -955,29 +904,8 @@ func buildShowIndex(stmt *tree.ShowIndex, ctx CompilerContext) (*Plan, error) {
 		}()
 	}
 
-	sql := "select " +
-		"`tcl`.`att_relname` as `Table`, " +
-		"if(`idx`.`type` = 'MULTIPLE', 1, 0) as `Non_unique`, " +
-		"`idx`.`name` as `Key_name`, " +
-		"`idx`.`ordinal_position` as `Seq_in_index`, " +
-		"`idx`.`column_name` as `Column_name`, " +
-		"'A' as `Collation`, 0 as `Cardinality`, " +
-		"'NULL' as `Sub_part`, " +
-		"'NULL' as `Packed`, " +
-		"if(`tcl`.`attnotnull` = 0, 'YES', '') as `Null`, " +
-		"`idx`.`algo` as 'Index_type', " +
-		"'' as `Comment`, " +
-		"`idx`.`comment` as `Index_comment`, " +
-		"`idx`.`algo_params` as `Index_params`, " +
-		"if(`idx`.`is_visible` = 1, 'YES', 'NO') as `Visible`, " +
-		"'NULL' as `Expression` " +
-		"from `%s`.`mo_indexes` `idx` left join `%s`.`mo_columns` `tcl` " +
-		"on (`idx`.`table_id` = `tcl`.`att_relname_id` and `idx`.`column_name` = `tcl`.`attname`) " +
-		"where `tcl`.`att_database` = '%s' AND " +
-		"`tcl`.`att_relname` = '%s' AND " +
-		"`idx`.`column_name` NOT LIKE '%s' " +
-		";"
-	showIndexSql := fmt.Sprintf(sql, MO_CATALOG_DB_NAME, MO_CATALOG_DB_NAME, dbName, tblName, catalog.AliasPrefix+"%")
+	sql := "select `tcl`.`att_relname` as `Table`, if(`idx`.`type` = 'MULTIPLE', 1, 0) as `Non_unique`, `idx`.`name` as `Key_name`, `idx`.`ordinal_position` as `Seq_in_index`, `idx`.`column_name` as `Column_name`, 'A' as `Collation`, 0 as `Cardinality`, 'NULL' as `Sub_part`, 'NULL' as `Packed`, if(`tcl`.`attnotnull` = 0, 'YES', '') as `Null`, '' as 'Index_type', '' as `Comment`, `idx`.`comment` as `Index_comment`, if(`idx`.`is_visible` = 1, 'YES', 'NO') as `Visible`, 'NULL' as `Expression` from `%s`.`mo_indexes` `idx` left join `%s`.`mo_columns` `tcl` on (`idx`.`table_id` = `tcl`.`att_relname_id` and `idx`.`column_name` = `tcl`.`attname`) where `tcl`.`att_database` = '%s' AND `tcl`.`att_relname` = '%s';"
+	showIndexSql := fmt.Sprintf(sql, MO_CATALOG_DB_NAME, MO_CATALOG_DB_NAME, dbName, tblName)
 
 	if stmt.Where != nil {
 		return returnByWhereAndBaseSQL(ctx, showIndexSql, stmt.Where, ddlType)

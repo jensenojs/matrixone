@@ -17,11 +17,10 @@ package index
 import (
 	"bytes"
 	"fmt"
+	"github.com/matrixorigin/matrixone/pkg/vectorize/moarray"
 	"math"
 	"sort"
 	"strings"
-
-	"github.com/matrixorigin/matrixone/pkg/vectorize/moarray"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -85,12 +84,11 @@ func (zm ZM) doInit(v []byte) {
 	zm.setInited()
 }
 
-func (zm ZM) innerString(f func([]byte) string) string {
+func (zm ZM) String() string {
 	var b strings.Builder
 	if zm.IsString() {
-		smin, smax := f(zm.GetMinBuf()), f(zm.GetMaxBuf())
 		_, _ = b.WriteString(fmt.Sprintf("ZM(%s)%d[%v,%v]",
-			zm.GetType().String(), zm.GetScale(), smin, smax))
+			zm.GetType().String(), zm.GetScale(), string(zm.GetMinBuf()), string(zm.GetMaxBuf())))
 	} else {
 		_, _ = b.WriteString(fmt.Sprintf("ZM(%s)%d[%v,%v]",
 			zm.GetType().String(), zm.GetScale(), zm.GetMin(), zm.GetMax()))
@@ -105,22 +103,6 @@ func (zm ZM) innerString(f func([]byte) string) string {
 		_, _ = b.WriteString("--")
 	}
 	return b.String()
-}
-
-func (zm ZM) StringForCompose() string {
-	return zm.innerString(func(b []byte) string {
-		s := string(b)
-		if r, _, e := types.DecodeTuple(b); e == nil {
-			s = r.ErrString()
-		}
-		return s
-	})
-}
-
-func (zm ZM) String() string {
-	return zm.innerString(func(b []byte) string {
-		return string(b)
-	})
 }
 
 func (zm ZM) supportSum() bool {
@@ -200,21 +182,8 @@ func (zm ZM) GetSum() any {
 	if !zm.IsInited() {
 		return nil
 	}
-	return zm.decodeSum()
-}
-
-func (zm ZM) decodeSum() any {
-	switch types.T(zm[63]) {
-	case types.T_int8, types.T_int16, types.T_int32, types.T_int64:
-		return types.DecodeInt64(zm.GetSumBuf())
-	case types.T_uint8, types.T_uint16, types.T_uint32, types.T_uint64:
-		return types.DecodeUint64(zm.GetSumBuf())
-	case types.T_float32, types.T_float64:
-		return types.DecodeFloat64(zm.GetSumBuf())
-	case types.T_decimal64:
-		return types.DecodeDecimal64(zm.GetSumBuf())
-	}
-	return nil
+	buf := zm.GetSumBuf()
+	return zm.getValue(buf)
 }
 
 func (zm ZM) GetMinBuf() []byte {
@@ -227,7 +196,7 @@ func (zm ZM) GetMaxBuf() []byte {
 
 func (zm ZM) GetSumBuf() []byte {
 	if zm.supportSum() {
-		return zm[8:16]
+		return zm[8 : 8+zm[30]&0x1f]
 	}
 	return nil
 }
@@ -1227,12 +1196,6 @@ func BatchUpdateZM(zm ZM, vec *vector.Vector) (err error) {
 		UpdateZM(zm, maxv)
 	}
 	return
-}
-
-func SetZMSum(zm ZM, vec *vector.Vector) {
-	if ok, sumv := vec.GetSumValue(); ok {
-		zm.SetSum(sumv)
-	}
 }
 
 func EncodeZM(zm *ZM) []byte {

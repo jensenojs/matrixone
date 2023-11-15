@@ -72,8 +72,7 @@ func TestDeleteNodeCmd(t *testing.T) {
 
 	controller := NewMVCCHandle(blk)
 
-	node := NewDeleteNode(nil, handle.DT_Normal,
-		IOET_WALTxnCommand_DeleteNode_CurrVer)
+	node := NewDeleteNode(nil, handle.DT_Normal)
 	node.mask = roaring.NewBitmap()
 	node.mask.Add(35)
 	node.chain.Store(controller.deletes.Load())

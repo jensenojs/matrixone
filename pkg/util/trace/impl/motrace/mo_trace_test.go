@@ -372,17 +372,10 @@ func TestMOSpan_doProfile(t *testing.T) {
 	tracer := p.Tracer("test").(*MOTracer)
 	ctx := context.TODO()
 
-	prepareCheckCpu := func(t *testing.T) {
-		if runtime.NumCPU() < 4 {
-			t.Skip("machine's performance too low to handle time sensitive case, issue #11864")
-		}
-	}
-
 	tests := []struct {
-		name    string
-		fields  fields
-		prepare func(t *testing.T)
-		want    bool
+		name   string
+		fields fields
+		want   bool
 	}{
 		{
 			name: "normal",
@@ -453,8 +446,7 @@ func TestMOSpan_doProfile(t *testing.T) {
 				ctx:    ctx,
 				tracer: tracer,
 			},
-			prepare: prepareCheckCpu,
-			want:    true,
+			want: true,
 		},
 		{
 			name: "trace",
@@ -463,15 +455,11 @@ func TestMOSpan_doProfile(t *testing.T) {
 				ctx:    ctx,
 				tracer: tracer,
 			},
-			prepare: prepareCheckCpu,
-			want:    true,
+			want: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.prepare != nil {
-				tt.prepare(t)
-			}
 			_, s := tt.fields.tracer.Start(tt.fields.ctx, "test", tt.fields.opts...)
 			ms, _ := s.(*MOSpan)
 			t.Logf("span.LongTimeThreshold: %v", ms.LongTimeThreshold)
@@ -532,7 +520,7 @@ func TestContextDeadlineAndCancel(t *testing.T) {
 	require.Equal(t, context.DeadlineExceeded, deadlineCtx.Err())
 }
 
-func TestMOTracer_FSSpanIsEnable(t *testing.T) {
+func TestWithFSSpan(t *testing.T) {
 
 	tracer := &MOTracer{
 		TracerConfig: trace.TracerConfig{Name: "motrace_test"},
@@ -540,97 +528,26 @@ func TestMOTracer_FSSpanIsEnable(t *testing.T) {
 	}
 	tracer.provider.enable = true
 
-	trace.InitMOCtledSpan()
-	trace.SetMoCtledSpanState("local", true, 0)
+	trace.MOCtledSpanEnableConfig.EnableLocalFSSpan.Store(true)
+	trace.MOCtledSpanEnableConfig.EnableS3FSSpan.Store(false)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	_, span := tracer.Start(ctx, "test", trace.WithKind(
+	_, span := tracer.Start(context.Background(), "test", trace.WithKind(
 		trace.SpanKindLocalFSVis))
 
 	_, ok := span.(trace.NoopSpan)
 
 	assert.True(t, tracer.IsEnable(trace.WithKind(trace.SpanKindLocalFSVis)))
 	assert.False(t, ok)
+	assert.True(t, span.(*MOSpan).NeedRecord(0))
 	span.End()
 
 	_, span = tracer.Start(context.Background(), "test", trace.WithKind(
-		trace.SpanKindRemoteFSVis))
+		trace.SpanKindS3FSVis))
 	_, ok = span.(trace.NoopSpan)
-	assert.False(t, tracer.IsEnable(trace.WithKind(trace.SpanKindRemoteFSVis)))
+	assert.False(t, tracer.IsEnable(trace.WithKind(trace.SpanKindS3FSVis)))
 	assert.True(t, ok)
 	span.End()
 
-}
-
-func TestMOSpan_NeedRecord(t *testing.T) {
-	tracer := &MOTracer{
-		TracerConfig: trace.TracerConfig{Name: "motrace_test"},
-		provider:     defaultMOTracerProvider(),
-	}
-
-	tracer.provider.enable = true
-	tracer.provider.longSpanTime = time.Millisecond * 20
-	trace.InitMOCtledSpan()
-
-	// ctx has deadline
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
-	defer cancel()
-
-	_, span := tracer.Start(ctx, "normal span")
-	time.Sleep(time.Millisecond * 30)
-	// deadline not expired, no need to record
-	ret, _ := span.(*MOSpan).NeedRecord()
-	require.False(t, ret)
-	span.End()
-
-	_, span = tracer.Start(ctx, "normal span")
-	time.Sleep(time.Second)
-	span.(*MOSpan).EndTime = time.Now()
-	// ctx expired, record
-	ret, _ = span.(*MOSpan).NeedRecord()
-	require.True(t, ret)
-	span.End()
-
-	trace.SetMoCtledSpanState("statement", true, 0)
-	_, span = tracer.Start(ctx, "mo_ctl controlled span",
-		trace.WithKind(trace.SpanKindStatement))
-	// ctx expired, but not to record
-	trace.SetMoCtledSpanState("statement", false, 0)
-	ret, _ = span.(*MOSpan).NeedRecord()
-	require.False(t, ret)
-	span.End()
-
-	trace.SetMoCtledSpanState("statement", true, 0)
-	_, span = tracer.Start(ctx, "mo_ctl controlled span",
-		trace.WithKind(trace.SpanKindStatement))
-	// record
-	ret, _ = span.(*MOSpan).NeedRecord()
-	require.True(t, ret)
-	span.End()
-
-	// it won't record until this trace last more than 1000ms
-	trace.SetMoCtledSpanState("statement", true, 1000)
-	_, span = tracer.Start(ctx, "mo_ctl controlled span",
-		trace.WithKind(trace.SpanKindStatement))
-
-	span.(*MOSpan).Duration = time.Since(span.(*MOSpan).StartTime)
-
-	ret, _ = span.(*MOSpan).NeedRecord()
-	require.False(t, ret)
-	span.End()
-
-	trace.SetMoCtledSpanState("statement", true, 100)
-	_, span = tracer.Start(ctx, "mo_ctl controlled span",
-		trace.WithKind(trace.SpanKindStatement))
-	time.Sleep(time.Millisecond * 200)
-	// record
-
-	span.(*MOSpan).Duration = time.Since(span.(*MOSpan).StartTime)
-
-	ret, _ = span.(*MOSpan).NeedRecord()
-	require.True(t, ret)
-	span.End()
 }
 
 func TestMOCtledKindOverwrite(t *testing.T) {
@@ -640,18 +557,16 @@ func TestMOCtledKindOverwrite(t *testing.T) {
 	}
 	tracer.provider.enable = true
 
-	trace.InitMOCtledSpan()
-
 	fctx, fspan := tracer.Start(context.Background(), "test2", trace.WithKind(trace.SpanKindRemote))
 	defer fspan.End()
 	require.Equal(t, fspan.SpanContext().Kind, trace.SpanKindRemote)
 
-	trace.SetMoCtledSpanState("statement", true, 0)
+	trace.MOCtledSpanEnableConfig.EnableS3FSSpan.Store(true)
 	// won't be overwritten
-	_, span := tracer.Start(fctx, "test3", trace.WithKind(trace.SpanKindStatement))
+	_, span := tracer.Start(fctx, "test3", trace.WithKind(trace.SpanKindS3FSVis))
 	defer span.End()
 	require.NotEqual(t, span.SpanContext().Kind, fspan.SpanContext().Kind)
-	require.Equal(t, span.SpanContext().Kind, trace.SpanKindStatement)
+	require.Equal(t, span.SpanContext().Kind, trace.SpanKindS3FSVis)
 
 }
 
@@ -662,12 +577,11 @@ func TestMOCtledKindPassDown(t *testing.T) {
 	}
 	tracer.provider.enable = true
 
-	trace.InitMOCtledSpan()
-	trace.SetMoCtledSpanState("s3", true, 0)
+	trace.MOCtledSpanEnableConfig.EnableS3FSSpan.Store(true)
 	specialCtx, specialSpan := tracer.Start(context.Background(), "special span",
-		trace.WithKind(trace.SpanKindRemoteFSVis))
+		trace.WithKind(trace.SpanKindS3FSVis))
 	defer specialSpan.End()
-	require.Equal(t, specialSpan.SpanContext().Kind, trace.SpanKindRemoteFSVis)
+	require.Equal(t, specialSpan.SpanContext().Kind, trace.SpanKindS3FSVis)
 
 	// won't pass down kind to child
 	_, span := tracer.Start(specialCtx, "child span")

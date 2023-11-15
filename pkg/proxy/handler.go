@@ -17,6 +17,7 @@ package proxy
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/fagongzi/goetty/v2"
 	"github.com/matrixorigin/matrixone/pkg/clusterservice"
@@ -42,7 +43,7 @@ type handler struct {
 	// counterSet counts the events in proxy.
 	counterSet *counterSet
 	// haKeeperClient is the client to communicate with HAKeeper.
-	haKeeperClient logservice.ProxyHAKeeperClient
+	haKeeperClient logservice.ClusterHAKeeperClient
 	// ipNetList is the list of ip net, which is parsed from CIDRs.
 	ipNetList []*net.IPNet
 }
@@ -56,10 +57,22 @@ func newProxyHandler(
 	cfg Config,
 	st *stopper.Stopper,
 	cs *counterSet,
-	haKeeperClient logservice.ProxyHAKeeperClient,
+	testHAKeeperClient logservice.ClusterHAKeeperClient,
 ) (*handler, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	var err error
+	c := testHAKeeperClient
+	if c == nil {
+		c, err = logservice.NewProxyHAKeeperClient(ctx, cfg.HAKeeper.ClientConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Create the MO cluster.
-	mc := clusterservice.NewMOCluster(haKeeperClient, cfg.Cluster.RefreshInterval.Duration)
+	mc := clusterservice.NewMOCluster(c, cfg.Cluster.RefreshInterval.Duration)
 	rt.SetGlobalVariables(runtime.ClusterService, mc)
 
 	// Create the rebalancer.
@@ -99,14 +112,14 @@ func newProxyHandler(
 		}
 	}
 	return &handler{
-		ctx:            ctx,
+		ctx:            context.Background(),
 		logger:         rt.Logger(),
 		config:         cfg,
 		stopper:        st,
 		moCluster:      mc,
 		counterSet:     cs,
 		router:         ru,
-		haKeeperClient: haKeeperClient,
+		haKeeperClient: c,
 		ipNetList:      ipNetList,
 	}, nil
 }
@@ -141,25 +154,22 @@ func (h *handler) handle(c goetty.IOSession) error {
 		h.logger.Error("failed to create client conn", zap.Error(err))
 		return err
 	}
-	h.logger.Debug("client conn created")
+	h.logger.Info("client conn created")
 	defer func() { _ = cc.Close() }()
 
 	// client builds connections with a best CN server and returns
 	// the server connection.
 	sc, err := cc.BuildConnWithServer(true)
 	if err != nil {
-		if isConnEndErr(err) {
-			return nil
-		}
 		h.logger.Error("failed to create server conn", zap.Error(err))
 		h.counterSet.updateWithErr(err)
-		cc.SendErrToClient(err)
+		cc.SendErrToClient(err.Error())
 		return err
 	}
-	h.logger.Debug("server conn created")
+	h.logger.Info("server conn created")
 	defer func() { _ = sc.Close() }()
 
-	h.logger.Debug("build connection successfully",
+	h.logger.Info("build connection successfully",
 		zap.String("client", cc.RawConn().RemoteAddr().String()),
 		zap.String("server", sc.RawConn().RemoteAddr().String()),
 	)
@@ -203,12 +213,12 @@ func (h *handler) handle(c goetty.IOSession) error {
 	case <-h.ctx.Done():
 		return h.ctx.Err()
 	case err := <-t.errC:
-		if isEOFErr(err) || isConnEndErr(err) {
-			return nil
+		if !isEOFErr(err) {
+			h.counterSet.updateWithErr(err)
+			h.logger.Error("proxy handle error", zap.Error(err))
+			return err
 		}
-		h.counterSet.updateWithErr(err)
-		h.logger.Error("proxy handle error", zap.Error(err))
-		return err
+		return nil
 	}
 }
 

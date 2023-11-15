@@ -17,12 +17,11 @@ package taskservice
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
-
 	logservicepb "github.com/matrixorigin/matrixone/pkg/pb/logservice"
 	"github.com/matrixorigin/matrixone/pkg/pb/task"
 	"golang.org/x/exp/constraints"
+	"strings"
+	"time"
 )
 
 // Condition options for query tasks
@@ -447,7 +446,7 @@ type TaskService interface {
 	GetStorage() TaskStorage
 }
 
-// TaskExecutor which is responsible for the execution logic of a specific Task, and the function exists to
+// TaskExecutor which is responsible for the execution logic of a specific Task, and the function exits to
 // represent the completion of the task execution. In the process of task execution task may be interrupted
 // at any time, so the implementation needs to frequently check the state of the Context, in the
 // Context.Done(), as soon as possible to exit. Epoch is 1 means the task is executed for the first time,

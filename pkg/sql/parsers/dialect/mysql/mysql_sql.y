@@ -244,12 +244,6 @@ import (
     transactionCharacteristicList []*tree.TransactionCharacteristic
     isolationLevel tree.IsolationLevelType
     accessMode tree.AccessModeType
-
-    timeWindow  *tree.TimeWindow
-    timeInterval *tree.Interval
-    timeSliding *tree.Sliding
-    timeFill *tree.Fill
-    fillMode tree.FillMode
 }
 
 %token LEX_ERROR
@@ -312,7 +306,7 @@ import (
 %token <str> TEXT TINYTEXT MEDIUMTEXT LONGTEXT
 %token <str> BLOB TINYBLOB MEDIUMBLOB LONGBLOB JSON ENUM UUID VECF32 VECF64
 %token <str> GEOMETRY POINT LINESTRING POLYGON GEOMETRYCOLLECTION MULTIPOINT MULTILINESTRING MULTIPOLYGON
-%token <str> INT1 INT2 INT3 INT4 INT8 S3OPTION STAGEOPTION
+%token <str> INT1 INT2 INT3 INT4 INT8 S3OPTION
 
 // Select option
 %token <str> SQL_SMALL_RESULT SQL_BIG_RESULT SQL_BUFFER_RESULT
@@ -342,10 +336,9 @@ import (
 // MO table option
 %token <str> PROPERTIES
 
-// Secondary Index
-%token <str> PARSER VISIBLE INVISIBLE BTREE HASH RTREE BSI IVFFLAT
-%token <str> ZONEMAP LEADING BOTH TRAILING UNKNOWN LISTS SIMILARITY_FUNCTION
-
+// Index
+%token <str> PARSER VISIBLE INVISIBLE BTREE HASH RTREE BSI
+%token <str> ZONEMAP LEADING BOTH TRAILING UNKNOWN
 
 // Alter
 %token <str> EXPIRE ACCOUNT ACCOUNTS UNLOCK DAY NEVER PUMP MYSQL_COMPATIBILITY_MODE
@@ -416,7 +409,6 @@ import (
 %token <str> ADDDATE BIT_AND BIT_OR BIT_XOR CAST COUNT APPROX_COUNT APPROX_COUNT_DISTINCT
 %token <str> APPROX_PERCENTILE CURDATE CURTIME DATE_ADD DATE_SUB EXTRACT
 %token <str> GROUP_CONCAT MAX MID MIN NOW POSITION SESSION_USER STD STDDEV MEDIAN
-%token <str> CLUSTER_CENTERS SPHERICAL_KMEANS
 %token <str> STDDEV_POP STDDEV_SAMP SUBDATE SUBSTR SUBSTRING SUM SYSDATE
 %token <str> SYSTEM_USER TRANSLATE TRIM VARIANCE VAR_POP VAR_SAMP AVG RANK ROW_NUMBER
 %token <str> DENSE_RANK BIT_CAST
@@ -444,17 +436,10 @@ import (
 // Call
 %token <str> CALL
 
-
-// Time window
-%token <str> PREV SLIDING FILL
-
 // sp_begin_sym
 %token <str> SPBEGIN
 
 %token <str> BACKEND SERVERS
-
-// python udf
-%token <str> HANDLER
 
 %type <statement> stmt block_stmt block_type_stmt normal_stmt
 %type <statements> stmt_list stmt_list_return
@@ -537,7 +522,6 @@ import (
 %type <funcArg> func_arg
 %type <funcArgDecl> func_arg_decl
 %type <funcReturn> func_return
-%type <boolVal> func_body_import
 %type <str> func_lang extension_lang extension_name
 
 %type <procName> proc_name
@@ -685,7 +669,7 @@ import (
 %type <zeroFillOpt> zero_fill_opt
 %type <boolVal> global_scope exists_opt distinct_opt temporary_opt cycle_opt drop_table_opt
 %type <item> pwd_expire clear_pwd_opt
-%type <str> name_confict distinct_keyword separator_opt spherical_kmeans_opt
+%type <str> name_confict distinct_keyword separator_opt
 %type <insert> insert_data
 %type <replace> replace_data
 %type <rowsExprs> values_list
@@ -754,6 +738,8 @@ import (
 %token <str> BACKUP FILESYSTEM
 %type <statementOption> statement_id_opt
 %token <str> QUERY_RESULT
+%start start_command
+
 %type<tableLock> table_lock_elem
 %type<tableLocks> table_lock_list
 %type<tableLockType> table_lock_type
@@ -762,17 +748,6 @@ import (
 %type<transactionCharacteristicList> transaction_characteristic_list
 %type<isolationLevel> isolation_level
 %type<accessMode> access_mode
-
-%type <timeWindow> time_window_opt time_window
-%type <timeInterval> interval
-%type <timeSliding> sliding_opt
-%type <timeFill> fill_opt
-%type <fillMode> fill_mode
-
-%start start_command
-
-// python udf
-%type<str> func_handler func_handler_opt
 %%
 
 start_command:
@@ -3376,14 +3351,22 @@ show_target:
     }
 
 show_index_stmt:
-    SHOW extended_opt index_kwd table_column_name database_name_opt where_expression_opt
+    SHOW extended_opt index_kwd from_or_in table_name where_expression_opt
     {
         $$ = &tree.ShowIndex{
-            TableName: $4,
-            DbName: $5,
+            TableName: *$5,
             Where: $6,
         }
     }
+|	SHOW extended_opt index_kwd from_or_in ident from_or_in ident where_expression_opt
+     {
+     	 prefix := tree.ObjectNamePrefix{SchemaName: tree.Identifier($7.Compare()), ExplicitSchema: true}
+         tbl := tree.NewTableName(tree.Identifier($5.Compare()), prefix)
+         $$ = &tree.ShowIndex{
+             TableName: *tbl,
+             Where: $8,
+         }
+     }
 
 extended_opt:
     {}
@@ -3721,7 +3704,7 @@ drop_index_stmt:
     {
         $$ = &tree.DropIndex{
             Name: tree.Identifier($4.Compare()),
-            TableName: $6,
+            TableName: *$6,
             IfExists: $3,
         }
     }
@@ -4290,21 +4273,21 @@ select_stmt:
     }
 
 select_no_parens:
-    simple_select time_window_opt order_by_opt limit_opt export_data_param_opt select_lock_opt
+    simple_select order_by_opt limit_opt export_data_param_opt select_lock_opt
     {
-        $$ = &tree.Select{Select: $1, TimeWindow: $2, OrderBy: $3, Limit: $4, Ep: $5, SelectLockInfo: $6}
+        $$ = &tree.Select{Select: $1, OrderBy: $2, Limit: $3, Ep: $4, SelectLockInfo: $5}
     }
-|   select_with_parens time_window_opt order_by_clause export_data_param_opt
+|   select_with_parens order_by_clause export_data_param_opt
     {
-        $$ = &tree.Select{Select: $1, TimeWindow: $2, OrderBy: $3, Ep: $4}
+        $$ = &tree.Select{Select: $1, OrderBy: $2, Ep: $3}
     }
-|   select_with_parens time_window_opt order_by_opt limit_clause export_data_param_opt
+|   select_with_parens order_by_opt limit_clause export_data_param_opt
     {
-        $$ = &tree.Select{Select: $1, TimeWindow: $2, OrderBy: $3, Limit: $4, Ep: $5}
+        $$ = &tree.Select{Select: $1, OrderBy: $2, Limit: $3, Ep: $4}
     }
-|   with_clause simple_select time_window_opt order_by_opt limit_opt export_data_param_opt select_lock_opt
+|   with_clause simple_select order_by_opt limit_opt export_data_param_opt select_lock_opt
     {
-        $$ = &tree.Select{Select: $2, TimeWindow: $3, OrderBy: $4, Limit: $5, Ep: $6, SelectLockInfo:$7, With: $1}
+        $$ = &tree.Select{Select: $2, OrderBy: $3, Limit: $4, Ep: $5, SelectLockInfo:$6, With: $1}
     }
 |   with_clause select_with_parens order_by_clause export_data_param_opt
     {
@@ -4314,99 +4297,6 @@ select_no_parens:
     {
         $$ = &tree.Select{Select: $2, OrderBy: $3, Limit: $4, Ep: $5, With: $1}
     }
-
-time_window_opt:
-	{
-		$$ = nil
-	}
-|	time_window
-	{
-		$$ = $1
-	}
-
-time_window:
-	interval sliding_opt fill_opt
-	{
-		$$ = &tree.TimeWindow{
-			Interval: $1,
-			Sliding: $2,
-			Fill: $3,
-		}
-	}
-
-interval:
-	INTERVAL '(' column_name ',' INTEGRAL ',' time_unit ')'
-	{
-		str := fmt.Sprintf("%v", $5)
-		v, errStr := util.GetInt64($5)
-        if errStr != "" {
-           yylex.Error(errStr)
-           return 1
-        }
-		$$ = &tree.Interval{
-			Col: $3,
-			Val: tree.NewNumValWithType(constant.MakeInt64(v), str, false, tree.P_int64),
-			Unit: $7,
-		}
-	}
-
-sliding_opt:
-	{
-		$$ = nil
-	}
-|	SLIDING '(' INTEGRAL ',' time_unit ')'
-	{
-		str := fmt.Sprintf("%v", $3)
-        v, errStr := util.GetInt64($3)
-        if errStr != "" {
-            yylex.Error(errStr)
-            return 1
-        }
-		$$ = &tree.Sliding{
-        	Val: tree.NewNumValWithType(constant.MakeInt64(v), str, false, tree.P_int64),
-        	Unit: $5,
-        }
-	}
-
-fill_opt:
-	{
-		$$ = nil
-	}
-|	FILL '(' fill_mode ')'
-	{
-		$$ = &tree.Fill{
-        	Mode: $3,
-        }
-	}
-|	FILL '(' VALUE ','  expression ')'
-	{
-		$$ = &tree.Fill{
-			Mode: tree.FillValue,
-			Val: $5,
-		}
-	}
-
-fill_mode:
-	PREV
-	{
-		$$ = tree.FillPrev
-	}
-|	NEXT
-	{
-		$$ = tree.FillNext
-	}
-|	NONE
-	{
-		$$ = tree.FillNone
-	}
-|	NULL
-	{
-		$$ = tree.FillNull
-	}
-|	LINEAR
-	{
-		$$ = tree.FillLinear
-	}
 
 with_clause:
     WITH cte_list
@@ -5335,26 +5225,14 @@ proc_arg_in_out_type:
 
 
 create_function_stmt:
-    CREATE replace_opt FUNCTION func_name '(' func_args_list_opt ')' RETURNS func_return LANGUAGE func_lang func_body_import STRING func_handler_opt
+    CREATE FUNCTION func_name '(' func_args_list_opt ')' RETURNS func_return LANGUAGE func_lang AS STRING
     {
-    	if $13 == "" {
-            yylex.Error("no function body error")
-            return 1
-        }
-        if $11 == "python" && $14 == "" {
-            yylex.Error("no handler error")
-            return 1
-        }
-
         $$ = &tree.CreateFunction{
-            Replace: $2,
-            Name: $4,
-            Args: $6,
-            ReturnType: $9,
-            Language: $11,
-            Import: $12,
-            Body: $13,
-            Handler: $14,
+            Name: $3,
+            Args: $5,
+            ReturnType: $8,
+            Language: $10,
+            Body: $12,
         }
     }
 
@@ -5416,29 +5294,6 @@ func_return:
     column_type
     {
         $$ = tree.NewReturnType($1)
-    }
-
-func_body_import:
-    AS
-    {
-    	$$ = false
-    }
-|   IMPORT
-    {
-    	$$ = true
-    }
-
-
-func_handler_opt:
-    {
-    	$$ = ""
-    }
-|   func_handler
-
-func_handler:
-    HANDLER STRING
-    {
-    	$$ = $2
     }
 
 create_view_stmt:
@@ -5677,11 +5532,11 @@ stage_comment_opt:
             Exist: false,
         }
     }
-|   COMMENT_KEYWORD '=' STRING
+|   COMMENT_KEYWORD STRING
     {
         $$ = tree.StageComment{
             Exist: true,
-            Comment: $3,
+            Comment: $2,
         }
     }
 
@@ -6111,12 +5966,10 @@ create_index_stmt:
         } else if $11 != nil{
             io = $11
             io.IType = $5
-        }else{
-	     io = &tree.IndexOption{IType: tree.INDEX_TYPE_INVALID}
-	 }
+        }
         $$ = &tree.CreateIndex{
             Name: tree.Identifier($4.Compare()),
-            Table: $7,
+            Table: *$7,
             IndexCat: $2,
             KeyParts: $9,
             IndexOption: io,
@@ -6144,11 +5997,7 @@ index_option_list:
                 opt1.ParserName = opt2.ParserName
             } else if opt2.Visible != tree.VISIBLE_TYPE_INVALID {
                 opt1.Visible = opt2.Visible
-            } else if opt2.AlgoParamList > 0 {
-	      opt1.AlgoParamList = opt2.AlgoParamList
-	    } else if len(opt2.AlgoParamVectorSimilarityFn) > 0 {
-	      opt1.AlgoParamVectorSimilarityFn = opt2.AlgoParamVectorSimilarityFn
-	    }
+            }
             $$ = opt1
         }
     }
@@ -6157,14 +6006,6 @@ index_option:
     KEY_BLOCK_SIZE equal_opt INTEGRAL
     {
         $$ = &tree.IndexOption{KeyBlockSize: uint64($3.(int64))}
-    }
-|   LISTS equal_opt INTEGRAL
-    {
-	$$ = &tree.IndexOption{AlgoParamList: int64($3.(int64))}
-    }
-|   SIMILARITY_FUNCTION STRING
-    {
-	$$ = &tree.IndexOption{AlgoParamVectorSimilarityFn: $2}
     }
 |   COMMENT_KEYWORD STRING
     {
@@ -6211,10 +6052,6 @@ using_opt:
 |   USING BTREE
     {
         $$ = tree.INDEX_TYPE_BTREE
-    }
-|   USING IVFFLAT
-    {
-	$$ = tree.INDEX_TYPE_IVFFLAT
     }
 |   USING HASH
     {
@@ -6494,14 +6331,6 @@ load_param_opt:
             ExParamConst: tree.ExParamConst{
                 ScanType: tree.S3,
                 Option: $4,
-            },
-        }
-    }
-|   URL STAGEOPTION ident
-    {
-        $$ = &tree.ExternParam{
-            ExParamConst: tree.ExParamConst{
-                StageName: tree.Identifier($3.Compare()),
             },
         }
     }
@@ -7352,12 +7181,6 @@ index_def:
         if $3[1] != "" {
                t := strings.ToLower($3[1])
             switch t {
- 	    case "btree":
-            	keyTyp = tree.INDEX_TYPE_BTREE
-            case "hash":
-            	keyTyp = tree.INDEX_TYPE_HASH
-	    case "rtree":
-	   	keyTyp = tree.INDEX_TYPE_RTREE
             case "zonemap":
                 keyTyp = tree.INDEX_TYPE_ZONEMAP
             case "bsi":
@@ -7381,16 +7204,10 @@ index_def:
         if $3[1] != "" {
                t := strings.ToLower($3[1])
             switch t {
-             case "btree":
-		keyTyp = tree.INDEX_TYPE_BTREE
-	     case "hash":
-		keyTyp = tree.INDEX_TYPE_HASH
-	     case "rtree":
-		keyTyp = tree.INDEX_TYPE_RTREE
-	     case "zonemap":
-		keyTyp = tree.INDEX_TYPE_ZONEMAP
-	     case "bsi":
-		keyTyp = tree.INDEX_TYPE_BSI
+            case "zonemap":
+                keyTyp = tree.INDEX_TYPE_ZONEMAP
+            case "bsi":
+                keyTyp = tree.INDEX_TYPE_BSI
             default:
                 yylex.Error("Invail the type of index")
                 return 1
@@ -7524,7 +7341,6 @@ index_type:
 |   HASH
 |   RTREE
 |   ZONEMAP
-|   IVFFLAT
 |   BSI
 
 insert_method_options:
@@ -8362,15 +8178,6 @@ separator_opt:
        $$ = $2
     }
 
-spherical_kmeans_opt:
-    {
-        $$ = "1,vector_cosine_ops"
-    }
-|   SPHERICAL_KMEANS STRING
-    {
-       $$ = $2
-    }
-
 window_spec_opt:
     {
         $$ = nil
@@ -8415,17 +8222,6 @@ function_call_aggregate:
             OrderBy:$5,
 	    }
     }
-|  CLUSTER_CENTERS '(' func_type_opt expression_list order_by_opt spherical_kmeans_opt ')' window_spec_opt
-      {
-  	     name := tree.SetUnresolvedName(strings.ToLower($1))
-		$$ = &tree.FuncExpr{
-		Func: tree.FuncName2ResolvableFunctionReference(name),
-		Exprs: append($4,tree.NewNumValWithType(constant.MakeString($6), $6, false, tree.P_char)),
-		Type: $3,
-		WindowSpec: $8,
-		OrderBy:$5,
-	    }
-      }
 |   AVG '(' func_type_opt expression  ')' window_spec_opt
     {
         name := tree.SetUnresolvedName(strings.ToLower($1))
@@ -10518,8 +10314,6 @@ non_reserved_keyword:
 |   VECF32
 |   VECF64
 |   KEY_BLOCK_SIZE
-|   LISTS
-|   SIMILARITY_FUNCTION
 |   KEYS
 |   LANGUAGE
 |   LESS
@@ -10641,7 +10435,6 @@ non_reserved_keyword:
 |   HISTORY
 |   LOW_CARDINALITY
 |   S3OPTION
-|   STAGEOPTION
 |   EXTENSION
 |   NODE
 |   ROLES
@@ -10661,8 +10454,7 @@ non_reserved_keyword:
 |   STAGE
 |   STAGES
 |   BACKUP
-|  FILESYSTEM
-|	VALUE
+| FILESYSTEM
 
 func_not_keyword:
     DATE_ADD
@@ -10692,8 +10484,6 @@ not_keyword:
 |   DATE_SUB
 |   EXTRACT
 |   GROUP_CONCAT
-|   CLUSTER_CENTERS
-|   SPHERICAL_KMEANS
 |   MAX
 |   MID
 |   MIN

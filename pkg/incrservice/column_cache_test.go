@@ -59,7 +59,7 @@ func TestColumnCacheAllocate(t *testing.T) {
 			c *columnCache) {
 			c.Lock()
 			require.NoError(t, c.waitPrevAllocatingLocked(ctx))
-			require.NoError(t, c.allocateLocked(ctx, 0, 200, 0, nil))
+			require.NoError(t, c.allocateLocked(ctx, 0, 200, 0))
 			c.Unlock()
 
 			c.Lock()
@@ -80,7 +80,7 @@ func TestColumnCacheInsert(t *testing.T) {
 			c *columnCache) {
 			c.Lock()
 			require.NoError(t, c.waitPrevAllocatingLocked(ctx))
-			require.NoError(t, c.allocateLocked(ctx, 0, 200, 0, nil))
+			require.NoError(t, c.allocateLocked(ctx, 0, 200, 0))
 			c.Unlock()
 
 			c.Lock()
@@ -354,8 +354,7 @@ func TestOverflow(t *testing.T) {
 					func(i int, u uint64) error {
 						require.Equal(t, uint64(0), u)
 						return nil
-					},
-					nil))
+					}))
 		},
 	)
 }
@@ -381,8 +380,7 @@ func TestOverflowWithInit(t *testing.T) {
 					func(i int, u uint64) error {
 						require.Equal(t, uint64(0), u)
 						return nil
-					},
-					nil))
+					}))
 		},
 	)
 }
@@ -417,8 +415,7 @@ func TestMergeAllocate(t *testing.T) {
 							func(i int, u uint64) error {
 								added.Add(1)
 								return nil
-							},
-							nil)
+							})
 					}
 				}()
 			}

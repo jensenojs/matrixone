@@ -23,11 +23,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan"
-	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
-
-var _ vm.Operator = new(Argument)
 
 const (
 	Build = iota
@@ -72,7 +69,6 @@ type container struct {
 
 	// store the all batch from the build table
 	bat     *batch.Batch
-	rbat    *batch.Batch
 	joinBat *batch.Batch
 	expr    colexec.ExpressionExecutor
 	cfs     []func(*vector.Vector, *vector.Vector, int64, int) error
@@ -155,22 +151,10 @@ type Argument struct {
 	Typs []types.Type
 	Cond *plan.Expr
 
-	OnList   []*plan.Expr
-	HashOnPK bool
-
-	info     *vm.OperatorInfo
-	children []vm.Operator
+	OnList []*plan.Expr
 }
 
-func (arg *Argument) SetInfo(info *vm.OperatorInfo) {
-	arg.info = info
-}
-
-func (arg *Argument) AppendChild(child vm.Operator) {
-	arg.children = append(arg.children, child)
-}
-
-func (arg *Argument) Free(proc *process.Process, pipelineFailed bool, err error) {
+func (arg *Argument) Free(proc *process.Process, pipelineFailed bool) {
 	ctr := arg.ctr
 	if ctr != nil {
 		mp := proc.Mp()
@@ -194,10 +178,6 @@ func (ctr *container) cleanBatch(mp *mpool.MPool) {
 	if ctr.bat != nil {
 		ctr.bat.Clean(mp)
 		ctr.bat = nil
-	}
-	if ctr.rbat != nil {
-		ctr.rbat.Clean(mp)
-		ctr.rbat = nil
 	}
 	if ctr.joinBat != nil {
 		ctr.joinBat.Clean(mp)

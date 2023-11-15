@@ -27,7 +27,7 @@ const (
 	HashMapSizeForShuffle           = 160000
 	threshHoldForHybirdShuffle      = 4000000
 	MAXShuffleDOP                   = 64
-	ShuffleThreshHoldOfNDV          = 50000
+	ShuffleThreshHold               = 50000
 	ShuffleTypeThreshHoldLowerLimit = 16
 	ShuffleTypeThreshHoldUpperLimit = 1024
 )
@@ -199,10 +199,11 @@ func determinShuffleType(col *plan.ColRef, n *plan.Node, builder *QueryBuilder) 
 		}
 	}
 
-	s := getStatsInfoByTableID(tableDef.TblId, builder)
-	if s == nil {
+	sc := builder.compCtx.GetStatsCache()
+	if sc == nil {
 		return
 	}
+	s := sc.GetStatsInfoMap(tableDef.TblId)
 	n.Stats.HashmapStats.ShuffleType = plan.ShuffleType_Range
 	n.Stats.HashmapStats.ShuffleColMin = int64(s.MinValMap[colName])
 	n.Stats.HashmapStats.ShuffleColMax = int64(s.MaxValMap[colName])
@@ -252,7 +253,7 @@ func determinShuffleForJoin(n *plan.Node, builder *QueryBuilder) {
 
 	//find the highest ndv
 	highestNDV := n.OnList[idx].Ndv
-	if highestNDV < ShuffleThreshHoldOfNDV {
+	if highestNDV < ShuffleThreshHold {
 		return
 	}
 
@@ -313,7 +314,7 @@ func determinShuffleForGroupBy(n *plan.Node, builder *QueryBuilder) {
 			idx = i
 		}
 	}
-	if highestNDV < ShuffleThreshHoldOfNDV {
+	if highestNDV < ShuffleThreshHold {
 		return
 	}
 
@@ -361,16 +362,20 @@ func GetShuffleDop() (dop int) {
 // for table with primary key, and ndv of first column in primary key is high enough, use range shuffle
 // only support integer type
 func determinShuffleForScan(n *plan.Node, builder *QueryBuilder) {
+	if n.Stats.HashmapStats == nil {
+		n.Stats.HashmapStats = &plan.HashMapStats{}
+	}
 	n.Stats.HashmapStats.Shuffle = true
 	n.Stats.HashmapStats.ShuffleType = plan.ShuffleType_Hash
 	if n.TableDef.Pkey != nil {
 		firstColName := n.TableDef.Pkey.Names[0]
 		firstColID := n.TableDef.Name2ColIndex[firstColName]
-		s := getStatsInfoByTableID(n.TableDef.TblId, builder)
-		if s == nil {
+		sc := builder.compCtx.GetStatsCache()
+		if sc == nil {
 			return
 		}
-		if s.NdvMap[firstColName] < ShuffleThreshHoldOfNDV {
+		s := sc.GetStatsInfoMap(n.TableDef.TblId)
+		if s.NdvMap[firstColName] < ShuffleThreshHold {
 			return
 		}
 		switch types.T(n.TableDef.Cols[firstColID].Typ.Id) {

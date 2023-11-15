@@ -82,7 +82,7 @@ func (r *runner) Replay(dataFactory catalog.DataFactory) (
 	if err != nil {
 		return
 	}
-	bats, err := reader.LoadAllColumns(ctx, nil, common.CheckpointAllocator)
+	bats, err := reader.LoadAllColumns(ctx, nil, common.DefaultAllocator)
 	if err != nil {
 		return
 	}
@@ -102,21 +102,14 @@ func (r *runner) Replay(dataFactory catalog.DataFactory) (
 		}
 		var vec containers.Vector
 		if bats[0].Vecs[i].Length() == 0 {
-			vec = containers.MakeVector(colTypes[i], common.CheckpointAllocator)
+			vec = containers.MakeVector(colTypes[i])
 		} else {
-			vec = containers.ToTNVector(bats[0].Vecs[i], common.CheckpointAllocator)
+			vec = containers.ToTNVector(bats[0].Vecs[i])
 		}
 		bat.AddVector(colNames[i], vec)
 	}
 	readDuration += time.Since(t0)
 	datas := make([]*logtail.CheckpointData, bat.Length())
-	defer func() {
-		for _, data := range datas {
-			if data != nil {
-				data.Close()
-			}
-		}
-	}()
 
 	entries := make([]*CheckpointEntry, bat.Length())
 	emptyFile := make([]*CheckpointEntry, 0)
@@ -273,18 +266,13 @@ func (r *runner) Replay(dataFactory catalog.DataFactory) (
 		if maxTs.Less(checkpointEntry.end) {
 			maxTs = checkpointEntry.end
 		}
-		if checkpointEntry.version >= logtail.CheckpointVersion7 && checkpointEntry.ckpLSN != 0 {
+		// for force checkpoint, ckpLSN is 0.
+		if checkpointEntry.version >= logtail.CheckpointVersion7 && checkpointEntry.ckpLSN > 0 {
 			if checkpointEntry.ckpLSN < maxLSN {
 				panic(fmt.Sprintf("logic error, current lsn %d, incoming lsn %d", maxLSN, checkpointEntry.ckpLSN))
 			}
 			isLSNValid = true
 			maxLSN = checkpointEntry.ckpLSN
-		}
-		// For version 7, all ckp LSN of force ickp is 0.
-		// In db.ForceIncrementalCheckpoint，it truncates.
-		// If the last ckp is force ickp，LSN check should be disable.
-		if checkpointEntry.version == logtail.CheckpointVersion7 && checkpointEntry.ckpLSN == 0 {
-			isLSNValid = false
 		}
 	}
 	applyDuration = time.Since(t0)

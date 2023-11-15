@@ -17,7 +17,6 @@ package plan
 import (
 	"context"
 	"fmt"
-	catalog2 "github.com/matrixorigin/matrixone/pkg/catalog"
 	"go/constant"
 	"strings"
 
@@ -38,16 +37,6 @@ const (
 			the number of subpartitions—discussed later in this section—is included in this maximum.)
 	*/
 	PartitionCountLimit = 1024
-
-	/*
-		    https://dev.mysql.com/doc/refman/8.0/en/create-table.html
-			1. KEY(column_list): the column_list argument is simply a list of 1 or more table columns (maximum: 16).
-			2. RANGE COLUMNS(column_list): The maximum number of columns that can be referenced in the column_list
-				and value_list is 16.
-			3. LIST COLUMNS(column_list): The maximum number of columns that can be used in the column_list and
-				in the elements making up the value_list is 16.
-	*/
-	PartitionColumnsLimit = 16
 )
 
 type partitionBuilder interface {
@@ -168,6 +157,7 @@ func getValidPartitionCount(ctx context.Context, needPartitionDefs bool, partiti
 
 	if needPartitionDefs && len(partitionSyntaxDef.Partitions) == 0 {
 		if _, ok := partitionSyntaxDef.PartBy.PType.(*tree.ListType); ok {
+			//return 0, moerr.NewInvalidInput(ctx, "For LIST partitions each partition must be defined")
 			return 0, moerr.NewPartitionsMustBeDefined(ctx, "LIST")
 		} else {
 			return 0, moerr.NewInvalidInput(ctx, "each partition must be defined")
@@ -636,17 +626,6 @@ func stringSliceToMap(stringSlice []string, stringMap map[string]int) (bool, str
 	return false, ""
 }
 
-func stringSliceToMapForIndexParts(stringSlice []string, stringMap map[string]int) (bool, string) {
-	for _, s := range stringSlice {
-		s = catalog2.ResolveAlias(s)
-		if _, ok := stringMap[s]; ok {
-			return true, s
-		}
-		stringMap[s] = 0
-	}
-	return false, ""
-}
-
 // checkPartitionKeys checks the partitioning key is included in the table constraint.
 func checkPartitionKeys(ctx context.Context, nameByColRef map[[2]int32]string,
 	tableDef *TableDef, partitionDef *plan.PartitionByDef) error {
@@ -683,7 +662,7 @@ func checkPartitionKeys(ctx context.Context, nameByColRef map[[2]int32]string,
 		for _, indexDef := range tableDef.Indexes {
 			if indexDef.Unique {
 				uniqueKeys := make(map[string]int)
-				if dup, dupName := stringSliceToMapForIndexParts(indexDef.Parts, uniqueKeys); dup {
+				if dup, dupName := stringSliceToMap(indexDef.Parts, uniqueKeys); dup {
 					//return moerr.NewInvalidInput(ctx, "duplicate name %s", dupName)
 					return moerr.NewSameNamePartition(ctx, dupName)
 				}
@@ -718,12 +697,10 @@ func findColumnInIndexCols(c string, pkcols map[string]int) bool {
 }
 
 /*
-checkPartitionDefines Check partition definition
-
-	1.check partition name unique or not
-	2.check partition count limitation
-	3.check partition columns count limitation
-	4.check partition column name uinque
+checkPartitionDefs
+check partition name unique or not
+check partition count limitation
+check partition column name uinque
 */
 func checkPartitionDefines(ctx context.Context, partitionBinder *PartitionBinder, partitionDef *plan.PartitionByDef, tableDef *TableDef) error {
 	var err error
@@ -735,18 +712,16 @@ func checkPartitionDefines(ctx context.Context, partitionBinder *PartitionBinder
 		return err
 	}
 
-	if err = checkPartitionColumnsCount(ctx, partitionDef); err != nil {
-		return err
-	}
-
 	if err = checkPartitionColumnsUnique(ctx, partitionDef); err != nil {
 		return err
 	}
 
 	if len(partitionDef.Partitions) == 0 {
 		if partitionDef.Type == plan.PartitionType_RANGE || partitionDef.Type == plan.PartitionType_RANGE_COLUMNS {
+			//return moerr.NewInvalidInput(partitionBinder.GetContext(), "range partition cannot be empty")
 			return moerr.NewPartitionsMustBeDefined(ctx, "RANGE")
 		} else if partitionDef.Type == plan.PartitionType_LIST || partitionDef.Type == plan.PartitionType_LIST_COLUMNS {
+			//return moerr.NewInvalidInput(partitionBinder.GetContext(), "list partition cannot be empty")
 			return moerr.NewPartitionsMustBeDefined(ctx, "LIST")
 		}
 	}
@@ -754,6 +729,8 @@ func checkPartitionDefines(ctx context.Context, partitionBinder *PartitionBinder
 	switch partitionDef.Type {
 	case plan.PartitionType_RANGE, plan.PartitionType_RANGE_COLUMNS:
 		err = checkPartitionByRange(partitionBinder, partitionDef, tableDef)
+	case plan.PartitionType_HASH:
+		// TODO
 	case plan.PartitionType_LIST, plan.PartitionType_LIST_COLUMNS:
 		err = checkPartitionByList(partitionBinder, partitionDef, tableDef)
 	}
@@ -777,17 +754,10 @@ func checkPartitionColumnsUnique(ctx context.Context, pi *plan.PartitionByDef) e
 	return nil
 }
 
-// checkPartitionColumns Check if the number of partition columns exceeds the limit
-func checkPartitionColumnsCount(ctx context.Context, pi *plan.PartitionByDef) error {
-	if pi.PartitionColumns != nil && len(pi.PartitionColumns.PartitionColumns) > PartitionColumnsLimit {
-		return moerr.NewErrTooManyPartitionFuncFields(ctx, "list of partition fields")
-	}
-	return nil
-}
-
 // checkPartitionCount: check whether check partition number exceeds the limit
 func checkPartitionCount(ctx context.Context, partNum int) error {
 	if partNum > PartitionCountLimit {
+		//return moerr.NewInvalidInput(ctx, "too many (%d) partitions", partNum)
 		return moerr.NewErrTooManyPartitions(ctx)
 	}
 	return nil
@@ -851,8 +821,9 @@ func handleEmptyKeyPartition(partitionBinder *PartitionBinder, tableDef *TableDe
 				if indexdef.Unique {
 					// A UNIQUE INDEX must include all columns in the table's partitioning function
 					uniqueKeys := make(map[string]int)
-					stringSliceToMapForIndexParts(indexdef.Parts, uniqueKeys)
+					stringSliceToMap(indexdef.Parts, uniqueKeys)
 					if !checkUniqueKeyIncludePartKey(pkcols, uniqueKeys) {
+						//return moerr.NewInvalidInput(partitionBinder.GetContext(), "partition key is not part of primary key")
 						return moerr.NewUniqueKeyNeedAllFieldsInPf(partitionBinder.GetContext(), "PRIMARY KEY")
 					}
 				} else {
@@ -865,19 +836,21 @@ func handleEmptyKeyPartition(partitionBinder *PartitionBinder, tableDef *TableDe
 		if uniqueIndexCount >= 2 {
 			firstUniqueKeyCols := make(map[string]int)
 			for _, indexdef := range tableDef.Indexes {
-				stringSliceToMapForIndexParts(indexdef.Parts, firstUniqueKeyCols)
+				stringSliceToMap(indexdef.Parts, firstUniqueKeyCols)
 				break
 			}
 
 			for _, indexdef := range tableDef.Indexes {
 				uniqueKeys := make(map[string]int)
-				stringSliceToMapForIndexParts(indexdef.Parts, uniqueKeys)
+				stringSliceToMap(indexdef.Parts, uniqueKeys)
 				if !checkUniqueKeyIncludePartKey(firstUniqueKeyCols, uniqueKeys) {
+					//return moerr.NewInvalidInput(partitionBinder.GetContext(), "partition key is not part of primary key")
 					return moerr.NewUniqueKeyNeedAllFieldsInPf(partitionBinder.GetContext(), "PRIMARY KEY")
 				}
 			}
 		}
 	} else {
+		//return moerr.NewInvalidInput(partitionBinder.GetContext(), "Field in list of fields for partition function not found in table")
 		return moerr.NewFieldNotFoundPart(partitionBinder.GetContext())
 	}
 	return nil

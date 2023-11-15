@@ -17,9 +17,8 @@ package motrace
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/matrixorigin/matrixone/pkg/util/trace/impl/motrace/statistic"
+	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/util/export/table"
 
@@ -109,7 +108,7 @@ var (
 			resultCntCol,
 		},
 		PrimaryKeyColumn: nil,
-		ClusterBy:        []table.Column{reqAtCol},
+		ClusterBy:        []table.Column{reqAtCol, accountCol},
 		// Engine
 		Engine:        table.NormalTableEngine,
 		Comment:       "record each statement and stats info",
@@ -182,7 +181,7 @@ var (
 			sessionIDCol,
 		},
 		PrimaryKeyColumn: nil,
-		ClusterBy:        []table.Column{timestampCol},
+		ClusterBy:        []table.Column{timestampCol, rawItemCol},
 		Engine:           table.NormalTableEngine,
 		Comment:          "read merge data from log, error, span",
 		PathBuilder:      table.NewAccountDatePathBuilder(),

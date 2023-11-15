@@ -108,8 +108,6 @@ func (node IndexT) ToString() string {
 	default:
 		return "INVAILD"
 	}
-	//TODO: @arjun fix this later
-	// Should this be same as secondary index algo type?
 }
 
 const (
@@ -570,7 +568,7 @@ func (def *StreamConfigsDef) ToPBVersion() ConstraintPB {
 type Relation interface {
 	Statistics
 
-	UpdateObjectInfos(context.Context) error
+	UpdateBlockInfos(context.Context) error
 
 	Ranges(context.Context, []*plan.Expr) ([][]byte, error)
 
