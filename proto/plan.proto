@@ -682,7 +682,7 @@ message Node {
 		//
 		TIME_WINDOW = 64;
 		Fill = 65;
-		FUZZY_FILTER = 60;
+		FUZZY_FILTER = 66;
 	}
 
 	enum JoinType {
