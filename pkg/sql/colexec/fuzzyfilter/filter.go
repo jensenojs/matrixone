@@ -121,11 +121,9 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 	pkCol := bat.GetVector(0)
 	for i := 0; i < rowCnt; i++ {
 		var bytes = pkCol.GetRawBytesAt(i)
-		if arg.filter.Test(bytes) {
+		if arg.filter.TestAndAdd(bytes) {
 			appendCollisionKey(proc, arg, i, bat)
 			arg.collisionCnt++
-		} else {
-			arg.filter.Add(bytes)
 		}
 	}
 	result.Batch = batch.EmptyBatch
