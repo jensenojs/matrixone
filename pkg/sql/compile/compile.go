@@ -381,6 +381,10 @@ func (c *Compile) Run(_ uint64) (result *util2.RunResult, err error) {
 		v2.TxnStatementExecuteDurationHistogram.Observe(time.Since(start).Seconds())
 	}()
 
+	if strings.Contains(c.sql, "generate_series") {
+		fmt.Printf("%s\n", DebugShowScopes(c.scope))
+	}
+
 	var span trace.Span
 	var cc *Compile // compile structure for rerun.
 	result = &util2.RunResult{}

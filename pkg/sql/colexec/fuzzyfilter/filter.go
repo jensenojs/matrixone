@@ -50,11 +50,11 @@ func (arg *Argument) String(buf *bytes.Buffer) {
 }
 
 func (arg *Argument) Prepare(proc *process.Process) (err error) {
-	rowCount := int64(arg.N * 1.1)
+	rowCount := int64(arg.N * 1.2)
 	if rowCount < 10000 {
 		rowCount = 10000
 	}
-	probability := 0.000001
+	probability := 0.00001
 	if rowCount < 10000001 {
 		probability = 0.00001
 	} else if rowCount < 100000001 {

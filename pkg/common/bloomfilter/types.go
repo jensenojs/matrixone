@@ -51,11 +51,11 @@ func New(rowCount int64, probability float64) *BloomFilter {
 func computeMemAndHashCount(rowCount int64, probability float64) (int64, int) {
 	if rowCount < 10001 {
 		return 64 * 10000, 1
-	} else if rowCount < 100000 {
-		return 64 * 100001, 1
-	} else if rowCount < 1000000 {
-		return 16 * 1000001, 1
-	} else if rowCount < 10000000 {
+	} else if rowCount < 100001 {
+		return 64 * 100000, 1
+	} else if rowCount < 1000001 {
+		return 16 * 1000000, 1
+	} else if rowCount < 10000001 {
 		return 38 * 10000000, 2
 	} else if rowCount < 100000001 {
 		// m := ceil((rowCount * log(0.000001)) / log(1/pow(2, log(2))))
