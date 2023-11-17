@@ -107,14 +107,14 @@ func NewDropFunction(n *FunctionName, args FunctionArgs, buf *buffer.Buffer) *Dr
 
 func (node *FunctionName) Format(ctx *FmtCtx) {
 	if node.Name.ExplicitCatalog {
-		ctx.WriteString(string(node.Name.CatalogName))
+		ctx.WriteString(string(node.Name.CatalogName.Get()))
 		ctx.WriteByte('.')
 	}
 	if node.Name.ExplicitSchema {
-		ctx.WriteString(string(node.Name.SchemaName))
+		ctx.WriteString(string(node.Name.SchemaName.Get()))
 		ctx.WriteByte('.')
 	}
-	ctx.WriteString(string(node.Name.ObjectName))
+	ctx.WriteString(string(node.Name.ObjectName.Get()))
 }
 
 func (node *FunctionName) HasNoNameQualifier() bool {
@@ -176,7 +176,10 @@ func NewFunctionArgDecl(name *UnresolvedName, typ ResolvableTypeReference, defau
 
 func NewFuncName(name Identifier, prefix ObjectNamePrefix, buf *buffer.Buffer) *FunctionName {
 	fn := buffer.Alloc[FunctionName](buf)
-	fn.Name.ObjectName = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
+	fn.Name.ObjectName = n
 	fn.Name.ObjectNamePrefix = prefix
 	return fn
 }

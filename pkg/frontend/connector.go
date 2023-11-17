@@ -47,7 +47,7 @@ func (mce *MysqlCmdExecutor) handleCreateConnector(ctx context.Context, st *tree
 	}
 	options := make(map[string]string)
 	for _, opt := range st.Options {
-		options[string(opt.Key)] = opt.Val.String()
+		options[string(opt.Key.Get())] = opt.Val.String()
 	}
 	if err := createConnector(
 		ctx,

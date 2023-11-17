@@ -32,13 +32,13 @@ type objName struct {
 	ObjectNamePrefix
 
 	//the unqualified name for the object
-	ObjectName Identifier
+	ObjectName *BufIdentifier
 }
 
 // the path prefix of an object name.
 type ObjectNamePrefix struct {
-	CatalogName Identifier
-	SchemaName  Identifier
+	CatalogName *BufIdentifier
+	SchemaName  *BufIdentifier
 
 	//true iff the catalog was explicitly specified
 	ExplicitCatalog bool
@@ -74,12 +74,12 @@ func (node *UnresolvedObjectName) ToTableName() TableName {
 	return TableName{
 		objName: objName{
 			ObjectNamePrefix: ObjectNamePrefix{
-				SchemaName:      Identifier(node.Parts[1]),
-				CatalogName:     Identifier(node.Parts[2]),
+				SchemaName:      NewBufIdentifier(node.Parts[1]),
+				CatalogName:     NewBufIdentifier(node.Parts[2]),
 				ExplicitSchema:  node.NumParts >= 2,
 				ExplicitCatalog: node.NumParts >= 3,
 			},
-			ObjectName: Identifier(node.Parts[0]),
+			ObjectName: NewBufIdentifier(node.Parts[0]),
 		},
 	}
 }

@@ -86,7 +86,7 @@ func (rpb *rangePartitionBuilder) buildPartitionDefs(ctx context.Context, partit
 	// VALUES LESS THAN value must be strictly increasing for each partition
 	for i, partition := range defs {
 		partitionItem := &plan.PartitionItem{
-			PartitionName:   string(partition.Name),
+			PartitionName:   string(partition.Name.Get()),
 			OrdinalPosition: uint32(i + 1),
 		}
 

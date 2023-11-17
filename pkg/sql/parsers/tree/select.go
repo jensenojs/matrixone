@@ -245,7 +245,7 @@ func (node *SelectClause) Format(ctx *FmtCtx) {
 		if ok {
 			tbl, ok := als.Expr.(*TableName)
 			if ok {
-				if string(tbl.ObjectName) == "" {
+				if string(tbl.ObjectName.Get()) == "" {
 					canFrom = false
 				}
 			}
@@ -481,20 +481,22 @@ func NewParenTableExpr(e TableExpr, buf *buffer.Buffer) *ParenTableExpr {
 // "AS name" or "AS name(col1, col2)".
 type AliasClause struct {
 	NodeFormatter
-	Alias Identifier
+	Alias *BufIdentifier
 	Cols  IdentifierList
 }
 
 func NewAliasClause(alias Identifier, cols IdentifierList, buf *buffer.Buffer) *AliasClause {
 	a := buffer.Alloc[AliasClause](buf)
-	a.Alias = alias
+	al := NewBufIdentifier(alias)
+	buf.Pin(al)
+	a.Alias = al
 	a.Cols = cols
 	return a
 }
 
 func (node *AliasClause) Format(ctx *FmtCtx) {
-	if node.Alias != "" {
-		ctx.WriteString(string(node.Alias))
+	if node.Alias.Get() != "" {
+		ctx.WriteString(string(node.Alias.Get()))
 	}
 	if node.Cols != nil {
 		ctx.WriteByte('(')
@@ -513,7 +515,7 @@ type AliasedTableExpr struct {
 
 func (node *AliasedTableExpr) Format(ctx *FmtCtx) {
 	node.Expr.Format(ctx)
-	if node.As.Alias != "" {
+	if node.As.Alias.Get() != "" {
 		ctx.WriteString(" as ")
 		node.As.Format(ctx)
 	}

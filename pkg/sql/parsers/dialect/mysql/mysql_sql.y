@@ -3905,7 +3905,9 @@ show_index_stmt:
 |	SHOW extended_opt index_kwd from_or_in ident from_or_in ident where_expression_opt
     {
         prefix := tree.NewObjectNamePrefix(yylex.(*Lexer).buf)
-        prefix.SchemaName = tree.Identifier($7.Compare())
+        bi := tree.NewBufIdentifier($7.Compare())
+        yylex.(*Lexer).buf.Pin(bi)
+        prefix.SchemaName = bi
         prefix.ExplicitSchema = true
         
         tbl := tree.NewTableName(tree.Identifier($5.Compare()), *prefix, yylex.(*Lexer).buf)
@@ -4533,7 +4535,9 @@ table_name_opt_wild:
 |    ident '.' ident wild_opt
     {
         prefix := tree.NewObjectNamePrefix(yylex.(*Lexer).buf)
-        prefix.SchemaName = tree.Identifier($1.Compare())
+        bi := tree.NewBufIdentifier($1.Compare())
+        yylex.(*Lexer).buf.Pin(bi)
+        prefix.SchemaName = bi
         prefix.ExplicitSchema = true
         $$ = tree.NewTableName(tree.Identifier($3.Compare()), *prefix, yylex.(*Lexer).buf)
     }
@@ -4606,7 +4610,7 @@ replace_data:
         identList := buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
         valueList := buffer.MakeSlice[tree.Expr](yylex.(*Lexer).buf)
 		for _, a := range $2 {
-            identList = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, identList, a.Column)
+            identList = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, identList, a.Column.Get())
             valueList = buffer.AppendSlice[tree.Expr](yylex.(*Lexer).buf, valueList, a.Expr)
 		}
         
@@ -4677,7 +4681,7 @@ insert_data:
         valueList := buffer.MakeSlice[tree.Expr](yylex.(*Lexer).buf)
         
 		for _, a := range $2 {
-            identList = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, identList, a.Column)
+            identList = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, identList, a.Column.Get())
             valueList = buffer.AppendSlice[tree.Expr](yylex.(*Lexer).buf, valueList, a.Expr)
 		}
         
@@ -6048,7 +6052,9 @@ proc_name:
 |   ident '.' ident
     {
         prefix := tree.NewObjectNamePrefix(yylex.(*Lexer).buf)
-        prefix.SchemaName = tree.Identifier($1.ToLower())
+        bi := tree.NewBufIdentifier($1.ToLower())
+        yylex.(*Lexer).buf.Pin(bi)
+        prefix.SchemaName = bi
         prefix.ExplicitSchema = true
         $$ = tree.NewProcedureName(tree.Identifier($3.ToLower()), *prefix, yylex.(*Lexer).buf)
     }
@@ -6128,7 +6134,9 @@ func_name:
     {
         prefix := tree.NewObjectNamePrefix(yylex.(*Lexer).buf)
         prefix.ExplicitSchema = true
-        prefix.SchemaName = tree.Identifier($1.Compare())
+        bi := tree.NewBufIdentifier($1.Compare())
+        yylex.(*Lexer).buf.Pin(bi)
+        prefix.SchemaName = bi
         $$ = tree.NewFuncName(tree.Identifier($3.Compare()), *prefix, yylex.(*Lexer).buf)
     }
 
@@ -8395,7 +8403,9 @@ table_name:
 |   ident '.' ident
     {
         prefix := tree.NewObjectNamePrefix(yylex.(*Lexer).buf)
-        prefix.SchemaName = tree.Identifier($1.Compare())
+        bi := tree.NewBufIdentifier($1.Compare())
+        yylex.(*Lexer).buf.Pin(bi)
+        prefix.SchemaName = bi
         prefix.ExplicitSchema = true
         $$ = tree.NewTableName(tree.Identifier($3.Compare()), *prefix, yylex.(*Lexer).buf)
     }

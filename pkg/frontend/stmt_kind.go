@@ -187,7 +187,7 @@ func statementCanBeExecutedInUncommittedTransaction(ses *Session, stmt tree.Stat
 		}
 		return statementCanBeExecutedInUncommittedTransaction(ses, preStmt)
 	case *tree.Execute:
-		preName := string(st.Name)
+		preName := string(st.Name.Get())
 		preStmt, err := ses.GetPrepareStmt(preName)
 		if err != nil {
 			return false, err

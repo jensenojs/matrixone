@@ -18,7 +18,7 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 
 type Reset struct {
 	Statement
-	Name Identifier
+	Name *BufIdentifier
 }
 
 func (node *Reset) Format(ctx *FmtCtx) {
@@ -32,6 +32,9 @@ func (node *Reset) GetQueryType() string     { return QueryTypeDCL }
 
 func NewReset(name Identifier, buf *buffer.Buffer) *Reset {
 	rs := buffer.Alloc[Reset](buf)
-	rs.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
+	rs.Name = n
 	return rs
 }

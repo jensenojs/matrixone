@@ -37,7 +37,7 @@ func TestSplitRecursiveMember(t *testing.T) {
 		return
 	}
 	c := stmts[0].(*tree.Select).With.CTEs[0]
-	name := string(c.Name.Alias)
+	name := string(c.Name.Alias.Get())
 	stmt := c.Stmt.(*tree.Select).Select
 	b := &QueryBuilder{}
 

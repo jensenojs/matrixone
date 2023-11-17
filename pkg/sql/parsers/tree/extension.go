@@ -19,26 +19,32 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 type CreateExtension struct {
 	statementImpl
 	Language string
-	Name     Identifier
-	Filename Identifier
+	Name     *BufIdentifier
+	Filename *BufIdentifier
 }
 
 func NewCreateExtension(language string, name, filename Identifier, buf *buffer.Buffer) *CreateExtension {
-	c := buffer.Alloc[CreateExtension](buf)	
+	c := buffer.Alloc[CreateExtension](buf)
 	c.Language = language
-	c.Name = name
-	c.Filename = filename
+	n := NewBufIdentifier(name)
+	f := NewBufIdentifier(filename)
+	buf.Pin(n, f)
+
+	c.Name = n
+	c.Filename = f
 	return c
 }
 
 type LoadExtension struct {
 	statementImpl
-	Name Identifier
+	Name *BufIdentifier
 }
 
 func NewLoadExtension(name Identifier, buf *buffer.Buffer) *LoadExtension {
 	l := buffer.Alloc[LoadExtension](buf)
-	l.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+	l.Name = n
 	return l
 }
 

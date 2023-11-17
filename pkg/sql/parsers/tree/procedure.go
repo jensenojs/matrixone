@@ -60,7 +60,9 @@ type ProcedureName struct {
 
 func NewProcedureName(name Identifier, prefix ObjectNamePrefix, buf *buffer.Buffer) *ProcedureName {
 	pn := buffer.Alloc[ProcedureName](buf)
-	pn.Name.ObjectName = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+	pn.Name.ObjectName = n
 	pn.Name.ObjectNamePrefix = prefix
 	return pn
 }
@@ -101,14 +103,14 @@ func (node *ProcedureArgDecl) GetType() int {
 
 func (node *ProcedureName) Format(ctx *FmtCtx) {
 	if node.Name.ExplicitCatalog {
-		ctx.WriteString(string(node.Name.CatalogName))
+		ctx.WriteString(string(node.Name.CatalogName.Get()))
 		ctx.WriteByte('.')
 	}
 	if node.Name.ExplicitSchema {
-		ctx.WriteString(string(node.Name.SchemaName))
+		ctx.WriteString(string(node.Name.SchemaName.Get()))
 		ctx.WriteByte('.')
 	}
-	ctx.WriteString(string(node.Name.ObjectName))
+	ctx.WriteString(string(node.Name.ObjectName.Get()))
 }
 
 func (node *ProcedureName) HasNoNameQualifier() bool {

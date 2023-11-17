@@ -23,7 +23,7 @@ import (
 type CreateStage struct {
 	statementImpl
 	IfNotExists bool
-	Name        Identifier
+	Name        *BufIdentifier
 	Url         string
 	Credentials StageCredentials
 	Status      StageStatus
@@ -31,9 +31,12 @@ type CreateStage struct {
 }
 
 func NewCreateStage(ifs bool, name Identifier, url string, cs StageCredentials, st StageStatus, co StageComment, buf *buffer.Buffer) *CreateStage {
-	cr := buffer.Alloc[CreateStage](buf)	
+	cr := buffer.Alloc[CreateStage](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
 	cr.IfNotExists = ifs
-	cr.Name = name
+	cr.Name = n
 	cr.Url = url
 	cr.Credentials = cs
 	cr.Status = st
@@ -62,13 +65,15 @@ func (node *CreateStage) GetQueryType() string     { return QueryTypeOth }
 type DropStage struct {
 	statementImpl
 	IfNotExists bool
-	Name        Identifier
+	Name        *BufIdentifier
 }
 
-func NewDropStage(i bool, n Identifier, buf *buffer.Buffer) *DropStage {
-	d := buffer.Alloc[DropStage ](buf)
-	d.IfNotExists = i
+func NewDropStage(i bool, name Identifier, buf *buffer.Buffer) *DropStage {
+	d := buffer.Alloc[DropStage](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
 	d.Name = n
+	d.IfNotExists = i
 	return d
 }
 
@@ -86,7 +91,7 @@ func (node *DropStage) GetQueryType() string     { return QueryTypeOth }
 type AlterStage struct {
 	statementImpl
 	IfNotExists       bool
-	Name              Identifier
+	Name              *BufIdentifier
 	UrlOption         StageUrl
 	CredentialsOption StageCredentials
 	StatusOption      StageStatus
@@ -95,8 +100,10 @@ type AlterStage struct {
 
 func NewAlterStage(ifn bool, name Identifier, url StageUrl, cop StageCredentials, sop StageStatus, co StageComment, buf *buffer.Buffer) *AlterStage {
 	al := buffer.Alloc[AlterStage](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
 	al.IfNotExists = ifn
-	al.Name = name
+	al.Name = n
 	al.UrlOption = url
 	al.CredentialsOption = cop
 	al.StatusOption = sop
@@ -166,7 +173,7 @@ type StageComment struct {
 	Comment string
 }
 
-func NewStageComment(e bool, c string, buf *buffer.Buffer) *StageComment{
+func NewStageComment(e bool, c string, buf *buffer.Buffer) *StageComment {
 	s := buffer.Alloc[StageComment](buf)
 	s.Exist = e
 	s.Comment = c
@@ -185,8 +192,8 @@ type StageCredentials struct {
 	Credentials []string
 }
 
-func NewStageCredentials (e bool, cs []string, buf *buffer.Buffer) *StageCredentials {
-	s := buffer.Alloc[StageCredentials ](buf)
+func NewStageCredentials(e bool, cs []string, buf *buffer.Buffer) *StageCredentials {
+	s := buffer.Alloc[StageCredentials](buf)
 	s.Exist = e
 	s.Credentials = cs
 	return s
@@ -214,7 +221,7 @@ type StageUrl struct {
 	Url   string
 }
 
-func NewStageUrl(e bool, u string, buf *buffer.Buffer) *StageUrl{
+func NewStageUrl(e bool, u string, buf *buffer.Buffer) *StageUrl {
 	s := buffer.Alloc[StageUrl](buf)
 	s.Exist = e
 	s.Url = u

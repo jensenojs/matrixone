@@ -83,7 +83,7 @@ func (lpb *listPartitionBuilder) build(ctx context.Context, partitionBinder *Par
 func (lpb *listPartitionBuilder) buildPartitionDefs(ctx context.Context, partitionBinder *PartitionBinder, partitionDef *plan.PartitionByDef, syntaxDefs []*tree.Partition) (err error) {
 	dedup := make(map[string]int)
 	for i, partition := range syntaxDefs {
-		name := string(partition.Name)
+		name := string(partition.Name.Get())
 		if _, ok := dedup[name]; ok {
 			return moerr.NewInvalidInput(ctx, "duplicate partition name %s", name)
 		}

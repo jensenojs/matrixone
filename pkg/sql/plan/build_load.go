@@ -41,7 +41,7 @@ func buildLoad(stmt *tree.Load, ctx CompilerContext, isPrepareStmt bool) (*Plan,
 	if err := InitNullMap(stmt.Param, ctx); err != nil {
 		return nil, err
 	}
-	tblName := string(stmt.Table.ObjectName)
+	tblName := string(stmt.Table.ObjectName.Get())
 	tblInfo, err := getDmlTableInfo(ctx, tree.TableExprs{stmt.Table}, nil, nil, "insert")
 	if err != nil {
 		return nil, err
@@ -186,7 +186,7 @@ func checkFileExist(param *tree.ExternParam, ctx CompilerContext) (string, error
 }
 
 func getProjectNode(stmt *tree.Load, ctx CompilerContext, node *plan.Node, tableDef *TableDef) (bool, error) {
-	tblName := string(stmt.Table.ObjectName)
+	tblName := string(stmt.Table.ObjectName.Get())
 	colToIndex := make(map[int32]string, 0)
 	isInsertWithoutAutoPkCol := false
 	if len(stmt.Param.Tail.ColumnList) == 0 {

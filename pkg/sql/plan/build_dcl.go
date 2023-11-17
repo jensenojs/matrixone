@@ -59,7 +59,7 @@ func buildPrepare(stmt tree.Prepare, ctx CompilerContext) (*Plan, error) {
 
 	switch pstmt := stmt.(type) {
 	case *tree.PrepareStmt:
-		stmtName = string(pstmt.Name)
+		stmtName = string(pstmt.Name.Get())
 		preparePlan, err = getPreparePlan(ctx, pstmt.Stmt)
 		if err != nil {
 			return nil, err
@@ -79,7 +79,7 @@ func buildPrepare(stmt tree.Prepare, ctx CompilerContext) (*Plan, error) {
 		if len(stmts) > 1 {
 			return nil, moerr.NewInvalidInput(ctx.GetContext(), "cannot prepare multi statements")
 		}
-		stmtName = string(pstmt.Name)
+		stmtName = string(pstmt.Name.Get())
 		preparePlan, err = getPreparePlan(ctx, stmts[0])
 		if err != nil {
 			return nil, err
@@ -166,7 +166,7 @@ func buildExecute(stmt *tree.Execute, ctx CompilerContext) (*Plan, error) {
 	}
 
 	execute := &plan.Execute{
-		Name: string(stmt.Name),
+		Name: string(stmt.Name.Get()),
 		Args: args,
 	}
 
@@ -184,7 +184,7 @@ func buildExecute(stmt *tree.Execute, ctx CompilerContext) (*Plan, error) {
 
 func buildDeallocate(stmt *tree.Deallocate, _ CompilerContext) (*Plan, error) {
 	deallocate := &plan.Deallocate{
-		Name: string(stmt.Name),
+		Name: string(stmt.Name.Get()),
 	}
 
 	return &Plan{

@@ -76,16 +76,16 @@ func init() {
 func getAliasToName(ctx CompilerContext, expr tree.TableExpr, alias string, aliasMap map[string][2]string) {
 	switch t := expr.(type) {
 	case *tree.TableName:
-		dbName := string(t.SchemaName)
+		dbName := string(t.SchemaName.Get())
 		if dbName == "" {
 			dbName = ctx.DefaultDatabase()
 		}
-		tblName := string(t.ObjectName)
+		tblName := string(t.ObjectName.Get())
 		if alias != "" {
 			aliasMap[alias] = [2]string{dbName, tblName}
 		}
 	case *tree.AliasedTableExpr:
-		alias := string(t.As.Alias)
+		alias := string(t.As.Alias.Get())
 		getAliasToName(ctx, t.Expr, alias, aliasMap)
 	case *tree.JoinTableExpr:
 		getAliasToName(ctx, t.Left, alias, aliasMap)
@@ -153,7 +153,7 @@ func getUpdateTableInfo(ctx CompilerContext, stmt *tree.Update) (*dmlTableInfo, 
 					if i > 0 {
 						str += ", "
 					}
-					str += string(c.Name.Alias)
+					str += string(c.Name.Alias.Get())
 				}
 				return nil, moerr.NewInternalError(ctx.GetContext(), "column '%v' not found in table or the target table %s of the UPDATE is not updatable", colName, str)
 			} else if !found {
@@ -207,7 +207,7 @@ func setTableExprToDmlTableInfo(ctx CompilerContext, tbl tree.TableExpr, tblInfo
 	var tblName, dbName, alias string
 
 	if aliasTbl, ok := tbl.(*tree.AliasedTableExpr); ok {
-		alias = string(aliasTbl.As.Alias)
+		alias = string(aliasTbl.As.Alias.Get())
 		tbl = aliasTbl.Expr
 	}
 
@@ -224,8 +224,8 @@ func setTableExprToDmlTableInfo(ctx CompilerContext, tbl tree.TableExpr, tblInfo
 	}
 
 	if baseTbl, ok := tbl.(*tree.TableName); ok {
-		tblName = string(baseTbl.ObjectName)
-		dbName = string(baseTbl.SchemaName)
+		tblName = string(baseTbl.ObjectName.Get())
+		dbName = string(baseTbl.SchemaName.Get())
 	}
 
 	if _, exist := withMap[tblName]; exist {
@@ -332,7 +332,7 @@ func getDmlTableInfo(ctx CompilerContext, tableExprs tree.TableExprs, with *tree
 	cteMap := make(map[string]struct{})
 	if with != nil {
 		for _, cte := range with.CTEs {
-			cteMap[string(cte.Name.Alias)] = struct{}{}
+			cteMap[string(cte.Name.Alias.Get())] = struct{}{}
 		}
 	}
 
@@ -350,7 +350,7 @@ func getDmlTableInfo(ctx CompilerContext, tableExprs tree.TableExprs, with *tree
 
 func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Insert, info *dmlSelectInfo) (bool, map[int]int, bool, error) {
 	buf := builder.compCtx.GetBuffer()
-	
+
 	var err error
 	var insertColumns []string
 	tableDef := info.tblInfo.tableDefs[0]
@@ -474,7 +474,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 	}
 
 	err = builder.addBinding(info.rootId, tree.AliasClause{
-		Alias: derivedTableName,
+		Alias: tree.NewBufIdentifier(derivedTableName),
 	}, bindCtx)
 	if err != nil {
 		return false, nil, false, err
@@ -753,15 +753,15 @@ func deleteToSelect(builder *QueryBuilder, bindCtx *BindContext, node *tree.Dele
 
 	for _, tbl := range node.Tables {
 		if aliasTbl, ok := tbl.(*tree.AliasedTableExpr); ok {
-			alias := string(aliasTbl.As.Alias)
+			alias := string(aliasTbl.As.Alias.Get())
 			if alias != "" {
 				getResolveExpr(alias)
 			} else {
 				astTbl := aliasTbl.Expr.(*tree.TableName)
-				getResolveExpr(string(astTbl.ObjectName))
+				getResolveExpr(string(astTbl.ObjectName.Get()))
 			}
 		} else if astTbl, ok := tbl.(*tree.TableName); ok {
-			getResolveExpr(string(astTbl.ObjectName))
+			getResolveExpr(string(astTbl.ObjectName.Get()))
 		}
 	}
 
@@ -1052,7 +1052,7 @@ func buildValueScan(
 	}
 	info.rootId = builder.appendNode(scanNode, bindCtx)
 	err = builder.addBinding(info.rootId, tree.AliasClause{
-		Alias: "_ValueScan",
+		Alias: tree.NewBufIdentifier("_ValueScan"),
 	}, bindCtx)
 	if err != nil {
 		return err

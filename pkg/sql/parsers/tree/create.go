@@ -94,8 +94,8 @@ func NewCreateOptionEncryption(encrypt string, buf *buffer.Buffer) *CreateOption
 
 type SubscriptionOption struct {
 	statementImpl
-	From        Identifier
-	Publication Identifier
+	From        *BufIdentifier
+	Publication *BufIdentifier
 }
 
 func (node *SubscriptionOption) Format(ctx *FmtCtx) {
@@ -105,17 +105,22 @@ func (node *SubscriptionOption) Format(ctx *FmtCtx) {
 	node.Publication.Format(ctx)
 }
 
-func NewSubscriptionOption(from Identifier, publication Identifier, buf *buffer.Buffer) *SubscriptionOption {
+func NewSubscriptionOption(from, publication Identifier, buf *buffer.Buffer) *SubscriptionOption {
 	s := buffer.Alloc[SubscriptionOption](buf)
-	s.From = from
-	s.Publication = publication
+
+	f := NewBufIdentifier(from)
+	p := NewBufIdentifier(publication)
+	buf.Pin(f, p)
+
+	s.From = f
+	s.Publication = p
 	return s
 }
 
 type CreateDatabase struct {
 	statementImpl
 	IfNotExists        bool
-	Name               Identifier
+	Name               *BufIdentifier
 	CreateOptions      []CreateOption
 	SubscriptionOption *SubscriptionOption
 }
@@ -144,8 +149,11 @@ func (node *CreateDatabase) GetQueryType() string     { return QueryTypeDDL }
 
 func NewCreateDatabase(ifNotExists bool, name Identifier, sub *SubscriptionOption, createOptions []CreateOption, buf *buffer.Buffer) *CreateDatabase {
 	c := buffer.Alloc[CreateDatabase](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
+	c.Name = n
 	c.IfNotExists = ifNotExists
-	c.Name = name
 	c.SubscriptionOption = sub
 	c.CreateOptions = createOptions
 	return c
@@ -1941,7 +1949,7 @@ func NewValuesIn(valueList Exprs, buf *buffer.Buffer) *ValuesIn {
 }
 
 type Partition struct {
-	Name    Identifier
+	Name    *BufIdentifier
 	Values  Values
 	Options []TableOption
 	Subs    []*SubPartition
@@ -1949,7 +1957,7 @@ type Partition struct {
 
 func (node *Partition) Format(ctx *FmtCtx) {
 	ctx.WriteString("partition ")
-	ctx.WriteString(string(node.Name))
+	ctx.WriteString(string(node.Name.Get()))
 	if node.Values != nil {
 		ctx.WriteByte(' ')
 		node.Values.Format(ctx)
@@ -1975,7 +1983,10 @@ func (node *Partition) Format(ctx *FmtCtx) {
 
 func NewPartition(name Identifier, values Values, options []TableOption, subs []*SubPartition, buf *buffer.Buffer) *Partition {
 	p := buffer.Alloc[Partition](buf)
-	p.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
+	p.Name = n
 	p.Values = values
 	p.Options = options
 	p.Subs = subs
@@ -1983,13 +1994,13 @@ func NewPartition(name Identifier, values Values, options []TableOption, subs []
 }
 
 type SubPartition struct {
-	Name    Identifier
+	Name    *BufIdentifier
 	Options []TableOption
 }
 
 func (node *SubPartition) Format(ctx *FmtCtx) {
 	ctx.WriteString("subpartition ")
-	ctx.WriteString(string(node.Name))
+	ctx.WriteString(string(node.Name.Get()))
 
 	if node.Options != nil {
 		prefix := " "
@@ -2003,7 +2014,9 @@ func (node *SubPartition) Format(ctx *FmtCtx) {
 
 func NewSubPartition(name Identifier, options []TableOption, buf *buffer.Buffer) *SubPartition {
 	s := buffer.Alloc[SubPartition](buf)
-	s.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+	s.Name = n
 	s.Options = options
 	return s
 }
@@ -2074,7 +2087,7 @@ const (
 
 type CreateIndex struct {
 	statementImpl
-	Name        Identifier
+	Name        *BufIdentifier
 	Table       TableName
 	IndexCat    IndexCategory
 	IfNotExists bool
@@ -2124,7 +2137,10 @@ func (node *CreateIndex) GetQueryType() string     { return QueryTypeDDL }
 
 func NewCreateIndex(name Identifier, table TableName, indexCat IndexCategory, keyParts []*KeyPart, indexOption *IndexOption, miscOption []MiscOption, buf *buffer.Buffer) *CreateIndex {
 	t := buffer.Alloc[CreateIndex](buf)
-	t.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
+	t.Name = n
 	t.Table = table
 	t.IndexCat = indexCat
 	t.KeyParts = keyParts
@@ -2841,17 +2857,21 @@ func (node *AccountCommentOrAttribute) Format(ctx *FmtCtx) {
 type CreatePublication struct {
 	statementImpl
 	IfNotExists bool
-	Name        Identifier
-	Database    Identifier
+	Name        *BufIdentifier
+	Database    *BufIdentifier
 	AccountsSet *AccountsSetOption
 	Comment     string
 }
 
 func NewCreatePublication(ifNotExists bool, name Identifier, database Identifier, accountsSet *AccountsSetOption, comment string, buf *buffer.Buffer) *CreatePublication {
 	c := buffer.Alloc[CreatePublication](buf)
+	n := NewBufIdentifier(name)
+	d := NewBufIdentifier(database)
+	buf.Pin(n, d)
+
 	c.IfNotExists = ifNotExists
-	c.Name = name
-	c.Database = database
+	c.Name = n
+	c.Database = d
 	c.AccountsSet = accountsSet
 	c.Comment = comment
 	return c

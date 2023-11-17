@@ -56,7 +56,10 @@ func NewCreateConnector(tableName *TableName, options []*ConnectorOption, buf *b
 
 func NewConnectorOption(key Identifier, val Expr, buf *buffer.Buffer) *ConnectorOption {
 	a := buffer.Alloc[ConnectorOption](buf)
-	a.Key = key
+	k := NewBufIdentifier(key)
+	buf.Pin(k)
+
+	a.Key = k
 	a.Val = val
 	return a
 }
@@ -77,12 +80,12 @@ func (node *CreateConnector) Format(ctx *FmtCtx) {
 
 type ConnectorOption struct {
 	createOptionImpl
-	Key Identifier
+	Key *BufIdentifier
 	Val Expr
 }
 
 func (node *ConnectorOption) Format(ctx *FmtCtx) {
-	ctx.WriteString(string(node.Key))
+	ctx.WriteString(string(node.Key.Get()))
 	ctx.WriteString(" = ")
 	node.Val.Format(ctx)
 }

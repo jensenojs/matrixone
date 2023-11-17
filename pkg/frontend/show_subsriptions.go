@@ -116,7 +116,7 @@ func doShowSubscriptions(ctx context.Context, ses *Session, sp *tree.ShowSubscri
 			if err != nil {
 				return err
 			}
-			fromAccount := string(ast[0].(*tree.CreateDatabase).SubscriptionOption.From)
+			fromAccount := string(ast[0].(*tree.CreateDatabase).SubscriptionOption.From.Get())
 			row[1] = fromAccount
 			rs.AddRow(row)
 		}

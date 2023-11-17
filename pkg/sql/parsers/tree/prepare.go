@@ -27,13 +27,13 @@ type prepareImpl struct {
 
 type PrepareStmt struct {
 	prepareImpl
-	Name Identifier
+	Name *BufIdentifier
 	Stmt Statement
 }
 
 type PrepareString struct {
 	prepareImpl
-	Name Identifier
+	Name *BufIdentifier
 	Sql  string
 }
 
@@ -58,14 +58,18 @@ func (node *PrepareString) GetQueryType() string     { return QueryTypeOth }
 
 func NewPrepareStmt(name Identifier, stmt Statement, buf *buffer.Buffer) *PrepareStmt {
 	ps := buffer.Alloc[PrepareStmt](buf)
-	ps.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+	ps.Name = n
 	ps.Stmt = stmt
 	return ps
 }
 
 func NewPrepareString(name Identifier, sql string, buf *buffer.Buffer) *PrepareString {
 	ps := buffer.Alloc[PrepareString](buf)
-	ps.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+	ps.Name = n
 	ps.Sql = sql
 	return ps
 }

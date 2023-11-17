@@ -19,7 +19,7 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 type Deallocate struct {
 	Statement
 	IsDrop bool
-	Name   Identifier
+	Name   *BufIdentifier
 }
 
 func (node *Deallocate) Format(ctx *FmtCtx) {
@@ -38,6 +38,9 @@ func (node *Deallocate) GetQueryType() string     { return QueryTypeOth }
 func NewDeallocate(name Identifier, isDrop bool, buf *buffer.Buffer) *Deallocate {
 	d := buffer.Alloc[Deallocate](buf)
 	d.IsDrop = isDrop
-	d.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
+	d.Name = n
 	return d
 }

@@ -253,13 +253,16 @@ type alterOptionImpl struct {
 
 type AlterOptionAlterIndex struct {
 	alterOptionImpl
-	Name       Identifier
+	Name       *BufIdentifier
 	Visibility VisibleType
 }
 
 func NewAlterOptionAlterIndex(name Identifier, visibility VisibleType, buf *buffer.Buffer) *AlterOptionAlterIndex {
 	a := buffer.Alloc[AlterOptionAlterIndex](buf)
-	a.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
+	a.Name = n
 	a.Visibility = visibility
 	return a
 }
@@ -327,13 +330,16 @@ const (
 type AlterOptionDrop struct {
 	alterOptionImpl
 	Typ  AlterTableDropType
-	Name Identifier
+	Name *BufIdentifier
 }
 
 func NewAlterOptionDrop(typ AlterTableDropType, name Identifier, buf *buffer.Buffer) *AlterOptionDrop {
 	a := buffer.Alloc[AlterOptionDrop](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
+	a.Name = n
 	a.Typ = typ
-	a.Name = name
 	return a
 }
 
@@ -415,15 +421,18 @@ func NewAccountsSetOption(al bool, se, ad, dr IdentifierList, buf *buffer.Buffer
 type AlterPublication struct {
 	statementImpl
 	IfExists    bool
-	Name        Identifier
+	Name        *BufIdentifier
 	AccountsSet *AccountsSetOption
 	Comment     string
 }
 
 func NewAlterPublication(exist bool, name Identifier, accountsSet *AccountsSetOption, comment string, buf *buffer.Buffer) *AlterPublication {
 	a := buffer.Alloc[AlterPublication](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
 	a.IfExists = exist
-	a.Name = name
+	a.Name = n
 	a.AccountsSet = accountsSet
 	a.Comment = comment
 	return a

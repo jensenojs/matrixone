@@ -298,7 +298,7 @@ func Test_hash_buildPartitionDefs(t *testing.T) {
 			//check partition names
 			i := 0
 			for ; i < len(syntaxDefs); i++ {
-				require.Equal(t, string(syntaxDefs[i].Name), k.def.Partitions[i].PartitionName)
+				require.Equal(t, string(syntaxDefs[i].Name.Get()), k.def.Partitions[i].PartitionName)
 				require.Equal(t, i, int(k.def.Partitions[i].OrdinalPosition)-1)
 			}
 			for ; i < int(k.def.PartitionNum); i++ {

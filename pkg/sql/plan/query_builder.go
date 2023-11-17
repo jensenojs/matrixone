@@ -1334,7 +1334,7 @@ func (builder *QueryBuilder) buildUnion(stmt *tree.UnionClause, astOrderBy tree.
 										Expr: sltStmt,
 									},
 									As: tree.AliasClause{
-										Alias: "a",
+										Alias: tree.NewBufIdentifier("a"),
 									},
 								},
 							},
@@ -1690,7 +1690,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 			idx := len(stmt.With.CTEs) - i - 1
 			cte := stmt.With.CTEs[idx]
 
-			name := string(cte.Name.Alias)
+			name := string(cte.Name.Alias.Get())
 			if _, ok := ctx.cteByName[name]; ok {
 				return 0, moerr.NewSyntaxError(builder.GetContext(), "WITH query name %q specified more than once", name)
 			}
@@ -1715,7 +1715,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 		// Try to do binding for CTE at declaration
 		for _, cte := range stmt.With.CTEs {
 
-			table := string(cte.Name.Alias)
+			table := string(cte.Name.Alias.Get())
 			cteRef := ctx.cteByName[table]
 
 			var err error
@@ -1946,7 +1946,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 		}
 
 		err = builder.addBinding(nodeID, tree.AliasClause{
-			Alias: "_ValueScan",
+			Alias: tree.NewBufIdentifier("_ValueScan"),
 		}, ctx)
 		if err != nil {
 			return 0, err
@@ -2559,7 +2559,7 @@ func (builder *QueryBuilder) checkRecursiveTable(stmt tree.TableExpr, name strin
 		return 0, moerr.NewParseError(builder.GetContext(), "unsupport SUBQUERY in recursive CTE: %T", stmt)
 
 	case *tree.TableName:
-		table := string(tbl.ObjectName)
+		table := string(tbl.ObjectName.Get())
 		if table == name {
 			return 1, nil
 		}
@@ -2624,8 +2624,8 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 		}
 
 	case *tree.TableName:
-		schema := string(tbl.SchemaName)
-		table := string(tbl.ObjectName)
+		schema := string(tbl.SchemaName.Get())
+		table := string(tbl.ObjectName.Get())
 		if len(table) == 0 || table == "dual" { //special table name
 			nodeID = builder.appendNode(&plan.Node{
 				NodeType: plan.Node_VALUE_SCAN,
@@ -2913,7 +2913,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 				if obj.PubInfo != nil {
 					defaultDatabase = obj.SubscriptionName
 				}
-				ctx.cteByName[string(viewName)] = &CTERef{
+				ctx.cteByName[string(viewName.Get())] = &CTERef{
 					ast: &tree.CTE{
 						Name: &tree.AliasClause{
 							Alias: viewName,
@@ -2925,9 +2925,9 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 					maskedCTEs:      maskedCTEs,
 				}
 
-				newTableName := tree.NewTableName(viewName, tree.ObjectNamePrefix{
+				newTableName := tree.NewTableName(viewName.Get(), tree.ObjectNamePrefix{
 					CatalogName:     tbl.CatalogName, // TODO unused now, if used in some code, that will be save in view
-					SchemaName:      tree.Identifier(""),
+					SchemaName:      tree.NewBufIdentifier(""),
 					ExplicitCatalog: false,
 					ExplicitSchema:  false,
 				}, nil)
@@ -2962,7 +2962,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 
 	case *tree.AliasedTableExpr: //allways AliasedTableExpr first
 		if _, ok := tbl.Expr.(*tree.Select); ok {
-			if tbl.As.Alias == "" {
+			if tbl.As.Alias.Get() == "" {
 				return 0, moerr.NewSyntaxError(builder.GetContext(), "subquery in FROM must have an alias: %T", stmt)
 			}
 		}
@@ -3089,8 +3089,8 @@ func (builder *QueryBuilder) addBinding(nodeID int32, alias tree.AliasClause, ct
 			return moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", alias.Alias, len(node.TableDef.Cols), len(alias.Cols))
 		}
 
-		if alias.Alias != "" {
-			table = string(alias.Alias)
+		if alias.Alias.Get() != "" {
+			table = string(alias.Alias.Get())
 		} else {
 			if node.NodeType == plan.Node_FUNCTION_SCAN {
 				return moerr.NewSyntaxError(builder.GetContext(), "Every table function must have an alias")
@@ -3134,12 +3134,12 @@ func (builder *QueryBuilder) addBinding(nodeID int32, alias tree.AliasClause, ct
 		projects := subCtx.projects
 
 		if len(alias.Cols) > len(headings) {
-			return moerr.NewSyntaxError(builder.GetContext(), "11111 table %q has %d columns available but %d columns specified", alias.Alias, len(headings), len(alias.Cols))
+			return moerr.NewSyntaxError(builder.GetContext(), "11111 table %q has %d columns available but %d columns specified", alias.Alias.Get(), len(headings), len(alias.Cols))
 		}
 
 		table = subCtx.cteName
-		if len(alias.Alias) > 0 {
-			table = string(alias.Alias)
+		if len(alias.Alias.Get()) > 0 {
+			table = string(alias.Alias.Get())
 		}
 		if len(table) == 0 {
 			table = fmt.Sprintf("mo_table_subquery_alias_%d", tag)

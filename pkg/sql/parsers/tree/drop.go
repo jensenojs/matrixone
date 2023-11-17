@@ -19,7 +19,7 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 // DROP Database statement
 type DropDatabase struct {
 	statementImpl
-	Name     Identifier
+	Name     *BufIdentifier
 	IfExists bool
 }
 
@@ -29,9 +29,9 @@ func (node *DropDatabase) Format(ctx *FmtCtx) {
 		ctx.WriteByte(' ')
 		ctx.WriteString("if exists")
 	}
-	if node.Name != "" {
+	if node.Name.Get() != "" {
 		ctx.WriteByte(' ')
-		ctx.WriteString(string(node.Name))
+		ctx.WriteString(string(node.Name.Get()))
 	}
 }
 
@@ -40,7 +40,10 @@ func (node *DropDatabase) GetQueryType() string     { return QueryTypeDDL }
 
 func NewDropDatabase(name Identifier, ifExists bool, buf *buffer.Buffer) *DropDatabase {
 	d := buffer.Alloc[DropDatabase](buf)
-	d.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
+	d.Name = n
 	d.IfExists = ifExists
 	return d
 }
@@ -99,7 +102,7 @@ func NewDropView(ifExists bool, names TableNames, buf *buffer.Buffer) *DropView 
 
 type DropIndex struct {
 	statementImpl
-	Name       Identifier
+	Name       *BufIdentifier
 	TableName  TableName
 	IfExists   bool
 	MiscOption []MiscOption
@@ -111,7 +114,7 @@ func (node *DropIndex) Format(ctx *FmtCtx) {
 		ctx.WriteString(" if exists")
 	}
 	ctx.WriteByte(' ')
-	ctx.WriteString(string(node.Name))
+	ctx.WriteString(string(node.Name.Get()))
 
 	ctx.WriteString(" on ")
 	node.TableName.Format(ctx)
@@ -122,7 +125,9 @@ func (node *DropIndex) GetQueryType() string     { return QueryTypeDDL }
 
 func NewDropIndex(name Identifier, tableName TableName, ifExists bool, buf *buffer.Buffer) *DropIndex {
 	d := buffer.Alloc[DropIndex](buf)
-	d.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+	d.Name = n
 	d.TableName = tableName
 	d.IfExists = ifExists
 	return d
@@ -213,12 +218,14 @@ func (node *DropAccount) GetQueryType() string     { return QueryTypeDCL }
 
 type DropPublication struct {
 	statementImpl
-	Name     Identifier
+	Name     *BufIdentifier
 	IfExists bool
 }
 
-func NewDropPublication(i bool, n Identifier, buf *buffer.Buffer) *DropPublication {
+func NewDropPublication(i bool, name Identifier, buf *buffer.Buffer) *DropPublication {
 	d := buffer.Alloc[DropPublication](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
 	d.IfExists = i
 	d.Name = n
 	return d

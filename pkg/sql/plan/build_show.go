@@ -564,7 +564,7 @@ func buildShowColumnNumber(stmt *tree.ShowColumnNumber, ctx CompilerContext) (*P
 		return nil, err
 	}
 
-	tblName := string(stmt.Table.ToTableName().ObjectName)
+	tblName := string(stmt.Table.ToTableName().ObjectName.Get())
 	obj, tableDef := ctx.Resolve(dbName, tblName)
 	if tableDef == nil {
 		return nil, moerr.NewNoSuchTable(ctx.GetContext(), dbName, tblName)
@@ -609,7 +609,7 @@ func buildShowTableValues(stmt *tree.ShowTableValues, ctx CompilerContext) (*Pla
 		return nil, err
 	}
 
-	tblName := string(stmt.Table.ToTableName().ObjectName)
+	tblName := string(stmt.Table.ToTableName().ObjectName.Get())
 	obj, tableDef := ctx.Resolve(dbName, tblName)
 	if tableDef == nil {
 		return nil, moerr.NewNoSuchTable(ctx.GetContext(), dbName, tblName)
@@ -665,7 +665,7 @@ func buildShowColumns(stmt *tree.ShowColumns, ctx CompilerContext) (*Plan, error
 		return nil, err
 	}
 
-	tblName := string(stmt.Table.ToTableName().ObjectName)
+	tblName := string(stmt.Table.ToTableName().ObjectName.Get())
 	obj, tableDef := ctx.Resolve(dbName, tblName)
 	if tableDef == nil {
 		return nil, moerr.NewNoSuchTable(ctx.GetContext(), dbName, tblName)

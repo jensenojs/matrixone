@@ -82,8 +82,8 @@ func TestBuildTable_AlterView(t *testing.T) {
 
 	qb := NewQueryBuilder(plan.Query_SELECT, ctx, false)
 	tb := &tree.TableName{}
-	tb.SchemaName = "db"
-	tb.ObjectName = "v"
+	tb.SchemaName = tree.NewBufIdentifier("db")
+	tb.ObjectName = tree.NewBufIdentifier("v")
 	bc := NewBindContext(qb, nil)
 	_, err = qb.buildTable(tb, bc, -1, nil)
 	assert.Error(t, err)

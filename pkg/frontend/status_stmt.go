@@ -91,7 +91,7 @@ type DropDatabaseExecutor struct {
 
 func (dde *DropDatabaseExecutor) ExecuteImpl(ctx context.Context, ses *Session) error {
 	// if the droped database is the same as the one in use, database must be reseted to empty.
-	if string(dde.dd.Name) == ses.GetDatabaseName() {
+	if string(dde.dd.Name.Get()) == ses.GetDatabaseName() {
 		ses.SetDatabaseName("")
 	}
 	return dde.statusStmtExecutor.ExecuteImpl(ctx, ses)

@@ -18,13 +18,16 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 
 type RepeatStmt struct {
 	statementImpl
-	Name Identifier
+	Name *BufIdentifier
 	Body []Statement
 	Cond Expr
 }
 
-func NewRepeatStmt(n Identifier, b []Statement, c Expr, buf *buffer.Buffer) *RepeatStmt {
+func NewRepeatStmt(name Identifier, b []Statement, c Expr, buf *buffer.Buffer) *RepeatStmt {
 	r := buffer.Alloc[RepeatStmt](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
 	r.Name = n
 	r.Cond = c
 	r.Body = b
@@ -32,8 +35,9 @@ func NewRepeatStmt(n Identifier, b []Statement, c Expr, buf *buffer.Buffer) *Rep
 }
 
 func (node *RepeatStmt) Format(ctx *FmtCtx) {
-	if node.Name != "" {
-		ctx.WriteString(string(node.Name))
+	n := node.Name.Get()
+	if n != "" {
+		ctx.WriteString(string(n))
 		ctx.WriteString(": ")
 	}
 	ctx.WriteString("repeat ")
@@ -46,8 +50,8 @@ func (node *RepeatStmt) Format(ctx *FmtCtx) {
 	ctx.WriteString("until ")
 	node.Cond.Format(ctx)
 	ctx.WriteString(" end repeat")
-	if node.Name != "" {
-		ctx.WriteString(string(node.Name))
+	if n != "" {
+		ctx.WriteString(string(n))
 	}
 }
 
@@ -56,22 +60,26 @@ func (node *RepeatStmt) GetQueryType() string     { return QueryTypeTCL }
 
 type WhileStmt struct {
 	statementImpl
-	Name Identifier
+	Name *BufIdentifier
 	Cond Expr
 	Body []Statement
 }
 
-func NewWhileStmt(n Identifier, c Expr, b []Statement, buf *buffer.Buffer) *WhileStmt {
+func NewWhileStmt(name Identifier, c Expr, b []Statement, buf *buffer.Buffer) *WhileStmt {
 	l := buffer.Alloc[WhileStmt](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
 	l.Name = n
+
 	l.Cond = c
 	l.Body = b
 	return l
 }
 
 func (node *WhileStmt) Format(ctx *FmtCtx) {
-	if node.Name != "" {
-		ctx.WriteString(string(node.Name))
+	n := node.Name.Get()
+	if n != "" {
+		ctx.WriteString(string(n))
 		ctx.WriteString(": ")
 	}
 	ctx.WriteString("while ")
@@ -84,9 +92,9 @@ func (node *WhileStmt) Format(ctx *FmtCtx) {
 		}
 	}
 	ctx.WriteString("end while")
-	if node.Name != "" {
+	if n != "" {
 		ctx.WriteByte(' ')
-		ctx.WriteString(string(node.Name))
+		ctx.WriteString(string(n))
 	}
 }
 
@@ -95,20 +103,24 @@ func (node *WhileStmt) GetQueryType() string     { return QueryTypeTCL }
 
 type LoopStmt struct {
 	statementImpl
-	Name Identifier
+	Name *BufIdentifier
 	Body []Statement
 }
 
-func NewLoopStmt(n Identifier, b []Statement, buf *buffer.Buffer) *LoopStmt {
+func NewLoopStmt(name Identifier, b []Statement, buf *buffer.Buffer) *LoopStmt {
 	l := buffer.Alloc[LoopStmt](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
 	l.Name = n
 	l.Body = b
 	return l
 }
 
 func (node *LoopStmt) Format(ctx *FmtCtx) {
-	if node.Name != "" {
-		ctx.WriteString(string(node.Name))
+	n := node.Name.Get()
+	if n != "" {
+		ctx.WriteString(string(n))
 		ctx.WriteString(": ")
 	}
 	ctx.WriteString("loop ")
@@ -119,9 +131,9 @@ func (node *LoopStmt) Format(ctx *FmtCtx) {
 		}
 	}
 	ctx.WriteString("end loop")
-	if node.Name != "" {
+	if n != "" {
 		ctx.WriteByte(' ')
-		ctx.WriteString(string(node.Name))
+		ctx.WriteString(string(n))
 	}
 }
 
@@ -130,18 +142,21 @@ func (node *LoopStmt) GetQueryType() string     { return QueryTypeTCL }
 
 type IterateStmt struct {
 	statementImpl
-	Name Identifier
+	Name *BufIdentifier
 }
 
-func NewIterateStmt(n Identifier, buf *buffer.Buffer) *IterateStmt {
+func NewIterateStmt(name Identifier, buf *buffer.Buffer) *IterateStmt {
 	l := buffer.Alloc[IterateStmt](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
 	l.Name = n
 	return l
 }
 
 func (node *IterateStmt) Format(ctx *FmtCtx) {
 	ctx.WriteString("iterate ")
-	ctx.WriteString(string(node.Name))
+	ctx.WriteString(string(node.Name.Get()))
 }
 
 func (node *IterateStmt) GetStatementType() string { return "Iterate Statement" }
@@ -149,18 +164,21 @@ func (node *IterateStmt) GetQueryType() string     { return QueryTypeTCL }
 
 type LeaveStmt struct {
 	statementImpl
-	Name Identifier
+	Name *BufIdentifier
 }
 
-func NewLeaveStmt(n Identifier, buf *buffer.Buffer) *LeaveStmt {
+func NewLeaveStmt(name Identifier, buf *buffer.Buffer) *LeaveStmt {
 	l := buffer.Alloc[LeaveStmt](buf)
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+
 	l.Name = n
 	return l
 }
 
 func (node *LeaveStmt) Format(ctx *FmtCtx) {
 	ctx.WriteString("leave ")
-	ctx.WriteString(string(node.Name))
+	ctx.WriteString(string(node.Name.Get()))
 }
 
 func (node *LeaveStmt) GetStatementType() string { return "Leave Statement" }

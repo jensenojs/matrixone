@@ -68,13 +68,16 @@ func NewInsert(columns IdentifierList, rows *Select, buf *buffer.Buffer) *Insert
 }
 
 type Assignment struct {
-	Column Identifier
+	Column *BufIdentifier
 	Expr   Expr
 }
 
 func NewAssignment(column Identifier, expr Expr, buf *buffer.Buffer) *Assignment {
 	i := buffer.Alloc[Assignment](buf)
-	i.Column = column
+	c := NewBufIdentifier(column)
+	buf.Pin(c)
+	
+	i.Column = c
 	i.Expr = expr
 	return i
 }

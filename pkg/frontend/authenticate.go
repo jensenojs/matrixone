@@ -3400,9 +3400,9 @@ func checkSubscriptionValid(ctx context.Context, ses *Session, createSql string)
 		return nil, err
 	}
 
-	accName = string(ast[0].(*tree.CreateDatabase).SubscriptionOption.From)
-	pubName = string(ast[0].(*tree.CreateDatabase).SubscriptionOption.Publication)
-	subName = string(ast[0].(*tree.CreateDatabase).Name)
+	accName = string(ast[0].(*tree.CreateDatabase).SubscriptionOption.From.Get())
+	pubName = string(ast[0].(*tree.CreateDatabase).SubscriptionOption.Publication.Get())
+	subName = string(ast[0].(*tree.CreateDatabase).Name.Get())
 
 	return checkSubscriptionValidCommon(ctx, ses, subName, accName, pubName)
 }
@@ -3510,14 +3510,14 @@ func doCreateStage(ctx context.Context, ses *Session, cs *tree.CreateStage) erro
 	}
 
 	// check stage
-	stageExist, err = checkStageExistOrNot(ctx, bh, string(cs.Name))
+	stageExist, err = checkStageExistOrNot(ctx, bh, string(cs.Name.Get()))
 	if err != nil {
 		return err
 	}
 
 	if stageExist {
 		if !cs.IfNotExists {
-			return moerr.NewInternalError(ctx, "the satge %s exists", cs.Name)
+			return moerr.NewInternalError(ctx, "the satge %s exists", cs.Name.Get())
 		} else {
 			// do nothing
 			return err
@@ -3536,7 +3536,7 @@ func doCreateStage(ctx context.Context, ses *Session, cs *tree.CreateStage) erro
 			comment = cs.Comment.Comment
 		}
 
-		sql = getSqlForInsertIntoMoStages(ctx, string(cs.Name), cs.Url, credentials, StageStatus, types.CurrentTimestamp().String2(time.UTC, 0), comment)
+		sql = getSqlForInsertIntoMoStages(ctx, string(cs.Name.Get()), cs.Url, credentials, StageStatus, types.CurrentTimestamp().String2(time.UTC, 0), comment)
 
 		err = bh.Exec(ctx, sql)
 		if err != nil {
@@ -3683,21 +3683,21 @@ func doAlterStage(ctx context.Context, ses *Session, as *tree.AlterStage) error 
 	}
 
 	// check stage
-	stageExist, err = checkStageExistOrNot(ctx, bh, string(as.Name))
+	stageExist, err = checkStageExistOrNot(ctx, bh, string(as.Name.Get()))
 	if err != nil {
 		return err
 	}
 
 	if !stageExist {
 		if !as.IfNotExists {
-			return moerr.NewInternalError(ctx, "the satge %s not exists", as.Name)
+			return moerr.NewInternalError(ctx, "the satge %s not exists", as.Name.Get())
 		} else {
 			// do nothing
 			return err
 		}
 	} else {
 		if as.UrlOption.Exist {
-			sql = getsqlForUpdateStageUrl(string(as.Name), as.UrlOption.Url)
+			sql = getsqlForUpdateStageUrl(string(as.Name.Get()), as.UrlOption.Url)
 			err = bh.Exec(ctx, sql)
 			if err != nil {
 				return err
@@ -3706,7 +3706,7 @@ func doAlterStage(ctx context.Context, ses *Session, as *tree.AlterStage) error 
 
 		if as.CredentialsOption.Exist {
 			credentials = HashPassWord(formatCredentials(as.CredentialsOption))
-			sql = getsqlForUpdateStageCredentials(string(as.Name), credentials)
+			sql = getsqlForUpdateStageCredentials(string(as.Name.Get()), credentials)
 			err = bh.Exec(ctx, sql)
 			if err != nil {
 				return err
@@ -3714,7 +3714,7 @@ func doAlterStage(ctx context.Context, ses *Session, as *tree.AlterStage) error 
 		}
 
 		if as.StatusOption.Exist {
-			sql = getsqlForUpdateStageStatus(string(as.Name), as.StatusOption.Option.String())
+			sql = getsqlForUpdateStageStatus(string(as.Name.Get()), as.StatusOption.Option.String())
 			err = bh.Exec(ctx, sql)
 			if err != nil {
 				return err
@@ -3722,7 +3722,7 @@ func doAlterStage(ctx context.Context, ses *Session, as *tree.AlterStage) error 
 		}
 
 		if as.Comment.Exist {
-			sql = getsqlForUpdateStageComment(string(as.Name), as.Comment.Comment)
+			sql = getsqlForUpdateStageComment(string(as.Name.Get()), as.Comment.Comment)
 			err = bh.Exec(ctx, sql)
 			if err != nil {
 				return err
@@ -3754,20 +3754,20 @@ func doDropStage(ctx context.Context, ses *Session, ds *tree.DropStage) error {
 	}
 
 	// check stage
-	stageExist, err = checkStageExistOrNot(ctx, bh, string(ds.Name))
+	stageExist, err = checkStageExistOrNot(ctx, bh, string(ds.Name.Get()))
 	if err != nil {
 		return err
 	}
 
 	if !stageExist {
 		if !ds.IfNotExists {
-			return moerr.NewInternalError(ctx, "the satge %s not exists", ds.Name)
+			return moerr.NewInternalError(ctx, "the satge %s not exists", ds.Name.Get())
 		} else {
 			// do nothing
 			return err
 		}
 	} else {
-		sql = getSqlForDropStage(string(ds.Name))
+		sql = getSqlForDropStage(string(ds.Name.Get()))
 		err = bh.Exec(ctx, sql)
 		if err != nil {
 			return err
@@ -3811,7 +3811,7 @@ func doCreatePublication(ctx context.Context, ses *Session, cp *tree.CreatePubli
 		accountList = strings.Join(accts, ",")
 	}
 
-	pubDb := string(cp.Database)
+	pubDb := string(cp.Database.Get())
 
 	if _, ok := sysDatabases[pubDb]; ok {
 		return moerr.NewInternalError(ctx, "invalid database name '%s', not support publishing system database", pubDb)
@@ -3839,7 +3839,7 @@ func doCreatePublication(ctx context.Context, ses *Session, cp *tree.CreatePubli
 		return err
 	}
 	if !execResultArrayHasData(erArray) {
-		return moerr.NewInternalError(ctx, "database '%s' does not exist", cp.Database)
+		return moerr.NewInternalError(ctx, "database '%s' does not exist", cp.Database.Get())
 	}
 	datId, err = erArray[0].GetUint64(ctx, 0, 0)
 	if err != nil {
@@ -3850,10 +3850,10 @@ func doCreatePublication(ctx context.Context, ses *Session, cp *tree.CreatePubli
 		return err
 	}
 	if datType != "" { //TODO: check the dat_type
-		return moerr.NewInternalError(ctx, "database '%s' is not a user database", cp.Database)
+		return moerr.NewInternalError(ctx, "database '%s' is not a user database", cp.Database.Get())
 	}
 	bh.ClearExecResultSet()
-	sql, err = getSqlForInsertIntoMoPubs(ctx, string(cp.Name), pubDb, datId, allTable, tableList, accountList, tenantInfo.GetDefaultRoleID(), tenantInfo.GetUserID(), cp.Comment, true)
+	sql, err = getSqlForInsertIntoMoPubs(ctx, string(cp.Name.Get()), pubDb, datId, allTable, tableList, accountList, tenantInfo.GetDefaultRoleID(), tenantInfo.GetUserID(), cp.Comment, true)
 	if err != nil {
 		return err
 	}
@@ -3891,7 +3891,7 @@ func doAlterPublication(ctx context.Context, ses *Session, ap *tree.AlterPublica
 		return err
 	}
 	bh.ClearExecResultSet()
-	sql, err = getSqlForGetPubInfo(ctx, string(ap.Name), true)
+	sql, err = getSqlForGetPubInfo(ctx, string(ap.Name.Get()), true)
 	if err != nil {
 		return err
 	}
@@ -3904,7 +3904,7 @@ func doAlterPublication(ctx context.Context, ses *Session, ap *tree.AlterPublica
 		return err
 	}
 	if !execResultArrayHasData(erArray) {
-		return moerr.NewInternalError(ctx, "publication '%s' does not exist", ap.Name)
+		return moerr.NewInternalError(ctx, "publication '%s' does not exist", ap.Name.Get())
 	}
 
 	accountList, err = erArray[0].GetString(ctx, 0, 0)
@@ -3969,7 +3969,7 @@ func doAlterPublication(ctx context.Context, ses *Session, ap *tree.AlterPublica
 	if ap.Comment != "" {
 		comment = ap.Comment
 	}
-	sql, err = getSqlForUpdatePubInfo(ctx, string(ap.Name), accountList, comment, false)
+	sql, err = getSqlForUpdatePubInfo(ctx, string(ap.Name.Get()), accountList, comment, false)
 	if err != nil {
 		return err
 	}
@@ -4004,7 +4004,7 @@ func doDropPublication(ctx context.Context, ses *Session, dp *tree.DropPublicati
 	if err != nil {
 		return err
 	}
-	sql, err = getSqlForGetPubInfo(ctx, string(dp.Name), true)
+	sql, err = getSqlForGetPubInfo(ctx, string(dp.Name.Get()), true)
 	if err != nil {
 		return err
 	}
@@ -4018,10 +4018,10 @@ func doDropPublication(ctx context.Context, ses *Session, dp *tree.DropPublicati
 		return err
 	}
 	if !execResultArrayHasData(erArray) {
-		return moerr.NewInternalError(ctx, "publication '%s' does not exist", dp.Name)
+		return moerr.NewInternalError(ctx, "publication '%s' does not exist", dp.Name.Get())
 	}
 
-	sql, err = getSqlForDropPubInfo(ctx, string(dp.Name), false)
+	sql, err = getSqlForDropPubInfo(ctx, string(dp.Name.Get()), false)
 	if err != nil {
 		return err
 	}
@@ -4495,14 +4495,14 @@ func doDropFunction(ctx context.Context, ses *Session, df *tree.DropFunction) (e
 		}
 		dbName = ses.GetDatabaseName()
 	} else {
-		dbName = string(df.Name.Name.SchemaName)
+		dbName = string(df.Name.Name.SchemaName.Get())
 	}
 
 	fmtctx = tree.NewFmtCtx(dialect.MYSQL, tree.WithQuoteString(true))
 
 	// validate database name and signature (name + args)
 	bh.ClearExecResultSet()
-	checkDatabase = fmt.Sprintf(checkUdfArgs, string(df.Name.Name.ObjectName), dbName)
+	checkDatabase = fmt.Sprintf(checkUdfArgs, string(df.Name.Name.ObjectName.Get()), dbName)
 	err = bh.Exec(ctx, checkDatabase)
 	if err != nil {
 		return err
@@ -4559,7 +4559,7 @@ func doDropFunction(ctx context.Context, ses *Session, df *tree.DropFunction) (e
 		return err
 	} else {
 		// no such function
-		return moerr.NewNoUDFNoCtx(string(df.Name.Name.ObjectName))
+		return moerr.NewNoUDFNoCtx(string(df.Name.Name.ObjectName.Get()))
 	}
 }
 
@@ -4579,12 +4579,12 @@ func doDropProcedure(ctx context.Context, ses *Session, dp *tree.DropProcedure) 
 		}
 		dbName = ses.GetDatabaseName()
 	} else {
-		dbName = string(dp.Name.Name.SchemaName)
+		dbName = string(dp.Name.Name.SchemaName.Get())
 	}
 
 	// validate database name and signature (name + args)
 	bh.ClearExecResultSet()
-	checkDatabase = fmt.Sprintf(checkStoredProcedureArgs, string(dp.Name.Name.ObjectName), dbName)
+	checkDatabase = fmt.Sprintf(checkStoredProcedureArgs, string(dp.Name.Name.ObjectName.Get()), dbName)
 	err = bh.Exec(ctx, checkDatabase)
 	if err != nil {
 		return err
@@ -4625,7 +4625,7 @@ func doDropProcedure(ctx context.Context, ses *Session, dp *tree.DropProcedure) 
 		if dp.IfExists {
 			return nil
 		}
-		return moerr.NewNoUDFNoCtx(string(dp.Name.Name.ObjectName))
+		return moerr.NewNoUDFNoCtx(string(dp.Name.Name.ObjectName.Get()))
 	}
 }
 
@@ -5543,7 +5543,7 @@ func determinePrivilegeSetOfStatement(stmt tree.Statement) *privilege {
 	case *tree.DropDatabase:
 		typs = append(typs, PrivilegeTypeDropDatabase, PrivilegeTypeAccountAll /*, PrivilegeTypeAccountOwnership*/)
 		writeDatabaseAndTableDirectly = true
-		dbName = string(st.Name)
+		dbName = string(st.Name.Get())
 	case *tree.ShowDatabases:
 		typs = append(typs, PrivilegeTypeShowDatabases, PrivilegeTypeAccountAll /*, PrivilegeTypeAccountOwnership*/)
 		canExecInRestricted = true
@@ -5565,48 +5565,48 @@ func determinePrivilegeSetOfStatement(stmt tree.Statement) *privilege {
 			clusterTable = true
 			clusterTableOperation = clusterTableCreate
 		}
-		dbName = string(st.Table.SchemaName)
+		dbName = string(st.Table.SchemaName.Get())
 	case *tree.CreateView:
 		objType = objectTypeDatabase
 		typs = append(typs, PrivilegeTypeCreateView, PrivilegeTypeDatabaseAll, PrivilegeTypeDatabaseOwnership)
 		writeDatabaseAndTableDirectly = true
 		if st.Name != nil {
-			dbName = string(st.Name.SchemaName)
+			dbName = string(st.Name.SchemaName.Get())
 		}
 	case *tree.CreateStream:
 		objType = objectTypeDatabase
 		typs = append(typs, PrivilegeTypeCreateView, PrivilegeTypeDatabaseAll, PrivilegeTypeDatabaseOwnership)
 		writeDatabaseAndTableDirectly = true
 		if st.StreamName != nil {
-			dbName = string(st.StreamName.SchemaName)
+			dbName = string(st.StreamName.SchemaName.Get())
 		}
 	case *tree.CreateConnector:
 		objType = objectTypeDatabase
 		typs = append(typs, PrivilegeTypeCreateView, PrivilegeTypeDatabaseAll, PrivilegeTypeDatabaseOwnership)
 		writeDatabaseAndTableDirectly = true
 		if st.TableName != nil {
-			dbName = string(st.TableName.SchemaName)
+			dbName = string(st.TableName.SchemaName.Get())
 		}
 	case *tree.CreateSequence:
 		objType = objectTypeDatabase
 		typs = append(typs, PrivilegeTypeDatabaseAll, PrivilegeTypeDatabaseOwnership)
 		writeDatabaseAndTableDirectly = true
 		if st.Name != nil {
-			dbName = string(st.Name.SchemaName)
+			dbName = string(st.Name.SchemaName.Get())
 		}
 	case *tree.AlterSequence:
 		objType = objectTypeDatabase
 		typs = append(typs, PrivilegeTypeDatabaseAll, PrivilegeTypeDatabaseOwnership)
 		writeDatabaseAndTableDirectly = true
 		if st.Name != nil {
-			dbName = string(st.Name.SchemaName)
+			dbName = string(st.Name.SchemaName.Get())
 		}
 	case *tree.AlterView:
 		objType = objectTypeDatabase
 		typs = append(typs, PrivilegeTypeAlterView, PrivilegeTypeDatabaseAll, PrivilegeTypeDatabaseOwnership)
 		writeDatabaseAndTableDirectly = true
 		if st.Name != nil {
-			dbName = string(st.Name.SchemaName)
+			dbName = string(st.Name.SchemaName.Get())
 		}
 	case *tree.AlterDataBaseConfig:
 		objType = objectTypeNone
@@ -5621,7 +5621,7 @@ func determinePrivilegeSetOfStatement(stmt tree.Statement) *privilege {
 		typs = append(typs, PrivilegeTypeAlterTable, PrivilegeTypeDatabaseAll, PrivilegeTypeDatabaseOwnership)
 		writeDatabaseAndTableDirectly = true
 		if st.Table != nil {
-			dbName = string(st.Table.SchemaName)
+			dbName = string(st.Table.SchemaName.Get())
 		}
 	case *tree.CreateProcedure:
 		objType = objectTypeDatabase
@@ -5636,21 +5636,21 @@ func determinePrivilegeSetOfStatement(stmt tree.Statement) *privilege {
 		typs = append(typs, PrivilegeTypeDropTable, PrivilegeTypeDropObject, PrivilegeTypeDatabaseAll, PrivilegeTypeDatabaseOwnership)
 		writeDatabaseAndTableDirectly = true
 		if len(st.Names) != 0 {
-			dbName = string(st.Names[0].SchemaName)
+			dbName = string(st.Names[0].SchemaName.Get())
 		}
 	case *tree.DropView:
 		objType = objectTypeDatabase
 		typs = append(typs, PrivilegeTypeDropView, PrivilegeTypeDropObject, PrivilegeTypeDatabaseAll, PrivilegeTypeDatabaseOwnership)
 		writeDatabaseAndTableDirectly = true
 		if len(st.Names) != 0 {
-			dbName = string(st.Names[0].SchemaName)
+			dbName = string(st.Names[0].SchemaName.Get())
 		}
 	case *tree.DropSequence:
 		objType = objectTypeDatabase
 		typs = append(typs, PrivilegeTypeDropObject, PrivilegeTypeDatabaseAll, PrivilegeTypeDatabaseOwnership)
 		writeDatabaseAndTableDirectly = true
 		if len(st.Names) != 0 {
-			dbName = string(st.Names[0].SchemaName)
+			dbName = string(st.Names[0].SchemaName.Get())
 		}
 	case *tree.DropFunction:
 		objType = objectTypeDatabase
@@ -5691,7 +5691,7 @@ func determinePrivilegeSetOfStatement(stmt tree.Statement) *privilege {
 		typs = append(typs, PrivilegeTypeInsert, PrivilegeTypeTableAll, PrivilegeTypeTableOwnership)
 		writeDatabaseAndTableDirectly = true
 		if st.Table != nil {
-			dbName = string(st.Table.SchemaName)
+			dbName = string(st.Table.SchemaName.Get())
 		}
 	case *tree.Update:
 		objType = objectTypeTable
@@ -5755,7 +5755,7 @@ func determinePrivilegeSetOfStatement(stmt tree.Statement) *privilege {
 		typs = append(typs, PrivilegeTypeTruncate, PrivilegeTypeTableAll, PrivilegeTypeTableOwnership)
 		writeDatabaseAndTableDirectly = true
 		if st.Name != nil {
-			dbName = string(st.Name.SchemaName)
+			dbName = string(st.Name.SchemaName.Get())
 		}
 	case *tree.MoDump:
 		objType = objectTypeTable
@@ -6665,11 +6665,11 @@ func authenticateUserCanExecuteStatementWithObjectTypeAccountAndDatabase(ctx con
 	if !ok && ses.GetFromRealUser() && ses.GetTenantInfo() != nil && ses.GetTenantInfo().IsSysTenant() {
 		switch dropTable := stmt.(type) {
 		case *tree.DropTable:
-			dbName := string(dropTable.Names[0].SchemaName)
+			dbName := string(dropTable.Names[0].SchemaName.Get())
 			if len(dbName) == 0 {
 				dbName = ses.GetDatabaseName()
 			}
-			return isClusterTable(dbName, string(dropTable.Names[0].ObjectName)), nil
+			return isClusterTable(dbName, string(dropTable.Names[0].ObjectName.Get())), nil
 		}
 	}
 
@@ -6693,7 +6693,7 @@ func authenticateUserCanExecuteStatementWithObjectTypeAccountAndDatabase(ctx con
 		switch st := stmt.(type) {
 		case *tree.DropDatabase:
 			// get the databasename
-			dbName := string(st.Name)
+			dbName := string(st.Name.Get())
 			if _, inSet := sysDatabases[dbName]; inSet {
 				return ok, nil
 			}
@@ -6703,14 +6703,14 @@ func authenticateUserCanExecuteStatementWithObjectTypeAccountAndDatabase(ctx con
 			if len(st.Names) != 1 {
 				return ok, nil
 			}
-			dbName := string(st.Names[0].SchemaName)
+			dbName := string(st.Names[0].SchemaName.Get())
 			if len(dbName) == 0 {
 				dbName = ses.GetDatabaseName()
 			}
 			if _, inSet := sysDatabases[dbName]; inSet {
 				return ok, nil
 			}
-			tbName := string(st.Names[0].ObjectName)
+			tbName := string(st.Names[0].ObjectName.Get())
 			return checkRoleWhetherTableOwner(ctx, ses, dbName, tbName, ok)
 		}
 	}
@@ -8347,7 +8347,7 @@ func InitFunction(ctx context.Context, ses *Session, tenant *TenantInfo, cf *tre
 		}
 		dbName = ses.GetDatabaseName()
 	} else {
-		dbName = string(cf.Name.Name.SchemaName)
+		dbName = string(cf.Name.Name.SchemaName.Get())
 	}
 
 	bh := ses.GetBackgroundExec(ctx)
@@ -8374,7 +8374,7 @@ func InitFunction(ctx context.Context, ses *Session, tenant *TenantInfo, cf *tre
 
 	// validate duplicate function declaration
 	bh.ClearExecResultSet()
-	checkExistence = fmt.Sprintf(checkUdfExistence, string(cf.Name.Name.ObjectName), dbName, string(argsJson))
+	checkExistence = fmt.Sprintf(checkUdfExistence, string(cf.Name.Name.ObjectName.Get()), dbName, string(argsJson))
 	err = bh.Exec(ctx, checkExistence)
 	if err != nil {
 		return err
@@ -8386,7 +8386,7 @@ func InitFunction(ctx context.Context, ses *Session, tenant *TenantInfo, cf *tre
 	}
 
 	if execResultArrayHasData(erArray) {
-		return moerr.NewUDFAlreadyExistsNoCtx(string(cf.Name.Name.ObjectName))
+		return moerr.NewUDFAlreadyExistsNoCtx(string(cf.Name.Name.ObjectName.Get()))
 	}
 
 	err = bh.Exec(ctx, "begin;")
@@ -8398,7 +8398,7 @@ func InitFunction(ctx context.Context, ses *Session, tenant *TenantInfo, cf *tre
 	}
 
 	initMoUdf = fmt.Sprintf(initMoUserDefinedFunctionFormat,
-		string(cf.Name.Name.ObjectName),
+		string(cf.Name.Name.ObjectName.Get()),
 		ses.GetTenantInfo().GetDefaultRoleID(),
 		string(argsJson),
 		retTypeStr, cf.Body, cf.Language, dbName,
@@ -8426,7 +8426,7 @@ func InitProcedure(ctx context.Context, ses *Session, tenant *TenantInfo, cp *tr
 		}
 		dbName = ses.GetDatabaseName()
 	} else {
-		dbName = string(cp.Name.Name.SchemaName)
+		dbName = string(cp.Name.Name.SchemaName.Get())
 	}
 
 	bh := ses.GetBackgroundExec(ctx)
@@ -8453,7 +8453,7 @@ func InitProcedure(ctx context.Context, ses *Session, tenant *TenantInfo, cp *tr
 
 	// validate duplicate procedure declaration
 	bh.ClearExecResultSet()
-	checkExistence = getSqlForCheckProcedureExistence(string(cp.Name.Name.ObjectName), dbName)
+	checkExistence = getSqlForCheckProcedureExistence(string(cp.Name.Name.ObjectName.Get()), dbName)
 	err = bh.Exec(ctx, checkExistence)
 	if err != nil {
 		return err
@@ -8465,7 +8465,7 @@ func InitProcedure(ctx context.Context, ses *Session, tenant *TenantInfo, cp *tr
 	}
 
 	if execResultArrayHasData(erArray) {
-		return moerr.NewProcedureAlreadyExistsNoCtx(string(cp.Name.Name.ObjectName))
+		return moerr.NewProcedureAlreadyExistsNoCtx(string(cp.Name.Name.ObjectName.Get()))
 	}
 
 	err = bh.Exec(ctx, "begin;")
@@ -8477,7 +8477,7 @@ func InitProcedure(ctx context.Context, ses *Session, tenant *TenantInfo, cp *tr
 	}
 
 	initMoProcedure = fmt.Sprintf(initMoStoredProcedureFormat,
-		string(cp.Name.Name.ObjectName),
+		string(cp.Name.Name.ObjectName.Get()),
 		string(argsJson),
 		cp.Body, dbName,
 		tenant.User, types.CurrentTimestamp().String2(time.UTC, 0), types.CurrentTimestamp().String2(time.UTC, 0), "PROCEDURE", "DEFINER", "", "utf8mb4", "utf8mb4_0900_ai_ci", "utf8mb4_0900_ai_ci")
@@ -8649,7 +8649,7 @@ func insertRecordToMoMysqlCompatibilityMode(ctx context.Context, ses *Session, s
 	variableValue := "0.7"
 
 	if createDatabaseStmt, ok := stmt.(*tree.CreateDatabase); ok {
-		dbName = string(createDatabaseStmt.Name)
+		dbName = string(createDatabaseStmt.Name.Get())
 		//if create sys database, do nothing
 		if _, ok = sysDatabases[dbName]; ok {
 			return nil
@@ -8704,7 +8704,7 @@ func deleteRecordToMoMysqlCompatbilityMode(ctx context.Context, ses *Session, st
 	var err error
 
 	if deleteDatabaseStmt, ok := stmt.(*tree.DropDatabase); ok {
-		datname = string(deleteDatabaseStmt.Name)
+		datname = string(deleteDatabaseStmt.Name.Get())
 		//if delete sys database, do nothing
 		if _, ok = sysDatabases[datname]; ok {
 			return nil
@@ -8799,10 +8799,10 @@ func doInterpretCall(ctx context.Context, ses *Session, call *tree.CallStmt) ([]
 		}
 		dbName = ses.GetDatabaseName()
 	} else {
-		dbName = string(call.Name.Name.SchemaName)
+		dbName = string(call.Name.Name.SchemaName.Get())
 	}
 
-	sql, err = getSqlForSpBody(ctx, string(call.Name.Name.ObjectName), dbName)
+	sql, err = getSqlForSpBody(ctx, string(call.Name.Name.ObjectName.Get()), dbName)
 	if err != nil {
 		return nil, err
 	}
@@ -8840,10 +8840,10 @@ func doInterpretCall(ctx context.Context, ses *Session, call *tree.CallStmt) ([]
 			return nil, err
 		}
 		if len(argList) != len(call.Args) {
-			return nil, moerr.NewInvalidArg(ctx, string(call.Name.Name.ObjectName)+" procedure have invalid input args length", len(call.Args))
+			return nil, moerr.NewInvalidArg(ctx, string(call.Name.Name.ObjectName.Get())+" procedure have invalid input args length", len(call.Args))
 		}
 	} else {
-		return nil, moerr.NewNoUDFNoCtx(string(call.Name.Name.ObjectName))
+		return nil, moerr.NewNoUDFNoCtx(string(call.Name.Name.ObjectName.Get()))
 	}
 
 	stmt, err := parsers.Parse(ctx, dialect.MYSQL, spBody, 1, ses.buf.Get(spBody))
@@ -8908,17 +8908,17 @@ func doGrantPrivilegeImplicitly(ctx context.Context, ses *Session, stmt tree.Sta
 	// 2.grant database privilege
 	switch st := stmt.(type) {
 	case *tree.CreateDatabase:
-		sql = getSqlForGrantOwnershipOnDatabase(string(st.Name), currentRole)
+		sql = getSqlForGrantOwnershipOnDatabase(string(st.Name.Get()), currentRole)
 	case *tree.CreateTable:
 		// get database name
 		var dbName string
-		if len(st.Table.SchemaName) == 0 {
+		if len(st.Table.SchemaName.Get()) == 0 {
 			dbName = ses.GetDatabaseName()
 		} else {
-			dbName = string(st.Table.SchemaName)
+			dbName = string(st.Table.SchemaName.Get())
 		}
 		// get table name
-		tableName := string(st.Table.ObjectName)
+		tableName := string(st.Table.ObjectName.Get())
 		sql = getSqlForGrantOwnershipOnTable(dbName, tableName, currentRole)
 	}
 
@@ -8959,17 +8959,17 @@ func doRevokePrivilegeImplicitly(ctx context.Context, ses *Session, stmt tree.St
 	// 2.grant database privilege
 	switch st := stmt.(type) {
 	case *tree.DropDatabase:
-		sql = getSqlForRevokeOwnershipFromDatabase(string(st.Name), currentRole)
+		sql = getSqlForRevokeOwnershipFromDatabase(string(st.Name.Get()), currentRole)
 	case *tree.DropTable:
 		// get database name
 		var dbName string
-		if len(st.Names[0].SchemaName) == 0 {
+		if len(st.Names[0].SchemaName.Get()) == 0 {
 			dbName = ses.GetDatabaseName()
 		} else {
-			dbName = string(st.Names[0].SchemaName)
+			dbName = string(st.Names[0].SchemaName.Get())
 		}
 		// get table name
-		tableName := string(st.Names[0].ObjectName)
+		tableName := string(st.Names[0].ObjectName.Get())
 		sql = getSqlForRevokeOwnershipFromTable(dbName, tableName, currentRole)
 	}
 

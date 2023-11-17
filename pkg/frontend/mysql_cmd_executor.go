@@ -2875,7 +2875,7 @@ func (mce *MysqlCmdExecutor) executeStmt(requestCtx context.Context,
 			return err
 		}
 	case *tree.CreateDatabase:
-		err = inputNameIsInvalid(proc.Ctx, string(st.Name))
+		err = inputNameIsInvalid(proc.Ctx, string(st.Name.Get()))
 		if err != nil {
 			return err
 		}
@@ -2883,13 +2883,13 @@ func (mce *MysqlCmdExecutor) executeStmt(requestCtx context.Context,
 			return moerr.NewInternalError(proc.Ctx, "only admin can create subscription")
 		}
 	case *tree.DropDatabase:
-		err = inputNameIsInvalid(proc.Ctx, string(st.Name))
+		err = inputNameIsInvalid(proc.Ctx, string(st.Name.Get()))
 		if err != nil {
 			return err
 		}
 		ses.InvalidatePrivilegeCache()
 		// if the droped database is the same as the one in use, database must be reseted to empty.
-		if string(st.Name) == ses.GetDatabaseName() {
+		if string(st.Name.Get()) == ses.GetDatabaseName() {
 			ses.SetDatabaseName("")
 		}
 	case *tree.PrepareStmt:

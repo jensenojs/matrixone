@@ -33,8 +33,8 @@ func buildInsert(stmt *tree.Insert, ctx CompilerContext, isReplace bool, isPrepa
 	}
 
 	tbl := stmt.Table.(*tree.TableName)
-	dbName := string(tbl.SchemaName)
-	tblName := string(tbl.ObjectName)
+	dbName := string(tbl.SchemaName.Get())
+	tblName := string(tbl.ObjectName.Get())
 	if len(dbName) == 0 {
 		dbName = ctx.DefaultDatabase()
 	}

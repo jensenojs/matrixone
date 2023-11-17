@@ -18,7 +18,7 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 
 type Execute struct {
 	Statement
-	Name      Identifier
+	Name      *BufIdentifier
 	Variables []*VarExpr
 }
 
@@ -41,13 +41,17 @@ func (node *Execute) GetQueryType() string     { return QueryTypeOth }
 
 func NewExecute(name Identifier, buf *buffer.Buffer) *Execute {
 	e := buffer.Alloc[Execute](buf)
-	e.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+	e.Name = n
 	return e
 }
 
 func NewExecuteWithVariables(name Identifier, variables []*VarExpr, buf *buffer.Buffer) *Execute {
 	e := buffer.Alloc[Execute](buf)
-	e.Name = name
+	n := NewBufIdentifier(name)
+	buf.Pin(n)
+	e.Name = n
 	e.Variables = variables
 	return e
 }

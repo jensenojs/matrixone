@@ -293,7 +293,7 @@ func getExprValue(e tree.Expr, mce *MysqlCmdExecutor, ses *Session) (interface{}
 	var err error
 
 	table := &tree.TableName{}
-	table.ObjectName = "dual"
+	table.ObjectName = tree.NewBufIdentifier("dual")
 
 	//1.composite the 'select (expr) from dual'
 	compositedSelect := &tree.Select{

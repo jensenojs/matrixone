@@ -51,7 +51,7 @@ type ColumnItem struct {
 	IdentifierName
 
 	//the name of the column
-	ColumnName Identifier
+	ColumnName *BufIdentifier
 }
 
 // the unresolved qualified name like column name.

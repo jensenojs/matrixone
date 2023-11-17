@@ -95,7 +95,7 @@ func buildAlterTableCopy(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, err
 			switch option.Typ {
 			case tree.AlterTableDropColumn:
 				//return nil, moerr.NewInvalidInput(ctx.GetContext(), "Do not support this stmt now. %v", option)
-				err = DropColumn(ctx, alterTablePlan, string(option.Name), alterTableCtx)
+				err = DropColumn(ctx, alterTablePlan, string(option.Name.Get()), alterTableCtx)
 			case tree.AlterTableDropIndex:
 				return nil, moerr.NewInvalidInput(ctx.GetContext(), "Do not support this stmt now. %v", option)
 			case tree.AlterTableDropKey:

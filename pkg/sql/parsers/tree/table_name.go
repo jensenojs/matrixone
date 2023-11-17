@@ -23,26 +23,26 @@ type TableName struct {
 
 func (tn TableName) Format(ctx *FmtCtx) {
 	if tn.ExplicitCatalog {
-		ctx.WriteString(string(tn.CatalogName))
+		ctx.WriteString(string(tn.CatalogName.Get()))
 		ctx.WriteByte('.')
 	}
 	if tn.ExplicitSchema {
-		ctx.WriteString(string(tn.SchemaName))
+		ctx.WriteString(string(tn.SchemaName.Get()))
 		ctx.WriteByte('.')
 	}
-	ctx.WriteString(string(tn.ObjectName))
+	ctx.WriteString(string(tn.ObjectName.Get()))
 }
 
 func (tn *TableName) Name() Identifier {
-	return tn.ObjectName
+	return tn.ObjectName.Get()
 }
 
 func (tn *TableName) Schema() Identifier {
-	return tn.SchemaName
+	return tn.SchemaName.Get()
 }
 
 func (tn *TableName) Catalog() Identifier {
-	return tn.CatalogName
+	return tn.CatalogName.Get()
 }
 
 var _ TableExpr = &TableName{}
@@ -61,12 +61,15 @@ func (node *TableNames) Format(ctx *FmtCtx) {
 
 func NewTableName(name Identifier, prefix ObjectNamePrefix, buf *buffer.Buffer) *TableName {
 	var tName *TableName
+	on := NewBufIdentifier(name)
 	if buf != nil {
 		tName = buffer.Alloc[TableName](buf)
-	} else { 
+		buf.Pin(on)
+	} else {
 		tName = new(TableName)
 	}
-	tName.objName.ObjectName = name
+
+	tName.objName.ObjectName = on
 	tName.objName.ObjectNamePrefix = prefix
 	return tName
 }

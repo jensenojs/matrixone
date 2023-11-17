@@ -360,8 +360,8 @@ func Test_initFunction(t *testing.T) {
 		cu := &tree.CreateFunction{
 			Name: tree.NewFuncName("testFunc",
 				tree.ObjectNamePrefix{
-					SchemaName:      tree.Identifier("db"),
-					CatalogName:     tree.Identifier(""),
+					SchemaName:      tree.NewBufIdentifier("db"),
+					CatalogName:     tree.NewBufIdentifier(""),
 					ExplicitSchema:  true,
 					ExplicitCatalog: false,
 				},
@@ -5492,8 +5492,8 @@ func Test_doDropFunction(t *testing.T) {
 		cu := &tree.DropFunction{
 			Name: tree.NewFuncName("testFunc",
 				tree.ObjectNamePrefix{
-					SchemaName:      tree.Identifier("db"),
-					CatalogName:     tree.Identifier(""),
+					SchemaName:      tree.NewBufIdentifier("db"),
+					CatalogName:     tree.NewBufIdentifier(""),
 					ExplicitSchema:  true,
 					ExplicitCatalog: false,
 				},
@@ -5853,7 +5853,7 @@ func Test_doInterpretCall(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, err := getSqlForSpBody(ses.GetConnectContext(), string(call.Name.Name.ObjectName), ses.GetDatabaseName())
+		sql, err := getSqlForSpBody(ses.GetConnectContext(), string(call.Name.Name.ObjectName.Get()), ses.GetDatabaseName())
 		convey.So(err, convey.ShouldBeNil)
 		mrs := newMrsForPasswordOfUser([][]interface{}{})
 		bh.sql2result[sql] = mrs
@@ -5896,7 +5896,7 @@ func Test_doInterpretCall(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, err := getSqlForSpBody(ses.GetConnectContext(), string(call.Name.Name.ObjectName), ses.GetDatabaseName())
+		sql, err := getSqlForSpBody(ses.GetConnectContext(), string(call.Name.Name.ObjectName.Get()), ses.GetDatabaseName())
 		convey.So(err, convey.ShouldBeNil)
 		mrs := newMrsForPasswordOfUser([][]interface{}{
 			{"begin set sid = 1000; end", "{}"},
@@ -5951,7 +5951,7 @@ func Test_doInterpretCall(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, err := getSqlForSpBody(ses.GetConnectContext(), string(call.Name.Name.ObjectName), ses.GetDatabaseName())
+		sql, err := getSqlForSpBody(ses.GetConnectContext(), string(call.Name.Name.ObjectName.Get()), ses.GetDatabaseName())
 		convey.So(err, convey.ShouldBeNil)
 		mrs := newMrsForPasswordOfUser([][]interface{}{
 			{"begin DECLARE v1 INT; SET v1 = 10; IF v1 > 5 THEN select * from tbh1; ELSEIF v1 = 5 THEN select * from tbh2; ELSEIF v1 = 4 THEN select * from tbh2 limit 1; ELSE select * from tbh3; END IF; end", "{}"},
@@ -6039,7 +6039,7 @@ func Test_initProcedure(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql := getSqlForCheckProcedureExistence(string(cp.Name.Name.ObjectName), ses.GetDatabaseName())
+		sql := getSqlForCheckProcedureExistence(string(cp.Name.Name.ObjectName.Get()), ses.GetDatabaseName())
 		mrs := newMrsForPasswordOfUser([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
@@ -6141,7 +6141,7 @@ func TestDoGrantPrivilegeImplicitly(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.CreateDatabase{
-			Name: tree.Identifier("abc"),
+			Name: tree.NewBufIdentifier("abc"),
 		}
 
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -6161,7 +6161,7 @@ func TestDoGrantPrivilegeImplicitly(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql := getSqlForGrantOwnershipOnDatabase(string(stmt.Name), ses.GetTenantInfo().GetDefaultRole())
+		sql := getSqlForGrantOwnershipOnDatabase(string(stmt.Name.Get()), ses.GetTenantInfo().GetDefaultRole())
 		mrs := newMrsForSqlForCheckUserHasRole([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
@@ -6219,7 +6219,7 @@ func TestDoRevokePrivilegeImplicitly(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.DropDatabase{
-			Name: tree.Identifier("abc"),
+			Name: tree.NewBufIdentifier("abc"),
 		}
 
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -6239,7 +6239,7 @@ func TestDoRevokePrivilegeImplicitly(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql := getSqlForRevokeOwnershipFromDatabase(string(stmt.Name), ses.GetTenantInfo().GetDefaultRole())
+		sql := getSqlForRevokeOwnershipFromDatabase(string(stmt.Name.Get()), ses.GetTenantInfo().GetDefaultRole())
 		mrs := newMrsForSqlForCheckUserHasRole([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
@@ -8141,18 +8141,18 @@ func TestDoCreatePublication(t *testing.T) {
 	ses.SetTenantInfo(tenant)
 
 	sa := &tree.CreatePublication{
-		Name:     "pub1",
-		Database: "db1",
+		Name:     tree.NewBufIdentifier("pub1"),
+		Database: tree.NewBufIdentifier("db1"),
 		Comment:  "124",
 		AccountsSet: &tree.AccountsSetOption{
 			SetAccounts: tree.IdentifierList{"a1", "a2"},
 		},
 	}
-	sql1, err := getSqlForGetDbIdAndType(ctx, string(sa.Database), true, 0)
+	sql1, err := getSqlForGetDbIdAndType(ctx, string(sa.Database.Get()), true, 0)
 	require.NoError(t, err)
 	bh := &backgroundExecTest{}
 	bh.init()
-	sql2, err := getSqlForInsertIntoMoPubs(ctx, string(sa.Name), string(sa.Database), 0, true, "", "a1, a2", tenant.GetDefaultRoleID(), tenant.GetUserID(), sa.Comment, true)
+	sql2, err := getSqlForInsertIntoMoPubs(ctx, string(sa.Name.Get()), string(sa.Database.Get()), 0, true, "", "a1, a2", tenant.GetDefaultRoleID(), tenant.GetUserID(), sa.Comment, true)
 	require.NoError(t, err)
 	bhStub := gostub.StubFunc(&NewBackgroundHandler, bh)
 	defer bhStub.Reset()
@@ -8201,11 +8201,11 @@ func TestDoDropPublication(t *testing.T) {
 	ses.SetTenantInfo(tenant)
 
 	sa := &tree.DropPublication{
-		Name: "pub1",
+		Name: tree.NewBufIdentifier("pub1"),
 	}
-	sql1, err := getSqlForGetPubInfo(ctx, string(sa.Name), true)
+	sql1, err := getSqlForGetPubInfo(ctx, string(sa.Name.Get()), true)
 	require.NoError(t, err)
-	sql2, err := getSqlForDropPubInfo(ctx, string(sa.Name), true)
+	sql2, err := getSqlForDropPubInfo(ctx, string(sa.Name.Get()), true)
 	require.NoError(t, err)
 	bh := &backgroundExecTest{}
 	bh.init()
@@ -8313,13 +8313,13 @@ func TestDoAlterPublication(t *testing.T) {
 
 	for _, kase := range kases {
 		sa := &tree.AlterPublication{
-			Name:        tree.Identifier(kase.pubName),
+			Name:        tree.NewBufIdentifier(kase.pubName),
 			Comment:     kase.comment,
 			AccountsSet: kase.accountsSet,
 		}
-		sql1, err := getSqlForGetPubInfo(ctx, string(sa.Name), true)
+		sql1, err := getSqlForGetPubInfo(ctx, string(sa.Name.Get()), true)
 		require.NoError(t, err)
-		sql2, err := getSqlForUpdatePubInfo(ctx, string(sa.Name), kase.accountList, sa.Comment, true)
+		sql2, err := getSqlForUpdatePubInfo(ctx, string(sa.Name.Get()), kase.accountList, sa.Comment, true)
 		require.NoError(t, err)
 
 		bh := &backgroundExecTest{}
@@ -9110,7 +9110,7 @@ func TestInsertRecordToMoMysqlCompatibilityMode(t *testing.T) {
 		ses.SetTenantInfo(tenant)
 
 		stmt := &tree.CreateDatabase{
-			Name: tree.Identifier("abc"),
+			Name: tree.NewBufIdentifier("abc"),
 		}
 
 		//no result set
@@ -9161,7 +9161,7 @@ func TestDeleteRecordToMoMysqlCompatbilityMode(t *testing.T) {
 		ses.SetTenantInfo(tenant)
 
 		stmt := &tree.DropDatabase{
-			Name: tree.Identifier("abc"),
+			Name: tree.NewBufIdentifier("abc"),
 		}
 
 		//no result set
@@ -9383,7 +9383,7 @@ func TestDoDropStage(t *testing.T) {
 
 		ds := &tree.DropStage{
 			IfNotExists: false,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 		}
 
 		//no result set
@@ -9397,7 +9397,7 @@ func TestDoDropStage(t *testing.T) {
 		})
 		bh.sql2result[sql] = mrs
 
-		sql = getSqlForDropStage(string(ds.Name))
+		sql = getSqlForDropStage(string(ds.Name.Get()))
 		mrs = newMrsForPasswordOfUser([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
@@ -9437,7 +9437,7 @@ func TestDoDropStage(t *testing.T) {
 
 		ds := &tree.DropStage{
 			IfNotExists: true,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 		}
 
 		//no result set
@@ -9451,7 +9451,7 @@ func TestDoDropStage(t *testing.T) {
 		})
 		bh.sql2result[sql] = mrs
 
-		sql = getSqlForDropStage(string(ds.Name))
+		sql = getSqlForDropStage(string(ds.Name.Get()))
 		mrs = newMrsForPasswordOfUser([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
@@ -9491,7 +9491,7 @@ func TestDoDropStage(t *testing.T) {
 
 		ds := &tree.DropStage{
 			IfNotExists: false,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 		}
 
 		//no result set
@@ -9503,7 +9503,7 @@ func TestDoDropStage(t *testing.T) {
 		mrs := newMrsForPasswordOfUser([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
-		sql = getSqlForDropStage(string(ds.Name))
+		sql = getSqlForDropStage(string(ds.Name.Get()))
 		mrs = newMrsForPasswordOfUser([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
@@ -9545,7 +9545,7 @@ func TestDoCreateStage(t *testing.T) {
 
 		cs := &tree.CreateStage{
 			IfNotExists: false,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 			Url:         "'s3://load/files/'",
 			Credentials: tree.StageCredentials{
 				Exist: false,
@@ -9603,7 +9603,7 @@ func TestDoCreateStage(t *testing.T) {
 
 		cs := &tree.CreateStage{
 			IfNotExists: false,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 			Url:         "'s3://load/files/'",
 			Credentials: tree.StageCredentials{
 				Exist: false,
@@ -9663,7 +9663,7 @@ func TestDoCreateStage(t *testing.T) {
 
 		cs := &tree.CreateStage{
 			IfNotExists: true,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 			Url:         "'s3://load/files/'",
 			Credentials: tree.StageCredentials{
 				Exist: false,
@@ -9721,7 +9721,7 @@ func TestDoCreateStage(t *testing.T) {
 
 		cs := &tree.CreateStage{
 			IfNotExists: false,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 			Url:         "'s3://load/files/'",
 			Credentials: tree.StageCredentials{
 				Exist:       true,
@@ -9783,7 +9783,7 @@ func TestDoAlterStage(t *testing.T) {
 
 		as := &tree.AlterStage{
 			IfNotExists: false,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 			UrlOption: tree.StageUrl{
 				Exist: true,
 				Url:   "'s3://load/files/'",
@@ -9846,7 +9846,7 @@ func TestDoAlterStage(t *testing.T) {
 
 		as := &tree.AlterStage{
 			IfNotExists: false,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 			UrlOption: tree.StageUrl{
 				Exist: false,
 			},
@@ -9909,7 +9909,7 @@ func TestDoAlterStage(t *testing.T) {
 
 		as := &tree.AlterStage{
 			IfNotExists: true,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 			UrlOption: tree.StageUrl{
 				Exist: true,
 				Url:   "'s3://load/files/'",
@@ -9970,7 +9970,7 @@ func TestDoAlterStage(t *testing.T) {
 
 		as := &tree.AlterStage{
 			IfNotExists: false,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 			UrlOption: tree.StageUrl{
 				Exist: true,
 				Url:   "'s3://load/files/'",
@@ -10031,7 +10031,7 @@ func TestDoAlterStage(t *testing.T) {
 
 		as := &tree.AlterStage{
 			IfNotExists: true,
-			Name:        tree.Identifier("my_stage_test"),
+			Name:        tree.NewBufIdentifier("my_stage_test"),
 			UrlOption: tree.StageUrl{
 				Exist: true,
 				Url:   "'s3://load/files/'",

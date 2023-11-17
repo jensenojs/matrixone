@@ -268,7 +268,7 @@ func buildPartitionDefs(ctx context.Context,
 	} else {
 		//process defs in syntax
 		for i := 0; i < len(syntaxDefs); i++ {
-			name := string(syntaxDefs[i].Name)
+			name := string(syntaxDefs[i].Name.Get())
 			if _, ok := dedup[name]; ok {
 				//return moerr.NewInvalidInput(ctx, "duplicate partition name %s", name)
 				return moerr.NewSameNamePartition(ctx, name)
