@@ -19,7 +19,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/sample"
 	"math"
 	"net"
 	"runtime"
@@ -29,6 +28,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/matrixorigin/matrixone/pkg/sql/colexec/sample"
 
 	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/catalog"
@@ -2553,7 +2554,8 @@ func (c *Compile) compileFuzzyFilter(n *plan.Node, ss []*Scope, ns []*plan.Node)
 	})
 
 	return ss, nil
-	
+}
+
 func (c *Compile) compileSample(n *plan.Node, ss []*Scope) []*Scope {
 	for i := range ss {
 		if containBrokenNode(ss[i]) {
