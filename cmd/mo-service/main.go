@@ -183,7 +183,7 @@ func startService(
 		}
 	}
 
-	fs, err := cfg.createFileService(ctx, st, uuid)
+	fs, err := cfg.createFileService(ctx, st, defines.LocalFileServiceName, st, uuid)
 	if err != nil {
 		return err
 	}

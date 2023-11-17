@@ -209,6 +209,8 @@ func NewService(
 		opt(srv)
 	}
 
+	srv.initCtlService()
+
 	// TODO: global client need to refactor
 	err = cnclient.NewCNClient(
 		srv.pipelineServiceServiceAddr(),
@@ -225,6 +227,10 @@ func (s *service) Start() error {
 	s.initSqlWriterFactory()
 
 	if err := s.queryService.Start(); err != nil {
+		return err
+	}
+
+	if err := s.ctlservice.Start(); err != nil {
 		return err
 	}
 
@@ -317,6 +323,11 @@ func (s *service) stopRPCs() error {
 			return err
 		}
 	}
+	if s.ctlservice != nil {
+		if err := s.ctlservice.Close(); err != nil {
+			return err
+		}
+	}
 	if s.queryService != nil {
 		if err := s.queryService.Close(); err != nil {
 			return err
@@ -349,9 +360,9 @@ func (s *service) handleRequest(
 		panic("cn server receive a message with unexpected type")
 	}
 	switch msg.GetSid() {
-	case pipeline.Status_WaitingNext:
+	case pipeline.WaitingNext:
 		return handleWaitingNextMsg(ctx, req, cs)
-	case pipeline.Status_Last:
+	case pipeline.Last:
 		if msg.IsPipelineMessage() { // only pipeline type need assemble msg now.
 			if err := handleAssemblePipeline(ctx, req, cs); err != nil {
 				return err
@@ -532,7 +543,7 @@ func (s *service) getTxnSender() (sender rpc.TxnSender, err error) {
 					resp.Txn.Status = txn.TxnStatus_Aborted
 				}
 			default:
-				return moerr.NewNotSupported(ctx, "unknown txn request method: %s", req.Method.String())
+				panic("should never happen")
 			}
 			return err
 		}
@@ -624,7 +635,7 @@ func (s *service) initLockService() {
 func handleWaitingNextMsg(ctx context.Context, message morpc.Message, cs morpc.ClientSession) error {
 	msg, _ := message.(*pipeline.Message)
 	switch msg.GetCmd() {
-	case pipeline.Method_PipelineMessage:
+	case pipeline.PipelineMessage:
 		var cache morpc.MessageCache
 		var err error
 		if cache, err = cs.CreateCache(ctx, message.GetID()); err != nil {

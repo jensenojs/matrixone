@@ -77,26 +77,8 @@ func (c *DashboardCreator) initLogtailQueueRow() dashboard.Option {
 	return dashboard.Row(
 		"Logtail Queue Status",
 		c.withMultiGraph(
-			"CN Received status",
-			4,
-			[]string{
-				`sum(rate(` + c.getMetricWithFilter("mo_logtail_received_total", `type="total"`) + `[$interval])) by (` + c.by + `)`,
-				`sum(rate(` + c.getMetricWithFilter("mo_logtail_received_total", `type="subscribe"`) + `[$interval])) by (` + c.by + `)`,
-				`sum(rate(` + c.getMetricWithFilter("mo_logtail_received_total", `type="unsubscribe"`) + `[$interval])) by (` + c.by + `)`,
-				`sum(rate(` + c.getMetricWithFilter("mo_logtail_received_total", `type="update"`) + `[$interval])) by (` + c.by + `)`,
-				`sum(rate(` + c.getMetricWithFilter("mo_logtail_received_total", `type="heartbeat"`) + `[$interval])) by (` + c.by + `)`,
-			},
-			[]string{
-				"{{ " + c.by + " }}: total",
-				"{{ " + c.by + " }}: subscribe",
-				"{{ " + c.by + " }}: unsubscribe",
-				"{{ " + c.by + " }}: update",
-				"{{ " + c.by + " }}: heartbeat",
-			}),
-
-		c.withMultiGraph(
-			"Queue status",
-			4,
+			"Sending Queue",
+			6,
 			[]string{
 				`sum(` + c.getMetricWithFilter("mo_logtail_queue_size", `type="send"`) + `)`,
 				`sum(` + c.getMetricWithFilter("mo_logtail_queue_size", `type="receive"`) + `)`,
@@ -109,7 +91,7 @@ func (c *DashboardCreator) initLogtailQueueRow() dashboard.Option {
 			}),
 		c.withGraph(
 			"Checkpoint logtail",
-			4,
+			6,
 			`sum(rate(`+c.getMetricWithFilter("mo_logtail_load_checkpoint_total", "")+`[$interval])) by (`+c.by+`)`,
 			"{{ "+c.by+" }}"),
 	)

@@ -153,9 +153,15 @@ func TestHandleInvalidMessageWillPanic(t *testing.T) {
 	})
 }
 
-func TestHandleNotRegisterWillReturnError(t *testing.T) {
+func TestHandleNotRegisterWillPanic(t *testing.T) {
 	runTestTxnServer(t, testTN1Addr, func(s *server) {
-		assert.Error(t, s.onMessage(context.Background(), newMessage(&txn.TxnRequest{}), 0, nil))
+		defer func() {
+			if err := recover(); err != nil {
+				return
+			}
+			assert.Fail(t, "must panic")
+		}()
+		assert.NoError(t, s.onMessage(context.Background(), newMessage(&txn.TxnRequest{}), 0, nil))
 	})
 }
 

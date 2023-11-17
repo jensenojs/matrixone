@@ -22,10 +22,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/clusterservice"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/morpc"
-	"github.com/matrixorigin/matrixone/pkg/common/stopper"
 	pb "github.com/matrixorigin/matrixone/pkg/pb/lock"
 	"github.com/matrixorigin/matrixone/pkg/pb/metadata"
-	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 	"github.com/matrixorigin/matrixone/pkg/util/trace"
 	"go.uber.org/zap"
 )
@@ -42,8 +40,7 @@ var (
 		},
 	}
 
-	defaultRPCTimeout    = time.Second * 10
-	defaultHandleWorkers = 4
+	defaultRPCTimeout = time.Second * 10
 )
 
 type client struct {
@@ -172,9 +169,6 @@ type server struct {
 	rpc      morpc.RPCServer
 	handlers map[pb.Method]RequestHandleFunc
 
-	requests chan requestCtx
-	stopper  *stopper.Stopper
-
 	options struct {
 		filter func(*pb.Request) bool
 	}
@@ -189,9 +183,6 @@ func NewServer(
 		cfg:      &cfg,
 		address:  address,
 		handlers: make(map[pb.Method]RequestHandleFunc),
-		requests: make(chan requestCtx, 10240),
-		stopper: stopper.NewStopper("lock-service-rpc-server",
-			stopper.WithLogger(getLogger().RawLogger())),
 	}
 	s.cfg.Adjust()
 	for _, opt := range opts {
@@ -214,21 +205,11 @@ func NewServer(
 }
 
 func (s *server) Start() error {
-	for i := 0; i < defaultHandleWorkers; i++ {
-		if err := s.stopper.RunTask(s.handle); err != nil {
-			panic(err)
-		}
-	}
 	return s.rpc.Start()
 }
 
 func (s *server) Close() error {
-	if err := s.rpc.Close(); err != nil {
-		return err
-	}
-	s.stopper.Stop()
-	close(s.requests)
-	return nil
+	return s.rpc.Close()
 }
 
 func (s *server) RegisterMethodHandler(m pb.Method, h RequestHandleFunc) {
@@ -294,34 +275,13 @@ func (s *server) onMessage(
 	default:
 	}
 
-	s.requests <- requestCtx{
-		req:     req,
-		handler: handler,
-		cs:      cs,
-		cancel:  msg.Cancel,
-		ctx:     ctx,
-	}
-	v2.TxnLockRPCQueueSizeGauge.Set(float64(len(s.requests)))
-	return nil
-}
-
-func (s *server) handle(ctx context.Context) {
-	fn := func(ctx requestCtx) {
-		req := ctx.req
+	fn := func(req *pb.Request) error {
 		defer releaseRequest(req)
 		resp := getResponse(req)
-		ctx.handler(ctx.ctx, ctx.cancel, req, resp, ctx.cs)
+		handler(ctx, msg.Cancel, req, resp, cs)
+		return nil
 	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case ctx := <-s.requests:
-			v2.TxnLockRPCQueueSizeGauge.Set(float64(len(s.requests)))
-			fn(ctx)
-		}
-	}
+	return fn(req)
 }
 
 func getResponse(req *pb.Request) *pb.Response {
@@ -374,12 +334,4 @@ func acquireResponse() *pb.Response {
 func releaseResponse(v morpc.Message) {
 	v.(*pb.Response).Reset()
 	responsePool.Put(v)
-}
-
-type requestCtx struct {
-	req     *pb.Request
-	handler RequestHandleFunc
-	cs      morpc.ClientSession
-	ctx     context.Context
-	cancel  context.CancelFunc
 }

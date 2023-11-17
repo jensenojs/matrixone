@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/fagongzi/goetty/v2"
-	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/morpc"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/common/runtime"
@@ -194,7 +193,8 @@ func (s *server) onMessage(
 
 	handler, ok := s.handlers[m.Method]
 	if !ok {
-		return moerr.NewNotSupported(ctx, "unknown txn request method: %s", m.Method.String())
+		s.rt.Logger().Fatal("missing txn request handler",
+			zap.String("method", m.Method.String()))
 	}
 
 	select {

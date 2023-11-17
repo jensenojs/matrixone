@@ -16,33 +16,20 @@ package ctl
 
 import (
 	"context"
+	"strings"
+
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 
+	pb "github.com/matrixorigin/matrixone/pkg/pb/ctl"
 	"github.com/matrixorigin/matrixone/pkg/pb/txn"
 )
 
 type serviceType string
 
-const (
+var (
 	tn serviceType = "DN"
 	cn serviceType = "CN"
 
-	PingMethod          = "PING"
-	FlushMethod         = "FLUSH"
-	TaskMethod          = "TASK"
-	UseSnapshotMethod   = "USESNAPSHOT"
-	GetSnapshotMethod   = "GETSNAPSHOT"
-	CheckpointMethod    = "CHECKPOINT"
-	ForceGCMethod       = "FORCEGC"
-	InspectMethod       = "INSPECT"
-	LabelMethod         = "LABEL"
-	SyncCommitMethod    = "SYNCCOMMIT"
-	AddFaultPointMethod = "ADDFAULTPOINT"
-	BackupMethod        = "BACKUP"
-	TraceSpanMethod     = "TRACESPAN"
-)
-
-var (
 	supportedServiceTypes = map[serviceType]struct{}{
 		tn: {},
 		cn: {},
@@ -52,19 +39,19 @@ var (
 var (
 	// register all supported debug command here
 	supportedCmds = map[string]handleFunc{
-		PingMethod:          handlePing(),
-		FlushMethod:         handleFlush(),
-		TaskMethod:          handleTask,
-		UseSnapshotMethod:   handleUseSnapshotTS,
-		GetSnapshotMethod:   handleGetSnapshotTS,
-		CheckpointMethod:    handleCheckpoint(),
-		ForceGCMethod:       handleCNGC,
-		InspectMethod:       handleInspectTN(),
-		LabelMethod:         handleSetLabel,
-		SyncCommitMethod:    handleSyncCommit,
-		AddFaultPointMethod: handleAddFaultPoint(),
-		BackupMethod:        handleBackup(),
-		TraceSpanMethod:     handleTraceSpan,
+		strings.ToUpper(pb.CmdMethod_Ping.String()):          handlePing(),
+		strings.ToUpper(pb.CmdMethod_Flush.String()):         handleFlush(),
+		strings.ToUpper(pb.CmdMethod_Task.String()):          handleTask,
+		strings.ToUpper(pb.CmdMethod_UseSnapshot.String()):   handleUseSnapshotTS,
+		strings.ToUpper(pb.CmdMethod_GetSnapshot.String()):   handleGetSnapshotTS,
+		strings.ToUpper(pb.CmdMethod_Checkpoint.String()):    handleCheckpoint(),
+		strings.ToUpper(pb.CmdMethod_ForceGC.String()):       handleCNGC,
+		strings.ToUpper(pb.CmdMethod_Inspect.String()):       handleInspectTN(),
+		strings.ToUpper(pb.CmdMethod_Label.String()):         handleSetLabel,
+		strings.ToUpper(pb.CmdMethod_SyncCommit.String()):    handleSyncCommit,
+		strings.ToUpper(pb.CmdMethod_AddFaultPoint.String()): handleAddFaultPoint(),
+		strings.ToUpper(pb.CmdMethod_Backup.String()):        handleBackup(),
+		strings.ToUpper(pb.CmdMethod_TraceSpan.String()):     handleTraceSpan,
 	}
 )
 
@@ -73,10 +60,4 @@ type requestSender = func(context.Context, *process.Process, []txn.CNOpRequest) 
 type handleFunc func(proc *process.Process,
 	service serviceType,
 	parameter string,
-	sender requestSender) (Result, error)
-
-// Result ctl result
-type Result struct {
-	Method string `json:"method"`
-	Data   any    `json:"result"`
-}
+	sender requestSender) (pb.CtlResult, error)

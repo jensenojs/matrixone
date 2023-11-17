@@ -33,10 +33,10 @@ const (
 type timestampWaiter struct {
 	stopper   stopper.Stopper
 	notifiedC chan timestamp.Timestamp
+	cancelC   chan struct{}
 	latestTS  atomic.Pointer[timestamp.Timestamp]
 	mu        struct {
 		sync.Mutex
-		cancelC      chan struct{}
 		waiters      []*waiter
 		lastNotified timestamp.Timestamp
 	}
@@ -48,8 +48,8 @@ func NewTimestampWaiter() TimestampWaiter {
 		stopper: *stopper.NewStopper("timestamp-waiter",
 			stopper.WithLogger(util.GetLogger().RawLogger())),
 		notifiedC: make(chan timestamp.Timestamp, maxNotifiedCount),
+		cancelC:   make(chan struct{}, 1),
 	}
-	tw.mu.cancelC = make(chan struct{}, 1)
 	if err := tw.stopper.RunTask(tw.handleEvent); err != nil {
 		panic(err)
 	}
@@ -62,10 +62,7 @@ func (tw *timestampWaiter) GetTimestamp(ctx context.Context, ts timestamp.Timest
 		return latest.Next(), nil
 	}
 
-	w, err := tw.addToWait(ts)
-	if err != nil {
-		return timestamp.Timestamp{}, err
-	}
+	w := tw.addToWait(ts)
 	if w != nil {
 		defer w.close()
 		if err := w.wait(ctx); err != nil {
@@ -81,54 +78,30 @@ func (tw *timestampWaiter) NotifyLatestCommitTS(ts timestamp.Timestamp) {
 	tw.notifiedC <- ts
 }
 
-func (tw *timestampWaiter) Pause() {
-	tw.mu.Lock()
-	defer tw.mu.Unlock()
+func (tw *timestampWaiter) Cancel() {
 	select {
-	case _, ok := <-tw.mu.cancelC:
-		if !ok {
-			// The channel is already closed.
-			return
-		}
+	case tw.cancelC <- struct{}{}:
+		util.LogTimestampWaiterCanceled()
 	default:
 	}
-	close(tw.mu.cancelC)
-	tw.mu.cancelC = nil
-	tw.removeWaitersLocked()
-	util.LogTimestampWaiterCanceled()
-}
-
-func (tw *timestampWaiter) Resume() {
-	tw.mu.Lock()
-	defer tw.mu.Unlock()
-	tw.mu.cancelC = make(chan struct{}, 1)
-}
-
-func (tw *timestampWaiter) CancelC() chan struct{} {
-	tw.mu.Lock()
-	defer tw.mu.Unlock()
-	return tw.mu.cancelC
 }
 
 func (tw *timestampWaiter) Close() {
 	tw.stopper.Stop()
 }
 
-func (tw *timestampWaiter) addToWait(ts timestamp.Timestamp) (*waiter, error) {
+func (tw *timestampWaiter) addToWait(ts timestamp.Timestamp) *waiter {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
 	if !tw.mu.lastNotified.IsEmpty() &&
 		tw.mu.lastNotified.GreaterEq(ts) {
-		return nil, nil
+		return nil
 	}
 
-	if tw.mu.cancelC == nil {
-		return nil, moerr.NewWaiterPausedNoCtx()
-	}
-	w := newWaiter(ts, tw.mu.cancelC)
+	w := newWaiter(ts)
 	w.ref()
 	tw.mu.waiters = append(tw.mu.waiters, w)
-	return w, nil
+	return w
 }
 
 func (tw *timestampWaiter) notifyWaiters(ts timestamp.Timestamp) {
@@ -151,9 +124,12 @@ func (tw *timestampWaiter) notifyWaiters(ts timestamp.Timestamp) {
 	tw.mu.lastNotified = ts
 }
 
-func (tw *timestampWaiter) removeWaitersLocked() {
+func (tw *timestampWaiter) cancelWaiters() {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
 	for idx, w := range tw.mu.waiters {
 		if w != nil {
+			w.cancel()
 			w.unref()
 			tw.mu.waiters[idx] = nil
 		}
@@ -174,6 +150,8 @@ func (tw *timestampWaiter) handleEvent(ctx context.Context) {
 				tw.latestTS.Store(&ts)
 				tw.notifyWaiters(ts)
 			}
+		case <-tw.cancelC:
+			tw.cancelWaiters()
 		}
 	}
 }
@@ -196,9 +174,11 @@ var (
 		New: func() any {
 			w := &waiter{
 				notifyC: make(chan struct{}, 1),
+				cancelC: make(chan struct{}, 1),
 			}
 			runtime.SetFinalizer(w, func(w *waiter) {
 				close(w.notifyC)
+				close(w.cancelC)
 			})
 			return w
 		},
@@ -214,15 +194,14 @@ type waiter struct {
 	cancelC chan struct{}
 }
 
-func newWaiter(ts timestamp.Timestamp, c chan struct{}) *waiter {
+func newWaiter(ts timestamp.Timestamp) *waiter {
 	w := waitersPool.Get().(*waiter)
-	w.init(ts, c)
+	w.init(ts)
 	return w
 }
 
-func (w *waiter) init(ts timestamp.Timestamp, c chan struct{}) {
+func (w *waiter) init(ts timestamp.Timestamp) {
 	w.waitAfter = ts
-	w.cancelC = c
 	if w.ref() != 1 {
 		panic("BUG: waiter init must has ref count 1")
 	}
@@ -235,12 +214,16 @@ func (w *waiter) wait(ctx context.Context) error {
 	case <-w.notifyC:
 		return nil
 	case <-w.cancelC:
-		return moerr.NewWaiterPausedNoCtx()
+		return moerr.NewWaiterCanceledNoCtx()
 	}
 }
 
 func (w *waiter) notify() {
 	w.notifyC <- struct{}{}
+}
+
+func (w *waiter) cancel() {
+	w.cancelC <- struct{}{}
 }
 
 func (w *waiter) ref() int32 {
@@ -266,10 +249,7 @@ func (w *waiter) reset() {
 	for {
 		select {
 		case <-w.notifyC:
-		case _, ok := <-w.cancelC:
-			if !ok {
-				return
-			}
+		case <-w.cancelC:
 		default:
 			return
 		}

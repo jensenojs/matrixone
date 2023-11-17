@@ -17,7 +17,6 @@ package compile
 import (
 	"context"
 	"fmt"
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec/sample"
 	"hash/crc32"
 	"runtime/debug"
 	"sync"
@@ -714,24 +713,6 @@ func newParallelScope(s *Scope, ss []*Scope) (*Scope, error) {
 					},
 				})
 			}
-		case vm.Sample:
-			flg = true
-			arg := in.Arg.(*sample.Argument)
-			s.Instructions = s.Instructions[i:]
-			s.Instructions[0] = vm.Instruction{
-				Op:  vm.Merge,
-				Idx: s.Instructions[0].Idx,
-				Arg: &merge.Argument{},
-			}
-
-			for j := range ss {
-				ss[j].appendInstruction(vm.Instruction{
-					Op:      vm.Sample,
-					Idx:     in.Idx,
-					IsFirst: in.IsFirst,
-					Arg:     arg.SimpleDup(),
-				})
-			}
 		case vm.Offset:
 			flg = true
 			arg := in.Arg.(*offset.Argument)
@@ -849,8 +830,8 @@ func (s *Scope) notifyAndReceiveFromRemote(errChan chan error) {
 			message := cnclient.AcquireMessage()
 			{
 				message.Id = streamSender.ID()
-				message.Cmd = pbpipeline.Method_PrepareDoneNotifyMessage
-				message.Sid = pbpipeline.Status_Last
+				message.Cmd = pbpipeline.PrepareDoneNotifyMessage
+				message.Sid = pbpipeline.Last
 				message.Uuid = info.Uuid[:]
 			}
 			if errSend := streamSender.Send(s.Proc.Ctx, message); errSend != nil {
@@ -913,9 +894,9 @@ func receiveMsgAndForward(proc *process.Process, receiveCh chan morpc.Message, f
 		}
 
 		switch m.GetSid() {
-		case pbpipeline.Status_WaitingNext:
+		case pbpipeline.WaitingNext:
 			continue
-		case pbpipeline.Status_Last:
+		case pbpipeline.Last:
 			if m.Checksum != crc32.ChecksumIEEE(dataBuffer) {
 				return moerr.NewInternalError(proc.Ctx, "Packages delivered by morpc is broken")
 			}

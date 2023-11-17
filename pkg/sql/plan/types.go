@@ -209,7 +209,6 @@ type BindContext struct {
 	sinkTag      int32
 	windowTag    int32
 	timeTag      int32
-	sampleTag    int32
 
 	groups     []*plan.Expr
 	aggregates []*plan.Expr
@@ -220,7 +219,6 @@ type BindContext struct {
 
 	groupByAst     map[string]int32
 	aggregateByAst map[string]int32
-	sampleByAst    map[string]int32
 	windowByAst    map[string]int32
 	projectByExpr  map[string]int32
 	timeByAst      map[string]int32
@@ -248,9 +246,6 @@ type BindContext struct {
 	defaultDatabase string
 
 	forceWindows bool
-
-	// sample function related.
-	sampleFunc SampleFuncCtx
 }
 
 type NameTuple struct {

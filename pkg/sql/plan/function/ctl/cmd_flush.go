@@ -21,14 +21,14 @@ import (
 	"github.com/fagongzi/util/protoc"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
-	"github.com/matrixorigin/matrixone/pkg/pb/api"
+	pb "github.com/matrixorigin/matrixone/pkg/pb/ctl"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/db"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
 func handleFlush() handleFunc {
 	return GetTNHandlerFunc(
-		api.OpCode_OpFlush,
+		pb.CmdMethod_Flush,
 		func(_ string) ([]uint64, error) {
 			return nil, nil
 		},
@@ -67,8 +67,8 @@ func handleFlush() handleFunc {
 			}
 			return payload, nil
 		},
-		func(data []byte) (any, error) {
-			resp := api.TNStringResponse{}
+		func(data []byte) (interface{}, error) {
+			resp := pb.TNStringResponse{}
 			protoc.MustUnmarshal(&resp, data)
 			return resp, nil
 		})

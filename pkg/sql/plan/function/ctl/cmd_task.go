@@ -16,6 +16,7 @@ package ctl
 
 import (
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
+	pb "github.com/matrixorigin/matrixone/pkg/pb/ctl"
 	"github.com/matrixorigin/matrixone/pkg/taskservice"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
@@ -28,21 +29,21 @@ var (
 func handleTask(proc *process.Process,
 	service serviceType,
 	parameter string,
-	sender requestSender) (Result, error) {
+	sender requestSender) (pb.CtlResult, error) {
 	switch parameter {
 	case disableTask:
 		taskservice.DebugCtlTaskFramwork(true)
 	case enableTask:
 		taskservice.DebugCtlTaskFramwork(false)
 	default:
-		return Result{},
+		return pb.CtlResult{},
 			moerr.NewInvalidInput(proc.Ctx, "task command only support %s and %s",
 				enableTask,
 				disableTask)
 	}
 
-	return Result{
-		Method: TaskMethod,
+	return pb.CtlResult{
+		Method: pb.CmdMethod_Task.String(),
 		Data:   "OK",
 	}, nil
 }

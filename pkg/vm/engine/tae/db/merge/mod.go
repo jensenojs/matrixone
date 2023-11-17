@@ -15,14 +15,10 @@
 package merge
 
 import (
-	"sync/atomic"
 	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 )
-
-var StopMerge atomic.Bool
 
 const (
 	constMergeMinBlks       = 5
@@ -36,7 +32,7 @@ const (
 type Policy interface {
 	OnObject(obj *catalog.SegmentEntry)
 	Revise(cpu, mem int64) []*catalog.SegmentEntry
-	ResetForTable(*catalog.TableEntry)
-	SetConfig(*catalog.TableEntry, func() txnif.AsyncTxn, any)
-	GetConfig(*catalog.TableEntry) any
+	ResetForTable(id uint64, schema *catalog.TableEntry)
+	Config(uint64, any)
+	GetConfig(uint64) any
 }

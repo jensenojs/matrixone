@@ -16,6 +16,7 @@ package ctl
 
 import (
 	"github.com/matrixorigin/matrixone/pkg/common/runtime"
+	pb "github.com/matrixorigin/matrixone/pkg/pb/ctl"
 	tspb "github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 	"github.com/matrixorigin/matrixone/pkg/txn/client"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -24,11 +25,11 @@ import (
 func handleGetSnapshotTS(proc *process.Process,
 	service serviceType,
 	parameter string,
-	sender requestSender) (Result, error) {
+	sender requestSender) (pb.CtlResult, error) {
 	rt := runtime.ProcessLevelRuntime()
 	now, _ := rt.Clock().Now()
-	return Result{
-		Method: GetSnapshotMethod,
+	return pb.CtlResult{
+		Method: pb.CmdMethod_GetSnapshot.String(),
 		Data:   now.DebugString(),
 	}, nil
 }
@@ -36,20 +37,20 @@ func handleGetSnapshotTS(proc *process.Process,
 func handleUseSnapshotTS(proc *process.Process,
 	service serviceType,
 	parameter string,
-	sender requestSender) (Result, error) {
+	sender requestSender) (pb.CtlResult, error) {
 	var options []client.TxnOption
 	rt := runtime.ProcessLevelRuntime()
 	if parameter != "" {
 		ts, err := tspb.ParseTimestamp(parameter)
 		if err != nil {
-			return Result{}, err
+			return pb.CtlResult{}, err
 		}
 		options = append(options, client.WithSnapshotTS(ts))
 	}
 
 	rt.SetGlobalVariables(runtime.TxnOptions, options)
-	return Result{
-		Method: UseSnapshotMethod,
+	return pb.CtlResult{
+		Method: pb.CmdMethod_UseSnapshot.String(),
 		Data:   "OK",
 	}, nil
 }

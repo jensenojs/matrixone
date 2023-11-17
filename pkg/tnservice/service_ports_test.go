@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/matrixorigin/matrixone/pkg/ctlservice"
 	"github.com/matrixorigin/matrixone/pkg/lockservice"
 	"github.com/matrixorigin/matrixone/pkg/util/address"
 	"github.com/matrixorigin/matrixone/pkg/util/toml"
@@ -63,6 +64,12 @@ func TestService_RegisterServices(t *testing.T) {
 				ListenAddress:  fmt.Sprintf("%s:%d", listenHost, port1+2),
 				ServiceAddress: fmt.Sprintf("%s:%d", serviceHost, port1+2),
 			},
+			Ctl: ctlservice.Config{
+				Address: address.Address{
+					ListenAddress:  fmt.Sprintf("%s:%d", listenHost, port1+3),
+					ServiceAddress: fmt.Sprintf("%s:%d", serviceHost, port1+3),
+				},
+			},
 		},
 		addressMgr: address.NewAddressManager(serviceHost, port2),
 	}
@@ -73,6 +80,8 @@ func TestService_RegisterServices(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%s:%d", listenHost, port1+1), s.logtailServiceListenAddr())
 	assert.Equal(t, fmt.Sprintf("%s:%d", serviceHost, port1+2), s.lockServiceServiceAddr())
 	assert.Equal(t, fmt.Sprintf("%s:%d", listenHost, port1+2), s.lockServiceListenAddr())
+	assert.Equal(t, fmt.Sprintf("%s:%d", serviceHost, port1+3), s.ctlServiceServiceAddr())
+	assert.Equal(t, fmt.Sprintf("%s:%d", listenHost, port1+3), s.ctlServiceListenAddr())
 
 	s.cfg.PortBase = port2
 	s.registerServices()
@@ -82,4 +91,6 @@ func TestService_RegisterServices(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%s:%d", listenHost, port2+1), s.logtailServiceListenAddr())
 	assert.Equal(t, fmt.Sprintf("%s:%d", serviceHost, port2+2), s.lockServiceServiceAddr())
 	assert.Equal(t, fmt.Sprintf("%s:%d", listenHost, port2+2), s.lockServiceListenAddr())
+	assert.Equal(t, fmt.Sprintf("%s:%d", serviceHost, port2+3), s.ctlServiceServiceAddr())
+	assert.Equal(t, fmt.Sprintf("%s:%d", listenHost, port2+3), s.ctlServiceListenAddr())
 }

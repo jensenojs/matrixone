@@ -28,6 +28,7 @@ import (
 	moruntime "github.com/matrixorigin/matrixone/pkg/common/runtime"
 	"github.com/matrixorigin/matrixone/pkg/common/stopper"
 	"github.com/matrixorigin/matrixone/pkg/config"
+	"github.com/matrixorigin/matrixone/pkg/ctlservice"
 	"github.com/matrixorigin/matrixone/pkg/defines"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 	"github.com/matrixorigin/matrixone/pkg/frontend"
@@ -55,6 +56,7 @@ import (
 
 var (
 	defaultListenAddress             = "127.0.0.1:6002"
+	defaultCtlListenAddress          = "127.0.0.1:19958"
 	defaultQueryServiceListenAddress = "0.0.0.0:19998"
 	// defaultTxnIsolation     = txn.TxnIsolation_SI
 	defaultTxnMode             = txn.TxnMode_Pessimistic
@@ -223,6 +225,9 @@ type Config struct {
 		MaxActive int `toml:"max-active"`
 	} `toml:"txn"`
 
+	// Ctl ctl service config. CtlService is used to handle ctl request. See mo_ctl for detail.
+	Ctl ctlservice.Config `toml:"ctl"`
+
 	// AutoIncrement auto increment config
 	AutoIncrement incrservice.Config `toml:"auto-increment"`
 
@@ -352,6 +357,7 @@ func (c *Config) Validate() error {
 	if c.Txn.MaxActive == 0 {
 		c.Txn.MaxActive = runtime.NumCPU() * 4
 	}
+	c.Ctl.Adjust(foundMachineHost, defaultCtlListenAddress)
 	c.LockService.ServiceID = c.UUID
 	c.LockService.Validate()
 
@@ -493,6 +499,7 @@ func (c *Config) SetDefaultValue() {
 	if c.Txn.MaxActive == 0 {
 		c.Txn.MaxActive = runtime.NumCPU() * 4
 	}
+	c.Ctl.Adjust(foundMachineHost, defaultCtlListenAddress)
 	c.LockService.ServiceID = "temp"
 	c.LockService.Validate()
 	c.LockService.ServiceID = c.UUID
@@ -554,6 +561,7 @@ type service struct {
 	pu                     *config.ParameterUnit
 	moCluster              clusterservice.MOCluster
 	lockService            lockservice.LockService
+	ctlservice             ctlservice.CtlService
 	sessionMgr             *queryservice.SessionManager
 	// queryService is used to send query request between CN services.
 	queryService queryservice.QueryService

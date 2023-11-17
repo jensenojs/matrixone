@@ -17,7 +17,7 @@ package ctl
 import (
 	"github.com/matrixorigin/matrixone/pkg/clusterservice"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
-	"github.com/matrixorigin/matrixone/pkg/pb/api"
+	pb "github.com/matrixorigin/matrixone/pkg/pb/ctl"
 	"github.com/matrixorigin/matrixone/pkg/pb/metadata"
 	"github.com/matrixorigin/matrixone/pkg/pb/txn"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -28,20 +28,20 @@ import (
 // whichDN: used to decide which DNs to send the debug request to, nil returned means send all dns.
 // payload: used to get debug command request payload
 // repsonseUnmarshaler: used to unmarshal response
-func GetTNHandlerFunc(method api.OpCode,
+func GetTNHandlerFunc(method pb.CmdMethod,
 	whichTN func(parameter string) ([]uint64, error),
 	payload func(tnShardID uint64, parameter string, proc *process.Process) ([]byte, error),
-	repsonseUnmarshaler func([]byte) (any, error)) handleFunc {
+	repsonseUnmarshaler func([]byte) (interface{}, error)) handleFunc {
 	return func(proc *process.Process,
 		service serviceType,
 		parameter string,
-		sender requestSender) (Result, error) {
+		sender requestSender) (pb.CtlResult, error) {
 		if service != tn {
-			return Result{}, moerr.NewNotSupported(proc.Ctx, "service %s not supported", service)
+			return pb.CtlResult{}, moerr.NewNotSupported(proc.Ctx, "service %s not supported", service)
 		}
 		targetTNs, err := whichTN(parameter)
 		if err != nil {
-			return Result{}, moerr.ConvertGoError(proc.Ctx, err)
+			return pb.CtlResult{}, moerr.ConvertGoError(proc.Ctx, err)
 		}
 
 		containsTN := func(id uint64) bool {
@@ -80,14 +80,14 @@ func GetTNHandlerFunc(method api.OpCode,
 				return true
 			})
 		if err != nil {
-			return Result{}, err
+			return pb.CtlResult{}, err
 		}
 
-		results := make([]any, 0, len(requests))
+		results := make([]interface{}, 0, len(requests))
 		if len(requests) > 0 {
 			responses, err := sender(proc.Ctx, proc, requests)
 			if err != nil {
-				return Result{}, err
+				return pb.CtlResult{}, err
 			}
 			if len(responses) != len(requests) {
 				panic("requests and response not match")
@@ -96,16 +96,11 @@ func GetTNHandlerFunc(method api.OpCode,
 			for _, resp := range responses {
 				r, err := repsonseUnmarshaler(resp.Payload)
 				if err != nil {
-					return Result{}, err
+					return pb.CtlResult{}, err
 				}
 				results = append(results, r)
 			}
 		}
-		// remove "Op" prefix
-		methodName, ok := api.OpMethodName[method]
-		if !ok {
-			return Result{Method: method.String(), Data: results}, nil
-		}
-		return Result{Method: methodName, Data: results}, nil
+		return pb.CtlResult{Method: method.String(), Data: results}, nil
 	}
 }

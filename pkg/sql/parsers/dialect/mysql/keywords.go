@@ -611,7 +611,5 @@ func init() {
 		"backup":                     BACKUP,
 		"filesystem":                 FILESYSTEM,
 		"handler":                    HANDLER,
-		"sample":                     SAMPLE,
-		"percent":                    PERCENT,
 	}
 }

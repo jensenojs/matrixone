@@ -39,7 +39,6 @@ type flushBlkTask struct {
 	blocks    []objectio.BlockObject
 	schemaVer uint32
 	seqnums   []uint16
-	isABlk    bool
 }
 
 func NewFlushBlkTask(
@@ -50,7 +49,6 @@ func NewFlushBlkTask(
 	meta *catalog.BlockEntry,
 	data *containers.Batch,
 	delta *containers.Batch,
-	isABlk bool,
 ) *flushBlkTask {
 	task := &flushBlkTask{
 		schemaVer: schemaVer,
@@ -59,7 +57,6 @@ func NewFlushBlkTask(
 		meta:      meta,
 		fs:        fs,
 		delta:     delta,
-		isABlk:    isABlk,
 	}
 	task.BaseTask = tasks.NewBaseTask(task, tasks.IOTask, ctx)
 	return task
@@ -78,9 +75,6 @@ func (task *flushBlkTask) Execute(ctx context.Context) (err error) {
 	writer, err := blockio.NewBlockWriterNew(task.fs.Service, name, task.schemaVer, task.seqnums)
 	if err != nil {
 		return err
-	}
-	if task.isABlk {
-		writer.SetAppendable()
 	}
 	if task.meta.GetSchema().HasPK() {
 		writer.SetPrimaryKey(uint16(task.meta.GetSchema().GetSingleSortKeyIdx()))

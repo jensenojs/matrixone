@@ -21,6 +21,19 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 )
 
+const (
+	// For cmd. Basic message type
+	UnknowType = iota
+	PipelineMessage
+	BatchMessage
+	PrepareDoneNotifyMessage // for dispatch
+
+	// For Sid. Status type
+	WaitingNext
+	Last
+	MessageEnd
+)
+
 func (m *Message) Size() int {
 	return m.ProtoSize()
 }
@@ -33,7 +46,7 @@ func (m *Message) SetID(id uint64) {
 	m.Id = id
 }
 
-func (m *Message) SetSid(sid Status) {
+func (m *Message) SetSid(sid uint64) {
 	m.Sid = sid
 }
 
@@ -65,7 +78,7 @@ func (m *Message) TryToGetMoErr() (error, bool) {
 	return nil, false
 }
 
-func (m *Message) SetMessageType(cmd Method) {
+func (m *Message) SetMessageType(cmd uint64) {
 	m.Cmd = cmd
 }
 
@@ -90,27 +103,27 @@ func (m *Message) DebugString() string {
 }
 
 func (m *Message) IsBatchMessage() bool {
-	return m.GetCmd() == Method_BatchMessage
+	return m.GetCmd() == BatchMessage
 }
 
 func (m *Message) IsNotifyMessage() bool {
-	return m.GetCmd() == Method_PrepareDoneNotifyMessage
+	return m.GetCmd() == PrepareDoneNotifyMessage
 }
 
 func (m *Message) IsPipelineMessage() bool {
-	return m.GetCmd() == Method_PipelineMessage
+	return m.GetCmd() == PipelineMessage
 }
 
 func (m *Message) IsEndMessage() bool {
-	return m.Sid == Status_MessageEnd
+	return m.Sid == MessageEnd
 }
 
 func (m *Message) WaitingNextToMerge() bool {
-	return m.Sid == Status_WaitingNext
+	return m.Sid == WaitingNext
 }
 
 func (m *Message) IsLast() bool {
-	return m.Sid == Status_Last
+	return m.Sid == Last
 }
 
 func EncodedMessageError(ctx context.Context, err error) []byte {

@@ -14,13 +14,7 @@
 
 package fileservice
 
-import (
-	"sync"
-	"time"
-
-	"github.com/matrixorigin/matrixone/pkg/logutil"
-	"go.uber.org/zap"
-)
+import "sync"
 
 type IOLockKey struct {
 	File string
@@ -30,38 +24,20 @@ type IOLocks struct {
 	locks sync.Map
 }
 
-var slowIOWaitDuration = time.Second * 10
-
 func (i *IOLocks) Lock(key IOLockKey) (unlock func(), wait func()) {
 	ch := make(chan struct{})
 	v, loaded := i.locks.LoadOrStore(key, ch)
-
 	if loaded {
 		// not locked
 		wait = func() {
-			t0 := time.Now()
-			for {
-				timer := time.NewTimer(slowIOWaitDuration)
-				select {
-				case <-v.(chan struct{}):
-					timer.Stop()
-					return
-				case <-timer.C:
-					logutil.Warn("wait io lock for too long",
-						zap.Any("wait", time.Since(t0)),
-						zap.Any("key", key),
-					)
-				}
-			}
+			<-v.(chan struct{})
 		}
 		return
 	}
-
 	// locked
 	unlock = func() {
 		i.locks.Delete(key)
 		close(ch)
 	}
-
 	return
 }

@@ -74,9 +74,9 @@ func (tbl *txnTable) Stats(ctx context.Context, partitionTables []any, statsInfo
 	}
 	if s.NeedUpdate(approxNumObjects) {
 		if partitionTables != nil {
-			return UpdateStatsForPartitionTable(ctx, tbl, partitionTables, s, approxNumObjects)
+			return UpdateStatsForPartitionTable(ctx, tbl, partitionTables, s)
 		} else {
-			return UpdateStats(ctx, tbl, s, approxNumObjects)
+			return UpdateStats(ctx, tbl, s)
 		}
 	} else {
 		return true

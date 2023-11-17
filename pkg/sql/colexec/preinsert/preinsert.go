@@ -16,6 +16,7 @@ package preinsert
 
 import (
 	"bytes"
+
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
@@ -54,8 +55,6 @@ func (arg *Argument) Call(proc *proc) (vm.CallResult, error) {
 	}
 
 	arg.buf = batch.NewWithSize(len(arg.Attrs))
-	// keep shuffleIDX unchanged
-	arg.buf.ShuffleIDX = bat.ShuffleIDX
 	arg.buf.Attrs = make([]string, 0, len(arg.Attrs))
 	for idx := range arg.Attrs {
 		arg.buf.Attrs = append(arg.buf.Attrs, arg.Attrs[idx])

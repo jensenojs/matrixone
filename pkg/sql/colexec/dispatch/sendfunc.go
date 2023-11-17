@@ -209,9 +209,6 @@ func shuffleToAllFunc(bat *batch.Batch, ap *Argument, proc *process.Process) (bo
 			return true, nil
 		}
 	}
-
-	ap.ctr.batchCnt[bat.ShuffleIDX]++
-	ap.ctr.rowCnt[bat.ShuffleIDX] += bat.RowCount()
 	if ap.ShuffleType == plan2.ShuffleToRegIndex {
 		return false, sendBatToIndex(ap, proc, bat, uint32(bat.ShuffleIDX))
 	} else if ap.ShuffleType == plan2.ShuffleToLocalMatchedReg {
@@ -340,8 +337,8 @@ func sendBatchToClientSession(ctx context.Context, encodeBatData []byte, wcs *Wr
 		{
 			msg.Id = wcs.msgId
 			msg.Data = encodeBatData
-			msg.Cmd = pipeline.Method_BatchMessage
-			msg.Sid = pipeline.Status_Last
+			msg.Cmd = pipeline.BatchMessage
+			msg.Sid = pipeline.Last
 			msg.Checksum = checksum
 		}
 		if err := wcs.cs.Write(ctx, msg); err != nil {
@@ -353,17 +350,17 @@ func sendBatchToClientSession(ctx context.Context, encodeBatData []byte, wcs *Wr
 	start := 0
 	for start < len(encodeBatData) {
 		end := start + maxMessageSizeToMoRpc
-		sid := pipeline.Status_WaitingNext
+		sid := pipeline.WaitingNext
 		if end > len(encodeBatData) {
 			end = len(encodeBatData)
-			sid = pipeline.Status_Last
+			sid = pipeline.Last
 		}
 		msg := cnclient.AcquireMessage()
 		{
 			msg.Id = wcs.msgId
 			msg.Data = encodeBatData[start:end]
-			msg.Cmd = pipeline.Method_BatchMessage
-			msg.Sid = sid
+			msg.Cmd = pipeline.BatchMessage
+			msg.Sid = uint64(sid)
 			msg.Checksum = checksum
 		}
 

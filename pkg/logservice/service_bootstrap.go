@@ -21,7 +21,6 @@ import (
 	"github.com/lni/dragonboat/v4"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/runtime"
-	"github.com/matrixorigin/matrixone/pkg/defines"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 	pb "github.com/matrixorigin/matrixone/pkg/pb/logservice"
 	"go.uber.org/zap"
@@ -103,10 +102,7 @@ func (s *Service) BootstrapHAKeeper(ctx context.Context, cfg Config) error {
 }
 
 func (s *Service) getBackupData(ctx context.Context) (*pb.BackupData, error) {
-	fs, err := fileservice.Get[fileservice.FileService](s.fileService, defines.LocalFileServiceName)
-	if err != nil {
-		return nil, err
-	}
+	fs := s.fileService
 	filePath := s.cfg.BootstrapConfig.Restore.FilePath
 	if filePath == "" {
 		return nil, nil

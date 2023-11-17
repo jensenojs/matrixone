@@ -66,6 +66,7 @@ func (s *store) heartbeat(ctx context.Context) {
 		TaskServiceCreated:   s.taskServiceCreated(),
 		LogtailServerAddress: s.logtailServiceServiceAddr(),
 		LockServiceAddress:   s.lockServiceServiceAddr(),
+		CtlAddress:           s.ctlServiceServiceAddr(),
 		ConfigData:           s.config.GetData(),
 	}
 

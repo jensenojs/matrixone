@@ -16,27 +16,13 @@ package v2
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
 )
 
 var (
-	registry = prometheus.NewRegistry()
+	registry = prometheus.DefaultRegisterer
 )
 
-func GetPrometheusRegistry() prometheus.Registerer {
-	return registry
-}
-
-func GetPrometheusGatherer() prometheus.Gatherer {
-	return registry
-}
-
 func init() {
-	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
-	registry.MustRegister(collectors.NewGoCollector(
-		collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsAll),
-	))
-
 	initFileServiceMetrics()
 	initLogtailMetrics()
 	initTxnMetrics()
@@ -81,7 +67,6 @@ func initFileServiceMetrics() {
 
 func initLogtailMetrics() {
 	registry.MustRegister(LogtailLoadCheckpointCounter)
-	registry.MustRegister(logtailReceivedCounter)
 
 	registry.MustRegister(logTailQueueSizeGauge)
 
@@ -118,8 +103,6 @@ func initTxnMetrics() {
 	registry.MustRegister(TxnLockWaitersTotalHistogram)
 	registry.MustRegister(TxnTableRangeSizeHistogram)
 	registry.MustRegister(txnMpoolDurationHistogram)
-	registry.MustRegister(TxnUnlockTableTotalHistogram)
-	registry.MustRegister(txnReaderDurationHistogram)
 
 	registry.MustRegister(TxnRangesLoadedObjectMetaTotalCounter)
 	registry.MustRegister(txnCNCommittedLocationQuantityGauge)

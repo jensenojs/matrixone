@@ -16,13 +16,8 @@ package fileservice
 
 import (
 	"context"
-	"io"
 )
 
 type FileCache interface {
-	SetFile(
-		ctx context.Context,
-		path string,
-		openReader func(context.Context) (io.ReadCloser, error),
-	) error
+	SetFile(ctx context.Context, path string, content []byte) error
 }

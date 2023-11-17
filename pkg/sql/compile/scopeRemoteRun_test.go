@@ -127,7 +127,7 @@ func Test_CnServerMessageHandler(t *testing.T) {
 	// should be timeout
 	t.Run("PrepareDoneNotifyMessage", func(t *testing.T) {
 		msg := &pipeline.Message{
-			Cmd:          pipeline.Method_PrepareDoneNotifyMessage,
+			Cmd:          pipeline.PrepareDoneNotifyMessage,
 			Uuid:         id[:],
 			ProcInfoData: procInfoData,
 			Data:         pipeData,
@@ -162,7 +162,7 @@ func Test_CnServerMessageHandler(t *testing.T) {
 	// should be timeout
 	t.Run("PipelineMessage", func(t *testing.T) {
 		msg := &pipeline.Message{
-			Cmd:          pipeline.Method_PipelineMessage,
+			Cmd:          pipeline.PipelineMessage,
 			Uuid:         id[:],
 			ProcInfoData: procInfoData,
 			Data:         pipeData,

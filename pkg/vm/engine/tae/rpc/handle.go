@@ -369,7 +369,7 @@ func (h *Handle) handleRequests(
 			}
 			write++
 		default:
-			err = moerr.NewNotSupported(ctx, "unknown txn request type: %T", req)
+			panic(moerr.NewNYI(ctx, "Pls implement me"))
 		}
 		//Need to roll back the txn.
 		if err != nil {
@@ -842,7 +842,7 @@ func (h *Handle) HandlePreCommitWrite(
 				return err
 			}
 		default:
-			return moerr.NewNYI(ctx, "pre commit write type: %T", cmds)
+			panic(moerr.NewNYI(ctx, ""))
 		}
 	}
 	//evaluate all the txn requests.

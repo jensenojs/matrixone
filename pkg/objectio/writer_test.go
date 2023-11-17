@@ -24,7 +24,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/defines"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 	"github.com/stretchr/testify/assert"
-	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -78,8 +77,6 @@ func TestNewObjectWriter(t *testing.T) {
 
 	objectWriter, err := NewObjectWriterSpecial(WriterNormal, name, service)
 	assert.Nil(t, err)
-	objectWriter.SetAppendable()
-	//objectWriter.pkColIdx = 3
 	fd, err := objectWriter.Write(bat)
 	assert.Nil(t, err)
 	for i := range bat.Vecs {
@@ -115,8 +112,6 @@ func TestNewObjectWriter(t *testing.T) {
 	assert.Nil(t, err)
 	meta, _ := metaHeader.DataMeta()
 	assert.Equal(t, uint32(3), meta.BlockCount())
-	assert.True(t, meta.BlockHeader().Appendable())
-	assert.Equal(t, uint16(math.MaxUint16), meta.BlockHeader().SortKey())
 	idxs := make([]uint16, 3)
 	idxs[0] = 0
 	idxs[1] = 2
