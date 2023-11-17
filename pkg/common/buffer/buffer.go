@@ -34,6 +34,21 @@ func (b *Buffer) Pin(os ...any) {
 	}
 }
 
+// Don't use this function unless you're pretty sure that the structure's string won't be reassigned later. 
+// If a string from go memory replaces it, there is a risk of a segmentation error.
+func (b *Buffer) CopyString(src string) string {
+	sv := MakeSlice[byte](b, len(src), len(src))
+	copy(sv, []byte(src))
+	return bytes2String(sv)
+}
+
+func bytes2String(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
+	return unsafe.String(&b[0], len(b))
+}
+
 func (b *Buffer) Free() {
 	if b == (*Buffer)(nil) {
 		panic("free with nil buffer")

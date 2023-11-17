@@ -28,7 +28,7 @@ type Explain interface {
 type explainImpl struct {
 	Explain
 	Statement Statement
-	Format    string
+	Format    *BufString
 	Options   []OptionElem
 }
 
@@ -43,9 +43,9 @@ func (node *ExplainStmt) Format(ctx *FmtCtx) {
 		ctx.WriteString(" (")
 		var temp string
 		for _, v := range node.Options {
-			temp += v.Name
-			if v.Value != "NULL" {
-				temp += " " + v.Value
+			temp += v.Name.Get()
+			if v.Value.Get() != "NULL" {
+				temp += " " + v.Value.Get()
 			}
 			temp += ","
 		}
@@ -77,7 +77,7 @@ func (node *ExplainStmt) GetQueryType() string     { return QueryTypeOth }
 func NewExplainStmt(stmt Statement, format string, buf *buffer.Buffer) *ExplainStmt {
 	e := buffer.Alloc[ExplainStmt](buf)
 	e.explainImpl.Statement = stmt
-	e.explainImpl.Format = format
+	e.explainImpl.Format = NewBufString(format)
 	return e
 }
 
@@ -92,9 +92,9 @@ func (node *ExplainAnalyze) Format(ctx *FmtCtx) {
 		ctx.WriteString(" (")
 		var temp string
 		for _, v := range node.Options {
-			temp += v.Name
-			if v.Value != "NULL" {
-				temp += " " + v.Value
+			temp += v.Name.Get()
+			if v.Value.Get() != "NULL" {
+				temp += " " + v.Value.Get()
 			}
 			temp += ","
 		}
@@ -126,7 +126,7 @@ func (node *ExplainAnalyze) GetQueryType() string     { return QueryTypeOth }
 func NewExplainAnalyze(stmt Statement, format string, buf *buffer.Buffer) *ExplainAnalyze {
 	e := buffer.Alloc[ExplainAnalyze](buf)
 	e.explainImpl.Statement = stmt
-	e.explainImpl.Format = format
+	e.explainImpl.Format = NewBufString(format)
 	return e
 }
 
@@ -138,7 +138,7 @@ type ExplainFor struct {
 
 func (node *ExplainFor) Format(ctx *FmtCtx) {
 	ctx.WriteString("explain format = ")
-	ctx.WriteString(node.explainImpl.Format)
+	ctx.WriteString(node.explainImpl.Format.Get())
 	ctx.WriteString(" for connection ")
 	ctx.WriteString(strconv.FormatInt(int64(node.ID), 10))
 }
@@ -148,25 +148,25 @@ func (node *ExplainFor) GetQueryType() string     { return QueryTypeOth }
 
 func NewExplainFor(format string, id uint64, buf *buffer.Buffer) *ExplainFor {
 	e := buffer.Alloc[ExplainFor](buf)
-	e.explainImpl.Format = format
+	e.explainImpl.Format = NewBufString(format)
 	e.ID = id
 	return e
 }
 
 type OptionElem struct {
-	Name  string
-	Value string
+	Name  *BufString
+	Value *BufString
 }
 
 func MakeOptionElem(name string, value string, buf *buffer.Buffer) OptionElem {
 	o := buffer.Alloc[OptionElem](buf)
-	o.Name = name
-	o.Value = value
+	o.Name = NewBufString(name)
+	o.Value = NewBufString(value)
 	return *o
 }
 
 func MakeOptions(elem OptionElem, buf *buffer.Buffer) []OptionElem {
-	os := buffer.MakeSlice[OptionElem](buf, 0, 1)	
+	os := buffer.MakeSlice[OptionElem](buf, 0, 1)
 	os = buffer.AppendSlice[OptionElem](buf, os, elem)
 	return os
 }
@@ -174,7 +174,7 @@ func MakeOptions(elem OptionElem, buf *buffer.Buffer) []OptionElem {
 func IsContainAnalyze(options []OptionElem) bool {
 	if len(options) > 0 {
 		for _, option := range options {
-			if strings.EqualFold(option.Name, "analyze") && strings.EqualFold(option.Value, "true") {
+			if strings.EqualFold(option.Name.Get(), "analyze") && strings.EqualFold(option.Value.Get(), "true") {
 				return true
 			}
 		}

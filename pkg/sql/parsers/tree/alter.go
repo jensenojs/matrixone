@@ -70,28 +70,31 @@ func NewAlterUser(e bool, u []*User, r *Role, m UserMiscOption, c AccountComment
 
 type AlterAccountAuthOption struct {
 	Exist          bool
-	Equal          string
-	AdminName      string
+	Equal          *BufString
+	AdminName      *BufString
 	IdentifiedType AccountIdentified
 }
 
 func NewAlterAccountAuthOption(exist bool, equal, name string, buf *buffer.Buffer) *AlterAccountAuthOption {
 	a := buffer.Alloc[AlterAccountAuthOption](buf)
 	a.Exist = exist
-	a.Equal = equal
-	a.AdminName = name
+	bEqual := NewBufString(equal)
+	bAdminName := NewBufString(name)
+	buf.Pin(bEqual, bAdminName)
+	a.Equal = bEqual
+	a.AdminName = bAdminName
 	return a
 }
 
 func (node *AlterAccountAuthOption) Format(ctx *FmtCtx) {
 	if node.Exist {
 		ctx.WriteString(" admin_name")
-		if len(node.Equal) != 0 {
+		if len(node.Equal.Get()) != 0 {
 			ctx.WriteString(" ")
-			ctx.WriteString(node.Equal)
+			ctx.WriteString(node.Equal.Get())
 		}
 
-		ctx.WriteString(fmt.Sprintf(" '%s'", node.AdminName))
+		ctx.WriteString(fmt.Sprintf(" '%s'", node.AdminName.Get()))
 		node.IdentifiedType.Format(ctx)
 	}
 }
@@ -99,7 +102,7 @@ func (node *AlterAccountAuthOption) Format(ctx *FmtCtx) {
 type AlterAccount struct {
 	statementImpl
 	IfExists   bool
-	Name       string
+	Name       *BufString
 	AuthOption AlterAccountAuthOption
 	//status_option or not
 	StatusOption AccountStatus
@@ -110,7 +113,9 @@ type AlterAccount struct {
 func NewAlterAccount(exist bool, name string, aopt AlterAccountAuthOption, sopt AccountStatus, c AccountComment, buf *buffer.Buffer) *AlterAccount {
 	a := buffer.Alloc[AlterAccount](buf)
 	a.IfExists = exist
-	a.Name = name
+	bName := NewBufString(name)
+	buf.Pin(bName)
+	a.Name = bName
 	a.AuthOption = aopt
 	a.StatusOption = sopt
 	a.Comment = c
@@ -122,7 +127,7 @@ func (ca *AlterAccount) Format(ctx *FmtCtx) {
 	if ca.IfExists {
 		ctx.WriteString("if exists ")
 	}
-	ctx.WriteString(ca.Name)
+	ctx.WriteString(ca.Name.Get())
 	ca.AuthOption.Format(ctx)
 	ca.StatusOption.Format(ctx)
 	ca.Comment.Format(ctx)
@@ -173,18 +178,22 @@ func (node *AlterView) GetQueryType() string     { return QueryTypeDDL }
 // alter configuration for mo_mysql_compatibility_mode
 type AlterDataBaseConfig struct {
 	statementImpl
-	AccountName    string
-	DbName         string
+	AccountName    *BufString
+	DbName         *BufString
 	IsAccountLevel bool
-	UpdateConfig   string
+	UpdateConfig   *BufString
 }
 
 func NewAlterDataBaseConfig(accountName, dbName string, isAccountLevel bool, updateConfig string, buf *buffer.Buffer) *AlterDataBaseConfig {
 	a := buffer.Alloc[AlterDataBaseConfig](buf)
-	a.AccountName = accountName
-	a.DbName = dbName
+	bAccountName := NewBufString(accountName)
+	bDbName := NewBufString(dbName)
+	bUpdateConfig := NewBufString(updateConfig)
+	buf.Pin(bAccountName, bDbName, bUpdateConfig)
+	a.AccountName = bAccountName
+	a.DbName = bDbName
+	a.UpdateConfig = bUpdateConfig
 	a.IsAccountLevel = isAccountLevel
-	a.UpdateConfig = updateConfig
 	return a
 }
 
@@ -195,17 +204,17 @@ func (node *AlterDataBaseConfig) Format(ctx *FmtCtx) {
 		ctx.WriteString("account configuration ")
 
 		ctx.WriteString("for ")
-		ctx.WriteString(fmt.Sprintf("%s ", node.AccountName))
+		ctx.WriteString(fmt.Sprintf("%s ", node.AccountName.Get()))
 	} else {
 		ctx.WriteString("alter ")
 		ctx.WriteString("database configuration ")
 
 		ctx.WriteString("for ")
-		ctx.WriteString(fmt.Sprintf("%s ", node.DbName))
+		ctx.WriteString(fmt.Sprintf("%s ", node.DbName.Get()))
 	}
 
 	ctx.WriteString("as ")
-	ctx.WriteString(fmt.Sprintf("%s ", node.UpdateConfig))
+	ctx.WriteString(fmt.Sprintf("%s ", node.UpdateConfig.Get()))
 }
 
 func (node *AlterDataBaseConfig) GetStatementType() string { return "Alter DataBase config" }
@@ -280,20 +289,22 @@ func (node *AlterOptionAlterIndex) Format(ctx *FmtCtx) {
 
 type AlterOptionAlterCheck struct {
 	alterOptionImpl
-	Type    string
+	Type    *BufString
 	Enforce bool
 }
 
 func NewAlterOptionAlterCheck(t string, enforce bool, buf *buffer.Buffer) *AlterOptionAlterCheck {
 	a := buffer.Alloc[AlterOptionAlterCheck](buf)
-	a.Type = t
+	bType := NewBufString(t)
+	buf.Pin(bType)
+	a.Type = bType
 	a.Enforce = enforce
 	return a
 }
 
 func (node *AlterOptionAlterCheck) Format(ctx *FmtCtx) {
 	ctx.WriteString("alter ")
-	ctx.WriteString(node.Type + " ")
+	ctx.WriteString(node.Type.Get() + " ")
 	if node.Enforce {
 		ctx.WriteString("enforce")
 	} else {
@@ -423,7 +434,7 @@ type AlterPublication struct {
 	IfExists    bool
 	Name        *BufIdentifier
 	AccountsSet *AccountsSetOption
-	Comment     string
+	Comment     *BufString
 }
 
 func NewAlterPublication(exist bool, name Identifier, accountsSet *AccountsSetOption, comment string, buf *buffer.Buffer) *AlterPublication {
@@ -434,7 +445,9 @@ func NewAlterPublication(exist bool, name Identifier, accountsSet *AccountsSetOp
 	a.IfExists = exist
 	a.Name = n
 	a.AccountsSet = accountsSet
-	a.Comment = comment
+bComment := NewBufString(comment)
+buf.Pin(bComment)
+	a.Comment = bComment
 	return a
 }
 
@@ -462,9 +475,9 @@ func (node *AlterPublication) Format(ctx *FmtCtx) {
 			}
 		}
 	}
-	if node.Comment != "" {
+	if node.Comment.Get() != "" {
 		ctx.WriteString(" comment ")
-		ctx.WriteString(fmt.Sprintf("'%s'", node.Comment))
+		ctx.WriteString(fmt.Sprintf("'%s'", node.Comment.Get()))
 	}
 }
 

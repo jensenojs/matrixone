@@ -72,7 +72,7 @@ func buildPrepare(stmt tree.Prepare, ctx CompilerContext) (*Plan, error) {
 		if err != nil {
 			v = int64(1)
 		}
-		stmts, err := mysql.Parse(ctx.GetContext(), pstmt.Sql, v.(int64), ctx.GetBuffer())
+		stmts, err := mysql.Parse(ctx.GetContext(), pstmt.Sql.Get(), v.(int64), ctx.GetBuffer())
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +210,7 @@ func buildSetVariables(stmt *tree.SetVar, ctx CompilerContext) (*Plan, error) {
 		item := &plan.SetVariablesItem{
 			System: assignment.System,
 			Global: assignment.Global,
-			Name:   assignment.Name,
+			Name:   assignment.Name.Get(),
 		}
 		if assignment.Value == nil {
 			return nil, moerr.NewInvalidInput(ctx.GetContext(), "Set statement has no value")

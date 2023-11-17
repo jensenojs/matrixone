@@ -270,13 +270,13 @@ func Test_checkTenantExistsOrNot(t *testing.T) {
 		ses.tenant = tenant
 
 		err = InitGeneralTenant(ctx, ses, &tree.CreateAccount{
-			Name:        "test",
+			Name:        tree.NewBufString("test"),
 			IfNotExists: true,
 			AuthOption: tree.AccountAuthOption{
-				AdminName: "root",
+				AdminName: tree.NewBufString("root"),
 				IdentifiedType: tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByPassword,
-					Str: "123456",
+					Str: tree.NewBufString("123456"),
 				},
 			},
 		})
@@ -316,12 +316,12 @@ func Test_createTablesInMoCatalogOfGeneralTenant(t *testing.T) {
 		//}
 
 		ca := &tree.CreateAccount{
-			Name:        "test",
+			Name:        tree.NewBufString("test"),
 			IfNotExists: true,
 			AuthOption: tree.AccountAuthOption{
-				AdminName:      "test_root",
-				IdentifiedType: tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: "123"}},
-			Comment: tree.AccountComment{Exist: true, Comment: "test acccount"},
+				AdminName:      tree.NewBufString("test_root"),
+				IdentifiedType: tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123")}},
+			Comment: tree.AccountComment{Exist: true, Comment: tree.NewBufString("test acccount")},
 		}
 
 		newTi, _, err := createTablesInMoCatalogOfGeneralTenant(ctx, bh, ca)
@@ -371,14 +371,14 @@ func Test_initFunction(t *testing.T) {
 			ReturnType: tree.NewReturnType(&tree.T{
 				InternalType: tree.InternalType{
 					Family:       tree.IntFamily,
-					FamilyString: "INT",
+					FamilyString: tree.NewBufString("INT"),
 					Width:        24,
 					Locale:       &locale,
 					Oid:          uint32(defines.MYSQL_TYPE_INT24),
 				},
 			}, buf),
-			Body:     "",
-			Language: "sql",
+			Body:     tree.NewBufString(""),
+			Language: tree.NewBufString("sql"),
 		}
 
 		tenant := &TenantInfo{
@@ -411,15 +411,15 @@ func Test_initUser(t *testing.T) {
 			IfNotExists: true,
 			Users: []*tree.User{
 				{
-					Username:   "u1",
-					AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: "123"},
+					Username:   tree.NewBufString("u1"),
+					AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123")},
 				},
 				{
-					Username:   "u2",
-					AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: "123"},
+					Username:   tree.NewBufString("u2"),
+					AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123")},
 				},
 			},
-			Role:    &tree.Role{UserName: "test_role"},
+			Role:    &tree.Role{UserName: tree.NewBufString("test_role")},
 			MiscOpt: &tree.UserMiscOptionAccountUnlock{},
 		}
 
@@ -427,15 +427,15 @@ func Test_initUser(t *testing.T) {
 			{10},
 		})
 
-		sql, _ := getSqlForRoleIdOfRole(context.TODO(), cu.Role.UserName)
+		sql, _ := getSqlForRoleIdOfRole(context.TODO(), cu.Role.UserName.Get())
 		sql2result[sql] = mrs
 
 		for _, user := range cu.Users {
-			sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			mrs = newMrsForPasswordOfUser([][]interface{}{})
 			sql2result[sql] = mrs
 
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 			mrs = newMrsForRoleIdOfRole([][]interface{}{})
 			sql2result[sql] = mrs
 		}
@@ -493,8 +493,8 @@ func Test_initRole(t *testing.T) {
 		cr := &tree.CreateRole{
 			IfNotExists: true,
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
 			},
 		}
 		ses := &Session{}
@@ -1280,7 +1280,7 @@ func Test_determineGrantRole(t *testing.T) {
 		}
 		gr := &g.GrantRole
 		for _, name := range roleNames {
-			gr.Roles = append(gr.Roles, &tree.Role{UserName: name})
+			gr.Roles = append(gr.Roles, &tree.Role{UserName: tree.NewBufString(name)})
 		}
 		priv := determinePrivilegeSetOfStatement(g)
 		ses := newSes(priv, ctrl)
@@ -1382,7 +1382,7 @@ func Test_determineGrantRole(t *testing.T) {
 		}
 		gr := &g.GrantRole
 		for _, name := range roleNames {
-			gr.Roles = append(gr.Roles, &tree.Role{UserName: name})
+			gr.Roles = append(gr.Roles, &tree.Role{UserName: tree.NewBufString(name)})
 		}
 		priv := determinePrivilegeSetOfStatement(g)
 		ses := newSes(priv, ctrl)
@@ -1484,7 +1484,7 @@ func Test_determineGrantRole(t *testing.T) {
 		}
 		gr := &g.GrantRole
 		for _, name := range roleNames {
-			gr.Roles = append(gr.Roles, &tree.Role{UserName: name})
+			gr.Roles = append(gr.Roles, &tree.Role{UserName: tree.NewBufString(name)})
 		}
 		priv := determinePrivilegeSetOfStatement(g)
 		ses := newSes(priv, ctrl)
@@ -1583,7 +1583,7 @@ func Test_determineGrantRole(t *testing.T) {
 		}
 		gr := &g.GrantRole
 		for _, name := range roleNames {
-			gr.Roles = append(gr.Roles, &tree.Role{UserName: name})
+			gr.Roles = append(gr.Roles, &tree.Role{UserName: tree.NewBufString(name)})
 		}
 		priv := determinePrivilegeSetOfStatement(g)
 		ses := newSes(priv, ctrl)
@@ -3736,14 +3736,14 @@ func Test_doGrantRole(t *testing.T) {
 
 		stmt := &tree.GrantRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "r4"},
-				{Username: "r5"},
-				{Username: "r6"},
+				{Username: tree.NewBufString("r4")},
+				{Username: tree.NewBufString("r5")},
+				{Username: tree.NewBufString("r6")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -3756,7 +3756,7 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -3765,7 +3765,7 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init to roles
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i + len(stmt.Roles)},
 			})
@@ -3805,14 +3805,14 @@ func Test_doGrantRole(t *testing.T) {
 
 		stmt := &tree.GrantRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "u4"},
-				{Username: "u5"},
-				{Username: "u6"},
+				{Username: tree.NewBufString("u4")},
+				{Username: tree.NewBufString("u5")},
+				{Username: tree.NewBufString("u6")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -3825,7 +3825,7 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -3835,14 +3835,14 @@ func Test_doGrantRole(t *testing.T) {
 		//init to empty roles,
 		//init to users
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{})
 
 			bh.sql2result[sql] = mrs
 
-			sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			mrs = newMrsForPasswordOfUser([][]interface{}{
-				{i, "111", i},
+				{i, tree.NewBufString("111"), i},
 			})
 			bh.sql2result[sql] = mrs
 
@@ -3885,14 +3885,14 @@ func Test_doGrantRole(t *testing.T) {
 
 		stmt := &tree.GrantRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "u4"},
-				{Username: "u5"},
-				{Username: "u6"},
+				{Username: tree.NewBufString("u4")},
+				{Username: tree.NewBufString("u5")},
+				{Username: tree.NewBufString("u6")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -3905,7 +3905,7 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -3916,25 +3916,25 @@ func Test_doGrantRole(t *testing.T) {
 		//init to 1 users
 		for i, user := range stmt.Users {
 			if i < 2 { //roles
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{
 					{i + len(stmt.Roles)},
 				})
 
 				bh.sql2result[sql] = mrs
 
-				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 				mrs = newMrsForPasswordOfUser([][]interface{}{})
 				bh.sql2result[sql] = mrs
 			} else { //users
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{})
 
 				bh.sql2result[sql] = mrs
 
-				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 				mrs = newMrsForPasswordOfUser([][]interface{}{
-					{i, "111", i},
+					{i, tree.NewBufString("111"), i},
 				})
 				bh.sql2result[sql] = mrs
 
@@ -3991,14 +3991,14 @@ func Test_doGrantRole(t *testing.T) {
 
 		stmt := &tree.GrantRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "u4"},
-				{Username: "u5"},
-				{Username: "u6"},
+				{Username: tree.NewBufString("u4")},
+				{Username: tree.NewBufString("u5")},
+				{Username: tree.NewBufString("u6")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -4011,7 +4011,7 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -4022,25 +4022,25 @@ func Test_doGrantRole(t *testing.T) {
 		//init to 1 users
 		for i, user := range stmt.Users {
 			if i < 2 { //roles
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{
 					{i + len(stmt.Roles)},
 				})
 
 				bh.sql2result[sql] = mrs
 
-				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 				mrs = newMrsForPasswordOfUser([][]interface{}{})
 				bh.sql2result[sql] = mrs
 			} else { //users
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{})
 
 				bh.sql2result[sql] = mrs
 
-				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 				mrs = newMrsForPasswordOfUser([][]interface{}{
-					{i, "111", i},
+					{i, tree.NewBufString("111"), i},
 				})
 				bh.sql2result[sql] = mrs
 
@@ -4100,14 +4100,14 @@ func Test_doGrantRole(t *testing.T) {
 
 		stmt := &tree.GrantRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "u4"},
-				{Username: "u5"},
-				{Username: "u6"},
+				{Username: tree.NewBufString("u4")},
+				{Username: tree.NewBufString("u5")},
+				{Username: tree.NewBufString("u6")},
 			},
 			GrantOption: true,
 		}
@@ -4121,7 +4121,7 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -4132,25 +4132,25 @@ func Test_doGrantRole(t *testing.T) {
 		//init to 1 users
 		for i, user := range stmt.Users {
 			if i < 2 { //roles
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{
 					{i + len(stmt.Roles)},
 				})
 
 				bh.sql2result[sql] = mrs
 
-				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 				mrs = newMrsForPasswordOfUser([][]interface{}{})
 				bh.sql2result[sql] = mrs
 			} else { //users
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{})
 
 				bh.sql2result[sql] = mrs
 
-				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 				mrs = newMrsForPasswordOfUser([][]interface{}{
-					{i, "111", i},
+					{i, tree.NewBufString("111"), i},
 				})
 				bh.sql2result[sql] = mrs
 
@@ -4215,10 +4215,10 @@ func Test_doGrantRole(t *testing.T) {
 
 		stmt := &tree.GrantRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
+				{UserName: tree.NewBufString("r1")},
 			},
 			Users: []*tree.User{
-				{Username: "r1"},
+				{Username: tree.NewBufString("r1")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -4231,7 +4231,7 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -4240,7 +4240,7 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init to roles
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i + len(stmt.Roles)},
 			})
@@ -4280,14 +4280,14 @@ func Test_doGrantRole(t *testing.T) {
 
 		stmt := &tree.GrantRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "r4"},
-				{Username: "r5"},
-				{Username: "u6"},
+				{Username: tree.NewBufString("r4")},
+				{Username: tree.NewBufString("r5")},
+				{Username: tree.NewBufString("u6")},
 			},
 			GrantOption: true,
 		}
@@ -4301,7 +4301,7 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -4312,25 +4312,25 @@ func Test_doGrantRole(t *testing.T) {
 		//init to 1 users
 		for i, user := range stmt.Users {
 			if i < 2 { //roles
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{
 					{i + len(stmt.Roles)},
 				})
 
 				bh.sql2result[sql] = mrs
 
-				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 				mrs = newMrsForPasswordOfUser([][]interface{}{})
 				bh.sql2result[sql] = mrs
 			} else { //users
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{})
 
 				bh.sql2result[sql] = mrs
 
-				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+				sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 				mrs = newMrsForPasswordOfUser([][]interface{}{
-					{i, "111", i},
+					{i, tree.NewBufString("111"), i},
 				})
 				bh.sql2result[sql] = mrs
 
@@ -4396,14 +4396,14 @@ func Test_doGrantRole(t *testing.T) {
 
 		stmt := &tree.GrantRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "r4"},
-				{Username: "r5"},
-				{Username: "r6"},
+				{Username: tree.NewBufString("r4")},
+				{Username: tree.NewBufString("r5")},
+				{Username: tree.NewBufString("r6")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -4416,14 +4416,14 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init from roles
 		for _, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{})
 			bh.sql2result[sql] = mrs
 		}
 
 		//init to roles
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i + len(stmt.Roles)},
 			})
@@ -4463,14 +4463,14 @@ func Test_doGrantRole(t *testing.T) {
 
 		stmt := &tree.GrantRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "u4"},
-				{Username: "u5"},
-				{Username: "u6"},
+				{Username: tree.NewBufString("u4")},
+				{Username: tree.NewBufString("u5")},
+				{Username: tree.NewBufString("u6")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -4483,7 +4483,7 @@ func Test_doGrantRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -4493,12 +4493,12 @@ func Test_doGrantRole(t *testing.T) {
 		//init to empty roles,
 		//init to users
 		for _, user := range stmt.Users {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{})
 
 			bh.sql2result[sql] = mrs
 
-			sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			mrs = newMrsForPasswordOfUser([][]interface{}{})
 			bh.sql2result[sql] = mrs
 		}
@@ -4540,14 +4540,14 @@ func Test_doRevokeRole(t *testing.T) {
 
 		stmt := &tree.RevokeRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "r4"},
-				{Username: "r5"},
-				{Username: "r6"},
+				{Username: tree.NewBufString("r4")},
+				{Username: tree.NewBufString("r5")},
+				{Username: tree.NewBufString("r6")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -4560,7 +4560,7 @@ func Test_doRevokeRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -4569,7 +4569,7 @@ func Test_doRevokeRole(t *testing.T) {
 
 		//init to roles
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i + len(stmt.Roles)},
 			})
@@ -4603,14 +4603,14 @@ func Test_doRevokeRole(t *testing.T) {
 		stmt := &tree.RevokeRole{
 			IfExists: true,
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "r4"},
-				{Username: "r5"},
-				{Username: "r6"},
+				{Username: tree.NewBufString("r4")},
+				{Username: tree.NewBufString("r5")},
+				{Username: tree.NewBufString("r6")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -4624,7 +4624,7 @@ func Test_doRevokeRole(t *testing.T) {
 		//init from roles
 		var mrs *MysqlResultSet
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs = newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -4633,7 +4633,7 @@ func Test_doRevokeRole(t *testing.T) {
 
 		//init to roles
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i + len(stmt.Roles)},
 			})
@@ -4666,14 +4666,14 @@ func Test_doRevokeRole(t *testing.T) {
 
 		stmt := &tree.RevokeRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "r4"},
-				{Username: "r5"},
-				{Username: "r6"},
+				{Username: tree.NewBufString("r4")},
+				{Username: tree.NewBufString("r5")},
+				{Username: tree.NewBufString("r6")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -4687,7 +4687,7 @@ func Test_doRevokeRole(t *testing.T) {
 		//init from roles
 		var mrs *MysqlResultSet
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			if i == 0 {
 				mrs = newMrsForRoleIdOfRole([][]interface{}{})
 			} else {
@@ -4701,7 +4701,7 @@ func Test_doRevokeRole(t *testing.T) {
 
 		//init to roles
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i + len(stmt.Roles)},
 			})
@@ -4734,14 +4734,14 @@ func Test_doRevokeRole(t *testing.T) {
 
 		stmt := &tree.RevokeRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "u1"},
-				{Username: "u2"},
-				{Username: "u3"},
+				{Username: tree.NewBufString("u1")},
+				{Username: tree.NewBufString("u2")},
+				{Username: tree.NewBufString("u3")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -4755,7 +4755,7 @@ func Test_doRevokeRole(t *testing.T) {
 		//init from roles
 		var mrs *MysqlResultSet
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs = newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -4765,10 +4765,10 @@ func Test_doRevokeRole(t *testing.T) {
 
 		//init to roles
 		for i, user := range stmt.Users {
-			//sql := sql, _ := getSqlForRoleIdOfRole(context.TODO(),user.Username)
+			//sql := sql, _ := getSqlForRoleIdOfRole(context.TODO(),user.Username.Get())
 			//mrs = newMrsForRoleIdOfRole([][]interface{}{})
 
-			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			//miss u2
 			if i == 1 {
 				mrs = newMrsForPasswordOfUser([][]interface{}{})
@@ -4806,14 +4806,14 @@ func Test_doRevokeRole(t *testing.T) {
 
 		stmt := &tree.RevokeRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 			Users: []*tree.User{
-				{Username: "u4"},
-				{Username: "u5"},
-				{Username: "u6"},
+				{Username: tree.NewBufString("u4")},
+				{Username: tree.NewBufString("u5")},
+				{Username: tree.NewBufString("u6")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -4826,7 +4826,7 @@ func Test_doRevokeRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -4835,12 +4835,12 @@ func Test_doRevokeRole(t *testing.T) {
 
 		//init to roles
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), user.Username.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{})
 
 			bh.sql2result[sql] = mrs
 
-			sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ = getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			mrs = newMrsForPasswordOfUser([][]interface{}{
 				{i},
 			})
@@ -4880,7 +4880,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 			ObjType: tree.OBJECT_TYPE_ACCOUNT,
 			Level:   &tree.PrivilegeLevel{Level: tree.PRIVILEGE_LEVEL_TYPE_STAR},
 			Roles: []*tree.Role{
-				{UserName: "r1"},
+				{UserName: tree.NewBufString("r1")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -4893,7 +4893,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -4933,7 +4933,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 					Level: tree.PRIVILEGE_LEVEL_TYPE_STAR,
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -4945,7 +4945,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 					Level: tree.PRIVILEGE_LEVEL_TYPE_STAR_STAR,
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -4955,10 +4955,10 @@ func Test_doGrantPrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_DATABASE,
 				Level: &tree.PrivilegeLevel{
 					Level:  tree.PRIVILEGE_LEVEL_TYPE_DATABASE,
-					DbName: "d",
+					DbName: tree.NewBufString("d"),
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -4968,10 +4968,10 @@ func Test_doGrantPrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_DATABASE,
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_TABLE,
-					TblName: "d",
+					TblName: tree.NewBufString("d"),
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 		}
@@ -4987,7 +4987,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 
 			//init from roles
 			for i, role := range stmt.Roles {
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{
 					{i},
 				})
@@ -4998,13 +4998,13 @@ func Test_doGrantPrivilege(t *testing.T) {
 			convey.So(err, convey.ShouldBeNil)
 
 			if stmt.Level.Level == tree.PRIVILEGE_LEVEL_TYPE_DATABASE {
-				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.DbName)
+				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.DbName.Get())
 				mrs := newMrsForCheckDatabase([][]interface{}{
 					{0},
 				})
 				bh.sql2result[sql] = mrs
 			} else if stmt.Level.Level == tree.PRIVILEGE_LEVEL_TYPE_TABLE {
-				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.TblName)
+				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.TblName.Get())
 				mrs := newMrsForCheckDatabase([][]interface{}{
 					{0},
 				})
@@ -5050,7 +5050,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 					Level: tree.PRIVILEGE_LEVEL_TYPE_STAR,
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5062,7 +5062,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 					Level: tree.PRIVILEGE_LEVEL_TYPE_STAR_STAR,
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5072,10 +5072,10 @@ func Test_doGrantPrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_TABLE,
 				Level: &tree.PrivilegeLevel{
 					Level:  tree.PRIVILEGE_LEVEL_TYPE_DATABASE_STAR,
-					DbName: dbName,
+					DbName: tree.NewBufString(dbName),
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5085,11 +5085,11 @@ func Test_doGrantPrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_TABLE,
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_DATABASE_TABLE,
-					DbName:  dbName,
-					TblName: tableName,
+					DbName:  tree.NewBufString(dbName),
+					TblName: tree.NewBufString(tableName),
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5099,10 +5099,10 @@ func Test_doGrantPrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_TABLE,
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_TABLE,
-					TblName: tableName,
+					TblName: tree.NewBufString(tableName),
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 		}
@@ -5119,7 +5119,7 @@ func Test_doGrantPrivilege(t *testing.T) {
 
 			//init from roles
 			for i, role := range stmt.Roles {
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{
 					{i},
 				})
@@ -5182,7 +5182,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 			ObjType: tree.OBJECT_TYPE_ACCOUNT,
 			Level:   &tree.PrivilegeLevel{Level: tree.PRIVILEGE_LEVEL_TYPE_STAR},
 			Roles: []*tree.Role{
-				{UserName: "r1"},
+				{UserName: tree.NewBufString("r1")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -5195,7 +5195,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -5235,7 +5235,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 					Level: tree.PRIVILEGE_LEVEL_TYPE_STAR,
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5247,7 +5247,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 					Level: tree.PRIVILEGE_LEVEL_TYPE_STAR_STAR,
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5257,10 +5257,10 @@ func Test_doRevokePrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_DATABASE,
 				Level: &tree.PrivilegeLevel{
 					Level:  tree.PRIVILEGE_LEVEL_TYPE_DATABASE,
-					DbName: "d",
+					DbName: tree.NewBufString("d"),
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5270,10 +5270,10 @@ func Test_doRevokePrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_DATABASE,
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_TABLE,
-					TblName: "d",
+					TblName: tree.NewBufString("d"),
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 		}
@@ -5289,7 +5289,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 
 			//init from roles
 			for i, role := range stmt.Roles {
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{
 					{i},
 				})
@@ -5300,13 +5300,13 @@ func Test_doRevokePrivilege(t *testing.T) {
 			convey.So(err, convey.ShouldBeNil)
 
 			if stmt.Level.Level == tree.PRIVILEGE_LEVEL_TYPE_DATABASE {
-				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.DbName)
+				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.DbName.Get())
 				mrs := newMrsForCheckDatabase([][]interface{}{
 					{0},
 				})
 				bh.sql2result[sql] = mrs
 			} else if stmt.Level.Level == tree.PRIVILEGE_LEVEL_TYPE_TABLE {
-				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.TblName)
+				sql, _ := getSqlForCheckDatabase(context.TODO(), stmt.Level.TblName.Get())
 				mrs := newMrsForCheckDatabase([][]interface{}{
 					{0},
 				})
@@ -5352,7 +5352,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 					Level: tree.PRIVILEGE_LEVEL_TYPE_STAR,
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5364,7 +5364,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 					Level: tree.PRIVILEGE_LEVEL_TYPE_STAR_STAR,
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5374,10 +5374,10 @@ func Test_doRevokePrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_TABLE,
 				Level: &tree.PrivilegeLevel{
 					Level:  tree.PRIVILEGE_LEVEL_TYPE_DATABASE_STAR,
-					DbName: dbName,
+					DbName: tree.NewBufString(dbName),
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5387,11 +5387,11 @@ func Test_doRevokePrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_TABLE,
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_DATABASE_TABLE,
-					DbName:  dbName,
-					TblName: tableName,
+					DbName:  tree.NewBufString(dbName),
+					TblName: tree.NewBufString(tableName),
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 			{
@@ -5401,10 +5401,10 @@ func Test_doRevokePrivilege(t *testing.T) {
 				ObjType: tree.OBJECT_TYPE_TABLE,
 				Level: &tree.PrivilegeLevel{
 					Level:   tree.PRIVILEGE_LEVEL_TYPE_TABLE,
-					TblName: tableName,
+					TblName: tree.NewBufString(tableName),
 				},
 				Roles: []*tree.Role{
-					{UserName: "r1"},
+					{UserName: tree.NewBufString("r1")},
 				},
 			},
 		}
@@ -5421,7 +5421,7 @@ func Test_doRevokePrivilege(t *testing.T) {
 
 			//init from roles
 			for i, role := range stmt.Roles {
-				sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+				sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 				mrs := newMrsForRoleIdOfRole([][]interface{}{
 					{i},
 				})
@@ -5521,9 +5521,9 @@ func Test_doDropRole(t *testing.T) {
 
 		stmt := &tree.DropRole{
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -5536,7 +5536,7 @@ func Test_doDropRole(t *testing.T) {
 
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			mrs := newMrsForRoleIdOfRole([][]interface{}{
 				{i},
 			})
@@ -5566,9 +5566,9 @@ func Test_doDropRole(t *testing.T) {
 		stmt := &tree.DropRole{
 			IfExists: true,
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -5582,7 +5582,7 @@ func Test_doDropRole(t *testing.T) {
 		var mrs *MysqlResultSet
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			if i == 0 {
 				mrs = newMrsForRoleIdOfRole([][]interface{}{})
 			} else {
@@ -5617,9 +5617,9 @@ func Test_doDropRole(t *testing.T) {
 		stmt := &tree.DropRole{
 			IfExists: false,
 			Roles: []*tree.Role{
-				{UserName: "r1"},
-				{UserName: "r2"},
-				{UserName: "r3"},
+				{UserName: tree.NewBufString("r1")},
+				{UserName: tree.NewBufString("r2")},
+				{UserName: tree.NewBufString("r3")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -5633,7 +5633,7 @@ func Test_doDropRole(t *testing.T) {
 		var mrs *MysqlResultSet
 		//init from roles
 		for i, role := range stmt.Roles {
-			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName)
+			sql, _ := getSqlForRoleIdOfRole(context.TODO(), role.UserName.Get())
 			if i == 0 {
 				mrs = newMrsForRoleIdOfRole([][]interface{}{})
 			} else {
@@ -5670,9 +5670,9 @@ func Test_doDropUser(t *testing.T) {
 
 		stmt := &tree.DropUser{
 			Users: []*tree.User{
-				{Username: "u1"},
-				{Username: "u2"},
-				{Username: "u3"},
+				{Username: tree.NewBufString("u1")},
+				{Username: tree.NewBufString("u2")},
+				{Username: tree.NewBufString("u3")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -5684,13 +5684,13 @@ func Test_doDropUser(t *testing.T) {
 		bh.sql2result["rollback;"] = nil
 
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			mrs := newMrsForPasswordOfUser([][]interface{}{
-				{i, "111", "public"},
+				{i, tree.NewBufString("111"), "public"},
 			})
 			bh.sql2result[sql] = mrs
 
-			sql, _ = getSqlForCheckUserHasRole(context.TODO(), user.Username, moAdminRoleID)
+			sql, _ = getSqlForCheckUserHasRole(context.TODO(), user.Username.Get(), moAdminRoleID)
 			mrs = newMrsForSqlForCheckUserHasRole([][]interface{}{})
 			bh.sql2result[sql] = mrs
 		}
@@ -5719,9 +5719,9 @@ func Test_doDropUser(t *testing.T) {
 		stmt := &tree.DropUser{
 			IfExists: true,
 			Users: []*tree.User{
-				{Username: "u1"},
-				{Username: "u2"},
-				{Username: "u3"},
+				{Username: tree.NewBufString("u1")},
+				{Username: tree.NewBufString("u2")},
+				{Username: tree.NewBufString("u3")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -5735,17 +5735,17 @@ func Test_doDropUser(t *testing.T) {
 		var mrs *MysqlResultSet
 		//init from roles
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			if i == 0 {
 				mrs = newMrsForPasswordOfUser([][]interface{}{})
 			} else {
 				mrs = newMrsForPasswordOfUser([][]interface{}{
-					{i, "111", "public"},
+					{i, tree.NewBufString("111"), "public"},
 				})
 			}
 
 			bh.sql2result[sql] = mrs
-			sql, _ = getSqlForCheckUserHasRole(context.TODO(), user.Username, moAdminRoleID)
+			sql, _ = getSqlForCheckUserHasRole(context.TODO(), user.Username.Get(), moAdminRoleID)
 			mrs = newMrsForSqlForCheckUserHasRole([][]interface{}{})
 			bh.sql2result[sql] = mrs
 		}
@@ -5774,9 +5774,9 @@ func Test_doDropUser(t *testing.T) {
 		stmt := &tree.DropUser{
 			IfExists: false,
 			Users: []*tree.User{
-				{Username: "u1"},
-				{Username: "u2"},
-				{Username: "u3"},
+				{Username: tree.NewBufString("u1")},
+				{Username: tree.NewBufString("u2")},
+				{Username: tree.NewBufString("u3")},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -5790,18 +5790,18 @@ func Test_doDropUser(t *testing.T) {
 		var mrs *MysqlResultSet
 		//init from roles
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			if i == 0 {
 				mrs = newMrsForPasswordOfUser([][]interface{}{})
 			} else {
 				mrs = newMrsForPasswordOfUser([][]interface{}{
-					{i, "111", "public"},
+					{i, tree.NewBufString("111"), "public"},
 				})
 			}
 
 			bh.sql2result[sql] = mrs
 
-			sql, _ = getSqlForCheckUserHasRole(context.TODO(), user.Username, moAdminRoleID)
+			sql, _ = getSqlForCheckUserHasRole(context.TODO(), user.Username.Get(), moAdminRoleID)
 			mrs = newMrsForSqlForCheckUserHasRole([][]interface{}{})
 			bh.sql2result[sql] = mrs
 		}
@@ -5998,7 +5998,7 @@ func Test_initProcedure(t *testing.T) {
 		cp := &tree.CreateProcedure{
 			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}, buf),
 			Args: nil,
-			Body: "'begin DECLARE v1 INT; SET v1 = 5; IF v1 > 5 THEN select * from tbh1; ELSEIF v1 = 5 THEN select * from tbh2; ELSEIF v1 = 4 THEN select * from tbh2 limit 1; ELSE select * from tbh3; END IF; end'",
+			Body: tree.NewBufString("'begin DECLARE v1 INT; SET v1 = 5; IF v1 > 5 THEN select * from tbh1; ELSEIF v1 = 5 THEN select * from tbh2; ELSEIF v1 = 4 THEN select * from tbh2 limit 1; ELSE select * from tbh3; END IF; end'"),
 		}
 
 		priv := determinePrivilegeSetOfStatement(cp)
@@ -6027,7 +6027,7 @@ func Test_initProcedure(t *testing.T) {
 		cp := &tree.CreateProcedure{
 			Name: tree.NewProcedureName("test_if_hit_elseif_first_elseif", tree.ObjectNamePrefix{}, buf),
 			Args: nil,
-			Body: "'begin DECLARE v1 INT; SET v1 = 5; IF v1 > 5 THEN select * from tbh1; ELSEIF v1 = 5 THEN select * from tbh2; ELSEIF v1 = 4 THEN select * from tbh2 limit 1; ELSE select * from tbh3; END IF; end'",
+			Body: tree.NewBufString("'begin DECLARE v1 INT; SET v1 = 5; IF v1 > 5 THEN select * from tbh1; ELSEIF v1 = 5 THEN select * from tbh2; ELSEIF v1 = 4 THEN select * from tbh2 limit 1; ELSE select * from tbh3; END IF; end'"),
 		}
 
 		priv := determinePrivilegeSetOfStatement(cp)
@@ -6341,7 +6341,7 @@ func TestDoSetGlobalSystemVariable(t *testing.T) {
 				{
 					System: true,
 					Global: true,
-					Name:   "sql_mode",
+					Name:   tree.NewBufString("sql_mode"),
 					Value:  tree.NewStrVal("", buf),
 				},
 			},
@@ -6355,11 +6355,11 @@ func TestDoSetGlobalSystemVariable(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql := getSqlForUpdateSystemVariableValue(getVariableValue(stmt.Assignments[0].Value), uint64(ses.GetTenantInfo().GetTenantID()), stmt.Assignments[0].Name)
+		sql := getSqlForUpdateSystemVariableValue(getVariableValue(stmt.Assignments[0].Value), uint64(ses.GetTenantInfo().GetTenantID()), stmt.Assignments[0].Name.Get())
 		mrs := newMrsForSqlForCheckUserHasRole([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
-		err := doSetGlobalSystemVariable(ses.GetRequestContext(), ses, stmt.Assignments[0].Name, stmt.Assignments[0].Value)
+		err := doSetGlobalSystemVariable(ses.GetRequestContext(), ses, stmt.Assignments[0].Name.Get(), stmt.Assignments[0].Value)
 		convey.So(err, convey.ShouldBeNil)
 	})
 
@@ -6380,7 +6380,7 @@ func TestDoSetGlobalSystemVariable(t *testing.T) {
 				{
 					System: true,
 					Global: true,
-					Name:   "sql_mode",
+					Name:   tree.NewBufString("sql_mode"),
 					Value:  tree.NewStrVal("NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION", buf),
 				},
 			},
@@ -6394,11 +6394,11 @@ func TestDoSetGlobalSystemVariable(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql := getSqlForUpdateSystemVariableValue(getVariableValue(stmt.Assignments[0].Value), uint64(ses.GetTenantInfo().GetTenantID()), stmt.Assignments[0].Name)
+		sql := getSqlForUpdateSystemVariableValue(getVariableValue(stmt.Assignments[0].Value), uint64(ses.GetTenantInfo().GetTenantID()), stmt.Assignments[0].Name.Get())
 		mrs := newMrsForSqlForCheckUserHasRole([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
-		err := doSetGlobalSystemVariable(ses.GetRequestContext(), ses, stmt.Assignments[0].Name, stmt.Assignments[0].Value)
+		err := doSetGlobalSystemVariable(ses.GetRequestContext(), ses, stmt.Assignments[0].Name.Get(), stmt.Assignments[0].Value)
 		convey.So(err, convey.ShouldBeNil)
 	})
 }
@@ -6416,7 +6416,7 @@ func Test_doAlterUser(t *testing.T) {
 
 		stmt := &tree.AlterUser{
 			Users: []*tree.User{
-				{Username: "u1", Hostname: "%", AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: "123456"}},
+				{Username: tree.NewBufString("u1"), Hostname: tree.NewBufString("%"), AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123456")}},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -6435,9 +6435,9 @@ func Test_doAlterUser(t *testing.T) {
 		bh.sql2result["rollback;"] = nil
 
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			mrs := newMrsForPasswordOfUser([][]interface{}{
-				{i, "111", 0},
+				{i, tree.NewBufString("111"), 0},
 			})
 			bh.sql2result[sql] = mrs
 
@@ -6449,7 +6449,7 @@ func Test_doAlterUser(t *testing.T) {
 		}
 
 		for _, user := range stmt.Users {
-			sql, _ := getSqlForUpdatePasswordOfUser(context.TODO(), user.AuthOption.Str, user.Username)
+			sql, _ := getSqlForUpdatePasswordOfUser(context.TODO(), user.AuthOption.Str.Get(), user.Username.Get())
 			bh.sql2result[sql] = nil
 		}
 
@@ -6469,9 +6469,9 @@ func Test_doAlterUser(t *testing.T) {
 
 		stmt := &tree.AlterUser{
 			Users: []*tree.User{
-				{Username: "u1", Hostname: "%", AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: "123456"}},
-				{Username: "u2", Hostname: "%", AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: "123456"}},
-				{Username: "u3", Hostname: "%", AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: "123456"}},
+				{Username: tree.NewBufString("u1"), Hostname: tree.NewBufString("%"), AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123456")}},
+				{Username: tree.NewBufString("u2"), Hostname: tree.NewBufString("%"), AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123456")}},
+				{Username: tree.NewBufString("u3"), Hostname: tree.NewBufString("%"), AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123456")}},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -6490,19 +6490,19 @@ func Test_doAlterUser(t *testing.T) {
 		bh.sql2result["rollback;"] = nil
 
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			mrs := newMrsForPasswordOfUser([][]interface{}{
-				{i, "111", "public"},
+				{i, tree.NewBufString("111"), "public"},
 			})
 			bh.sql2result[sql] = mrs
 
-			sql, _ = getSqlForCheckUserHasRole(context.TODO(), user.Username, moAdminRoleID)
+			sql, _ = getSqlForCheckUserHasRole(context.TODO(), user.Username.Get(), moAdminRoleID)
 			mrs = newMrsForSqlForCheckUserHasRole([][]interface{}{})
 			bh.sql2result[sql] = mrs
 		}
 
 		for _, user := range stmt.Users {
-			sql, _ := getSqlForUpdatePasswordOfUser(context.TODO(), user.AuthOption.Str, user.Username)
+			sql, _ := getSqlForUpdatePasswordOfUser(context.TODO(), user.AuthOption.Str.Get(), user.Username.Get())
 			bh.sql2result[sql] = nil
 		}
 
@@ -6522,7 +6522,7 @@ func Test_doAlterUser(t *testing.T) {
 
 		stmt := &tree.AlterUser{
 			Users: []*tree.User{
-				{Username: "u1", Hostname: "%", AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: "123456"}},
+				{Username: tree.NewBufString("u1"), Hostname: tree.NewBufString("%"), AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123456")}},
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -6541,19 +6541,19 @@ func Test_doAlterUser(t *testing.T) {
 		bh.sql2result["rollback;"] = nil
 
 		for i, user := range stmt.Users {
-			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username)
+			sql, _ := getSqlForPasswordOfUser(context.TODO(), user.Username.Get())
 			mrs := newMrsForPasswordOfUser([][]interface{}{
-				{i, "111", "public"},
+				{i, tree.NewBufString("111"), "public"},
 			})
 			bh.sql2result[sql] = mrs
 
-			sql, _ = getSqlForCheckUserHasRole(context.TODO(), user.Username, moAdminRoleID)
+			sql, _ = getSqlForCheckUserHasRole(context.TODO(), user.Username.Get(), moAdminRoleID)
 			mrs = newMrsForSqlForCheckUserHasRole([][]interface{}{})
 			bh.sql2result[sql] = mrs
 		}
 
 		for _, user := range stmt.Users {
-			sql, _ := getSqlForUpdatePasswordOfUser(context.TODO(), user.AuthOption.Str, user.Username)
+			sql, _ := getSqlForUpdatePasswordOfUser(context.TODO(), user.AuthOption.Str.Get(), user.Username.Get())
 			bh.sql2result[sql] = nil
 		}
 
@@ -6574,13 +6574,13 @@ func Test_doAlterAccount(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.AlterAccount{
-			Name: "acc",
+			Name: tree.NewBufString("aaa"),
 			AuthOption: tree.AlterAccountAuthOption{
 				Exist:     true,
-				AdminName: "rootx",
+				AdminName: tree.NewBufString("rootx"),
 				IdentifiedType: tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByPassword,
-					Str: "111",
+					Str: tree.NewBufString("111"),
 				},
 			},
 		}
@@ -6599,18 +6599,18 @@ func Test_doAlterAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		mrs := newMrsForCheckTenant([][]interface{}{
 			{0, 0, 0, 0},
 		})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName)
+		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = newMrsForPasswordOfUser([][]interface{}{
-			{10, "111", 0},
+			{10, tree.NewBufString("111"), 0},
 		})
 
-		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str, stmt.AuthOption.AdminName)
+		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str.Get(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
 		err := doAlterAccount(ses.GetRequestContext(), ses, stmt)
@@ -6628,13 +6628,13 @@ func Test_doAlterAccount(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.AlterAccount{
-			Name: "acc",
+			Name: tree.NewBufString("aaa"),
 			AuthOption: tree.AlterAccountAuthOption{
 				Exist:     true,
-				AdminName: "rootx",
+				AdminName: tree.NewBufString("rootx"),
 				IdentifiedType: tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByRandomPassword,
-					Str: "111",
+					Str: tree.NewBufString("111"),
 				},
 			},
 		}
@@ -6653,18 +6653,18 @@ func Test_doAlterAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		mrs := newMrsForCheckTenant([][]interface{}{
 			{0, 0, 0, 0},
 		})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName)
+		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = newMrsForPasswordOfUser([][]interface{}{
-			{10, "111", 0},
+			{10, tree.NewBufString("111"), 0},
 		})
 
-		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str, stmt.AuthOption.AdminName)
+		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str.Get(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
 		err := doAlterAccount(ses.GetRequestContext(), ses, stmt)
@@ -6682,13 +6682,13 @@ func Test_doAlterAccount(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.AlterAccount{
-			Name: "acc",
+			Name: tree.NewBufString("aaa"),
 			AuthOption: tree.AlterAccountAuthOption{
 				Exist:     true,
-				AdminName: "rootx",
+				AdminName: tree.NewBufString("rootx"),
 				IdentifiedType: tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByRandomPassword,
-					Str: "111",
+					Str: tree.NewBufString("111"),
 				},
 			},
 		}
@@ -6707,13 +6707,13 @@ func Test_doAlterAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		bh.sql2result[sql] = nil
 
-		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName)
+		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
-		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str, stmt.AuthOption.AdminName)
+		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str.Get(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
 		err := doAlterAccount(ses.GetRequestContext(), ses, stmt)
@@ -6732,13 +6732,13 @@ func Test_doAlterAccount(t *testing.T) {
 
 		stmt := &tree.AlterAccount{
 			IfExists: true,
-			Name:     "acc",
+			Name:     tree.NewBufString("aaa"),
 			AuthOption: tree.AlterAccountAuthOption{
 				Exist:     true,
-				AdminName: "rootx",
+				AdminName: tree.NewBufString("rootx"),
 				IdentifiedType: tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByPassword,
-					Str: "111",
+					Str: tree.NewBufString("111"),
 				},
 			},
 		}
@@ -6757,14 +6757,14 @@ func Test_doAlterAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		mrs := newMrsForCheckTenant([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName)
+		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
-		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str, stmt.AuthOption.AdminName)
+		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str.Get(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
 		err := doAlterAccount(ses.GetRequestContext(), ses, stmt)
@@ -6783,13 +6783,13 @@ func Test_doAlterAccount(t *testing.T) {
 
 		stmt := &tree.AlterAccount{
 			IfExists: true,
-			Name:     "acc",
+			Name:     tree.NewBufString("aaa"),
 			AuthOption: tree.AlterAccountAuthOption{
 				Exist:     true,
-				AdminName: "rootx",
+				AdminName: tree.NewBufString("rootx"),
 				IdentifiedType: tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByPassword,
-					Str: "111",
+					Str: tree.NewBufString("111"),
 				},
 			},
 		}
@@ -6808,16 +6808,16 @@ func Test_doAlterAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		mrs := newMrsForCheckTenant([][]interface{}{
 			{0, "0", "open", 0},
 		})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName)
+		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = newMrsForPasswordOfUser([][]interface{}{})
 
-		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str, stmt.AuthOption.AdminName)
+		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str.Get(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = newMrsForCheckTenant([][]interface{}{
 			{0, 0, 0, 0},
 		})
@@ -6838,7 +6838,7 @@ func Test_doAlterAccount(t *testing.T) {
 
 		stmt := &tree.AlterAccount{
 			IfExists: true,
-			Name:     "acc",
+			Name:     tree.NewBufString("aaa"),
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6855,13 +6855,13 @@ func Test_doAlterAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		bh.sql2result[sql] = nil
 
-		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName)
+		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
-		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str, stmt.AuthOption.AdminName)
+		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str.Get(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
 		err := doAlterAccount(ses.GetRequestContext(), ses, stmt)
@@ -6880,13 +6880,13 @@ func Test_doAlterAccount(t *testing.T) {
 
 		stmt := &tree.AlterAccount{
 			IfExists: true,
-			Name:     "acc",
+			Name:     tree.NewBufString("aaa"),
 			AuthOption: tree.AlterAccountAuthOption{
 				Exist:     true,
-				AdminName: "rootx",
+				AdminName: tree.NewBufString("rootx"),
 				IdentifiedType: tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByPassword,
-					Str: "111",
+					Str: tree.NewBufString("111"),
 				},
 			},
 			StatusOption: tree.AccountStatus{
@@ -6909,12 +6909,12 @@ func Test_doAlterAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		bh.sql2result[sql] = nil
-		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName)
+		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
-		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str, stmt.AuthOption.AdminName)
+		sql, _ = getSqlForUpdatePasswordOfUser(context.TODO(), stmt.AuthOption.IdentifiedType.Str.Get(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
 		err := doAlterAccount(ses.GetRequestContext(), ses, stmt)
@@ -6932,10 +6932,10 @@ func Test_doAlterAccount(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.AlterAccount{
-			Name: "acc",
+			Name: tree.NewBufString("aaa"),
 			Comment: tree.AccountComment{
 				Exist:   true,
-				Comment: "new account",
+				Comment: tree.NewBufString("new account"),
 			},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
@@ -6953,16 +6953,16 @@ func Test_doAlterAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		mrs := newMrsForCheckTenant([][]interface{}{
 			{0, 0, 0, 0},
 		})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName)
+		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
-		sql, _ = getSqlForUpdateCommentsOfAccount(context.TODO(), stmt.Comment.Comment, stmt.Name)
+		sql, _ = getSqlForUpdateCommentsOfAccount(context.TODO(), stmt.Comment.Comment.Get(), stmt.Name.Get())
 		bh.sql2result[sql] = nil
 
 		err := doAlterAccount(ses.GetRequestContext(), ses, stmt)
@@ -6980,7 +6980,7 @@ func Test_doAlterAccount(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.AlterAccount{
-			Name: "acc",
+			Name: tree.NewBufString("aaa"),
 			StatusOption: tree.AccountStatus{
 				Exist:  true,
 				Option: tree.AccountStatusSuspend,
@@ -7001,16 +7001,16 @@ func Test_doAlterAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		mrs := newMrsForCheckTenant([][]interface{}{
 			{0, 0, 0, 0},
 		})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName)
+		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
-		sql, _ = getSqlForUpdateStatusOfAccount(context.TODO(), stmt.StatusOption.Option.String(), types.CurrentTimestamp().String2(time.UTC, 0), stmt.Name)
+		sql, _ = getSqlForUpdateStatusOfAccount(context.TODO(), stmt.StatusOption.Option.String(), types.CurrentTimestamp().String2(time.UTC, 0), stmt.Name.Get())
 		bh.sql2result[sql] = nil
 
 		err := doAlterAccount(ses.GetRequestContext(), ses, stmt)
@@ -7028,7 +7028,7 @@ func Test_doAlterAccount(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.AlterAccount{
-			Name: "sys",
+			Name: tree.NewBufString("sys"),
 			StatusOption: tree.AccountStatus{
 				Exist:  true,
 				Option: tree.AccountStatusSuspend,
@@ -7049,13 +7049,13 @@ func Test_doAlterAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		bh.sql2result[sql] = nil
 
-		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName)
+		sql, _ = getSqlForPasswordOfUser(context.TODO(), stmt.AuthOption.AdminName.Get())
 		bh.sql2result[sql] = nil
 
-		sql, _ = getSqlForUpdateStatusOfAccount(context.TODO(), stmt.StatusOption.Option.String(), types.CurrentTimestamp().String2(time.UTC, 0), stmt.Name)
+		sql, _ = getSqlForUpdateStatusOfAccount(context.TODO(), stmt.StatusOption.Option.String(), types.CurrentTimestamp().String2(time.UTC, 0), stmt.Name.Get())
 		bh.sql2result[sql] = nil
 
 		err := doAlterAccount(ses.GetRequestContext(), ses, stmt)
@@ -7090,7 +7090,7 @@ func Test_doDropAccount(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.DropAccount{
-			Name: "acc",
+			Name: tree.NewBufString("aaa"),
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -7107,13 +7107,13 @@ func Test_doDropAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		mrs := newMrsForCheckTenant([][]interface{}{
 			{0, "0", "open", 0},
 		})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForDeleteAccountFromMoAccount(context.TODO(), stmt.Name)
+		sql, _ = getSqlForDeleteAccountFromMoAccount(context.TODO(), stmt.Name.Get())
 		bh.sql2result[sql] = nil
 
 		for _, sql = range getSqlForDropAccount() {
@@ -7140,7 +7140,7 @@ func Test_doDropAccount(t *testing.T) {
 
 		stmt := &tree.DropAccount{
 			IfExists: true,
-			Name:     "acc",
+			Name:     tree.NewBufString("aaa"),
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -7157,11 +7157,11 @@ func Test_doDropAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		mrs := newMrsForCheckTenant([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForDeleteAccountFromMoAccount(context.TODO(), stmt.Name)
+		sql, _ = getSqlForDeleteAccountFromMoAccount(context.TODO(), stmt.Name.Get())
 		bh.sql2result[sql] = nil
 
 		for _, sql = range getSqlForDropAccount() {
@@ -7184,7 +7184,7 @@ func Test_doDropAccount(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.DropAccount{
-			Name: "acc",
+			Name: tree.NewBufString("aaa"),
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -7201,11 +7201,11 @@ func Test_doDropAccount(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name)
+		sql, _ := getSqlForCheckTenant(context.TODO(), stmt.Name.Get())
 		mrs := newMrsForCheckTenant([][]interface{}{})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForDeleteAccountFromMoAccount(context.TODO(), stmt.Name)
+		sql, _ = getSqlForDeleteAccountFromMoAccount(context.TODO(), stmt.Name.Get())
 		bh.sql2result[sql] = nil
 
 		for _, sql = range getSqlForDropAccount() {
@@ -8143,7 +8143,7 @@ func TestDoCreatePublication(t *testing.T) {
 	sa := &tree.CreatePublication{
 		Name:     tree.NewBufIdentifier("pub1"),
 		Database: tree.NewBufIdentifier("db1"),
-		Comment:  "124",
+		Comment:  tree.NewBufString("124"),
 		AccountsSet: &tree.AccountsSetOption{
 			SetAccounts: tree.IdentifierList{"a1", "a2"},
 		},
@@ -8152,7 +8152,7 @@ func TestDoCreatePublication(t *testing.T) {
 	require.NoError(t, err)
 	bh := &backgroundExecTest{}
 	bh.init()
-	sql2, err := getSqlForInsertIntoMoPubs(ctx, string(sa.Name.Get()), string(sa.Database.Get()), 0, true, "", "a1, a2", tenant.GetDefaultRoleID(), tenant.GetUserID(), sa.Comment, true)
+	sql2, err := getSqlForInsertIntoMoPubs(ctx, string(sa.Name.Get()), string(sa.Database.Get()), 0, true, "", "a1, a2", tenant.GetDefaultRoleID(), tenant.GetUserID(), sa.Comment.Get(), true)
 	require.NoError(t, err)
 	bhStub := gostub.StubFunc(&NewBackgroundHandler, bh)
 	defer bhStub.Reset()
@@ -8314,12 +8314,12 @@ func TestDoAlterPublication(t *testing.T) {
 	for _, kase := range kases {
 		sa := &tree.AlterPublication{
 			Name:        tree.NewBufIdentifier(kase.pubName),
-			Comment:     kase.comment,
+			Comment:     tree.NewBufString(kase.comment),
 			AccountsSet: kase.accountsSet,
 		}
 		sql1, err := getSqlForGetPubInfo(ctx, string(sa.Name.Get()), true)
 		require.NoError(t, err)
-		sql2, err := getSqlForUpdatePubInfo(ctx, string(sa.Name.Get()), kase.accountList, sa.Comment, true)
+		sql2, err := getSqlForUpdatePubInfo(ctx, string(sa.Name.Get()), kase.accountList, sa.Comment.Get(), true)
 		require.NoError(t, err)
 
 		bh := &backgroundExecTest{}
@@ -8939,10 +8939,10 @@ func TestDoAlterDatabaseConfig(t *testing.T) {
 		ses.SetTenantInfo(tenant)
 
 		ad := &tree.AlterDataBaseConfig{
-			AccountName:    sysAccountName,
-			DbName:         "db1",
+			AccountName:    tree.NewBufString(sysAccountName),
+			DbName:         tree.NewBufString("db1"),
 			IsAccountLevel: false,
-			UpdateConfig:   "0.7",
+			UpdateConfig:   tree.NewBufString("0.7"),
 		}
 
 		//no result set
@@ -8950,13 +8950,13 @@ func TestDoAlterDatabaseConfig(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckDatabaseWithOwner(ctx, ad.DbName, int64(ses.GetTenantInfo().GetTenantID()))
+		sql, _ := getSqlForCheckDatabaseWithOwner(ctx, ad.DbName.Get(), int64(ses.GetTenantInfo().GetTenantID()))
 		mrs := newMrsForPasswordOfUser([][]interface{}{
 			{0, 0},
 		})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForupdateConfigurationByDbNameAndAccountName(ctx, ad.UpdateConfig, ses.GetTenantInfo().GetTenant(), ad.DbName, "version_compatibility")
+		sql, _ = getSqlForupdateConfigurationByDbNameAndAccountName(ctx, ad.UpdateConfig.Get(), ses.GetTenantInfo().GetTenant(), ad.DbName.Get(), "version_compatibility")
 		mrs = newMrsForPasswordOfUser([][]interface{}{{}})
 		bh.sql2result[sql] = mrs
 
@@ -8995,10 +8995,10 @@ func TestDoAlterDatabaseConfig(t *testing.T) {
 		ses.SetTenantInfo(tenant)
 
 		ad := &tree.AlterDataBaseConfig{
-			AccountName:    sysAccountName,
-			DbName:         "db1",
+			AccountName:    tree.NewBufString(sysAccountName),
+			DbName:         tree.NewBufString("db1"),
 			IsAccountLevel: false,
-			UpdateConfig:   "0.7",
+			UpdateConfig:   tree.NewBufString("0.7"),
 		}
 
 		//no result set
@@ -9006,13 +9006,13 @@ func TestDoAlterDatabaseConfig(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckDatabaseWithOwner(ctx, ad.DbName, int64(ses.GetTenantInfo().GetTenantID()))
+		sql, _ := getSqlForCheckDatabaseWithOwner(ctx, ad.DbName.Get(), int64(ses.GetTenantInfo().GetTenantID()))
 		mrs := newMrsForPasswordOfUser([][]interface{}{
 			{0, 1},
 		})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForupdateConfigurationByDbNameAndAccountName(ctx, ad.UpdateConfig, ses.GetTenantInfo().GetTenant(), ad.DbName, "version_compatibility")
+		sql, _ = getSqlForupdateConfigurationByDbNameAndAccountName(ctx, ad.UpdateConfig.Get(), ses.GetTenantInfo().GetTenant(), ad.DbName.Get(), "version_compatibility")
 		mrs = newMrsForPasswordOfUser([][]interface{}{{}})
 		bh.sql2result[sql] = mrs
 
@@ -9053,9 +9053,10 @@ func TestDoAlterAccountConfig(t *testing.T) {
 		ses.SetTenantInfo(tenant)
 
 		ad := &tree.AlterDataBaseConfig{
-			AccountName:    sysAccountName,
-			IsAccountLevel: true,
-			UpdateConfig:   "0.7",
+			AccountName:    tree.NewBufString(sysAccountName),
+			DbName:         tree.NewBufString("db1"),
+			IsAccountLevel: false,
+			UpdateConfig:   tree.NewBufString("0.7"),
 		}
 
 		//no result set
@@ -9063,13 +9064,13 @@ func TestDoAlterAccountConfig(t *testing.T) {
 		bh.sql2result["commit;"] = nil
 		bh.sql2result["rollback;"] = nil
 
-		sql, _ := getSqlForCheckTenant(ctx, ad.AccountName)
+		sql, _ := getSqlForCheckTenant(ctx, ad.AccountName.Get())
 		mrs := newMrsForPasswordOfUser([][]interface{}{
 			{0, 0},
 		})
 		bh.sql2result[sql] = mrs
 
-		sql, _ = getSqlForupdateConfigurationByAccount(ctx, ad.UpdateConfig, ses.GetTenantInfo().GetTenant(), "version_compatibility")
+		sql, _ = getSqlForupdateConfigurationByAccount(ctx, ad.UpdateConfig.Get(), ses.GetTenantInfo().GetTenant(), "version_compatibility")
 		mrs = newMrsForPasswordOfUser([][]interface{}{{}})
 		bh.sql2result[sql] = mrs
 
@@ -9546,7 +9547,7 @@ func TestDoCreateStage(t *testing.T) {
 		cs := &tree.CreateStage{
 			IfNotExists: false,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
-			Url:         "'s3://load/files/'",
+			Url:         tree.NewBufString("'s3://load/files/'"),
 			Credentials: tree.StageCredentials{
 				Exist: false,
 			},
@@ -9604,7 +9605,7 @@ func TestDoCreateStage(t *testing.T) {
 		cs := &tree.CreateStage{
 			IfNotExists: false,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
-			Url:         "'s3://load/files/'",
+			Url:         tree.NewBufString("'s3://load/files/'"),
 			Credentials: tree.StageCredentials{
 				Exist: false,
 			},
@@ -9664,7 +9665,7 @@ func TestDoCreateStage(t *testing.T) {
 		cs := &tree.CreateStage{
 			IfNotExists: true,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
-			Url:         "'s3://load/files/'",
+			Url:         tree.NewBufString("'s3://load/files/'"),
 			Credentials: tree.StageCredentials{
 				Exist: false,
 			},
@@ -9722,7 +9723,7 @@ func TestDoCreateStage(t *testing.T) {
 		cs := &tree.CreateStage{
 			IfNotExists: false,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
-			Url:         "'s3://load/files/'",
+			Url:         tree.NewBufString("'s3://load/files/'"),
 			Credentials: tree.StageCredentials{
 				Exist:       true,
 				Credentials: []string{"'AWS_KEY_ID'", "'1a2b3c'", "'AWS_SECRET_KEY'", "'4x5y6z'"},
@@ -9786,7 +9787,7 @@ func TestDoAlterStage(t *testing.T) {
 			Name:        tree.NewBufIdentifier("my_stage_test"),
 			UrlOption: tree.StageUrl{
 				Exist: true,
-				Url:   "'s3://load/files/'",
+				Url:   tree.NewBufString("'s3://load/files/'"),
 			},
 			CredentialsOption: tree.StageCredentials{
 				Exist: false,
@@ -9912,7 +9913,7 @@ func TestDoAlterStage(t *testing.T) {
 			Name:        tree.NewBufIdentifier("my_stage_test"),
 			UrlOption: tree.StageUrl{
 				Exist: true,
-				Url:   "'s3://load/files/'",
+				Url:   tree.NewBufString("'s3://load/files/'"),
 			},
 			CredentialsOption: tree.StageCredentials{
 				Exist: false,
@@ -9973,7 +9974,7 @@ func TestDoAlterStage(t *testing.T) {
 			Name:        tree.NewBufIdentifier("my_stage_test"),
 			UrlOption: tree.StageUrl{
 				Exist: true,
-				Url:   "'s3://load/files/'",
+				Url:   tree.NewBufString("'s3://load/files/'"),
 			},
 			CredentialsOption: tree.StageCredentials{
 				Exist: false,
@@ -10034,7 +10035,7 @@ func TestDoAlterStage(t *testing.T) {
 			Name:        tree.NewBufIdentifier("my_stage_test"),
 			UrlOption: tree.StageUrl{
 				Exist: true,
-				Url:   "'s3://load/files/'",
+				Url:   tree.NewBufString("'s3://load/files/'"),
 			},
 			CredentialsOption: tree.StageCredentials{
 				Exist:       true,
@@ -10137,7 +10138,7 @@ func TestDoCheckFilePath(t *testing.T) {
 
 		cs := &tree.Select{
 			Ep: &tree.ExportParam{
-				FilePath: "/mnt/disk1/t1.csv",
+				FilePath: tree.NewBufString("/mnt/disk1/t1.csv"),
 			},
 		}
 		ses.InitExportConfig(cs.Ep)
@@ -10187,7 +10188,7 @@ func TestDoCheckFilePath(t *testing.T) {
 
 		cs := &tree.Select{
 			Ep: &tree.ExportParam{
-				FilePath: "/mnt/disk1/t1.csv",
+				FilePath: tree.NewBufString("/mnt/disk1/t1.csv"),
 			},
 		}
 		ses.InitExportConfig(cs.Ep)
@@ -10239,7 +10240,7 @@ func TestDoCheckFilePath(t *testing.T) {
 
 		cs := &tree.Select{
 			Ep: &tree.ExportParam{
-				FilePath: "stage1:/t1.csv",
+				FilePath: tree.NewBufString("stage1:/t1.csv"),
 			},
 		}
 		ses.InitExportConfig(cs.Ep)
@@ -10289,7 +10290,7 @@ func TestDoCheckFilePath(t *testing.T) {
 
 		cs := &tree.Select{
 			Ep: &tree.ExportParam{
-				FilePath: "stage1:/t1.csv",
+				FilePath: tree.NewBufString("stage1:/t1.csv"),
 			},
 		}
 		ses.InitExportConfig(cs.Ep)
@@ -10341,7 +10342,7 @@ func TestDoCheckFilePath(t *testing.T) {
 
 		cs := &tree.Select{
 			Ep: &tree.ExportParam{
-				FilePath: "stage1:/t1.csv",
+				FilePath: tree.NewBufString("stage1:/t1.csv"),
 			},
 		}
 		ses.InitExportConfig(cs.Ep)
@@ -10359,7 +10360,7 @@ func TestDoCheckFilePath(t *testing.T) {
 
 		err := doCheckFilePath(ctx, ses, cs.Ep)
 		convey.So(err, convey.ShouldBeNil)
-		convey.So(cs.Ep.FilePath, convey.ShouldEqual, "stage1:/t1.csv")
+		convey.So(cs.Ep.FilePath.Get(), convey.ShouldEqual, tree.NewBufString("stage1:/t1.csv").Get())
 	})
 }
 

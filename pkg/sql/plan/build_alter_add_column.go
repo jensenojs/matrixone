@@ -264,7 +264,7 @@ func checkAddColumWithUniqueKey(ctx context.Context, tableDef *TableDef, uniKey 
 	}
 
 	if uniKey.IndexOption != nil {
-		indexDef.Comment = uniKey.IndexOption.Comment
+		indexDef.Comment = uniKey.IndexOption.Comment.Get()
 	}
 	return indexDef, nil
 }

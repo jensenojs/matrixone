@@ -220,7 +220,7 @@ func buildStreamDefs(stmt *tree.CreateStream, ctx CompilerContext, createStream 
 				case *tree.AttributeKey:
 					col.Primary = true
 				case *tree.AttributeHeader:
-					col.Header = a.Key
+					col.Header = a.Key.Get()
 				case *tree.AttributeHeaders:
 					col.Headers = true
 				}
@@ -620,8 +620,8 @@ func buildCreateTable(stmt *tree.CreateTable, ctx CompilerContext) (*Plan, error
 			properties := make([]*plan.Property, len(opt.Preperties))
 			for idx, property := range opt.Preperties {
 				properties[idx] = &plan.Property{
-					Key:   property.Key,
-					Value: property.Value,
+					Key:   property.Key.Get(),
+					Value: property.Value.Get(),
 				}
 			}
 			createTable.TableDef.Defs = append(createTable.TableDef.Defs, &plan.TableDef_DefType{
@@ -633,14 +633,14 @@ func buildCreateTable(stmt *tree.CreateTable, ctx CompilerContext) (*Plan, error
 			})
 		// todo confirm: option data store like this?
 		case *tree.TableOptionComment:
-			if getNumOfCharacters(opt.Comment) > maxLengthOfTableComment {
+			if getNumOfCharacters(opt.Comment.Get()) > maxLengthOfTableComment {
 				return nil, moerr.NewInvalidInput(ctx.GetContext(), "comment for field '%s' is too long", createTable.TableDef.Name)
 			}
 
 			properties := []*plan.Property{
 				{
 					Key:   catalog.SystemRelAttr_Comment,
-					Value: opt.Comment,
+					Value: opt.Comment.Get(),
 				},
 			}
 			createTable.TableDef.Defs = append(createTable.TableDef.Defs, &plan.TableDef_DefType{
@@ -920,7 +920,7 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 								ColName: def.Name,
 							},
 						},
-						Name: def.Name.Parts[0],
+						Name: tree.NewBufString(def.Name.Parts[0]),
 					})
 					indexs = append(indexs, def.Name.Parts[0])
 				}
@@ -1331,7 +1331,7 @@ func buildUniqueIndexTable(createTable *plan.CreateTable, indexInfos []*tree.Uni
 		indexDef.Parts = indexParts
 		indexDef.TableExist = true
 		if indexInfo.IndexOption != nil {
-			indexDef.Comment = indexInfo.IndexOption.Comment
+			indexDef.Comment = indexInfo.IndexOption.Comment.Get()
 		} else {
 			indexDef.Comment = ""
 		}
@@ -1367,7 +1367,7 @@ func buildSecondaryIndexDef(createTable *plan.CreateTable, indexInfos []*tree.In
 			indexParts = append(indexParts, name)
 		}
 
-		if indexInfo.Name == "" {
+		if indexInfo.Name.Get() == "" {
 			firstPart := indexInfo.KeyParts[0].ColName.Parts[0]
 			nameCount[firstPart]++
 			count := nameCount[firstPart]
@@ -1377,13 +1377,13 @@ func buildSecondaryIndexDef(createTable *plan.CreateTable, indexInfos []*tree.In
 			}
 			indexDef.IndexName = indexName
 		} else {
-			indexDef.IndexName = indexInfo.Name
+			indexDef.IndexName = indexInfo.Name.Get()
 		}
 		indexDef.IndexTableName = ""
 		indexDef.Parts = indexParts
 		indexDef.TableExist = false
 		if indexInfo.IndexOption != nil {
-			indexDef.Comment = indexInfo.IndexOption.Comment
+			indexDef.Comment = indexInfo.IndexOption.Comment.Get()
 		} else {
 			indexDef.Comment = ""
 		}
@@ -1683,13 +1683,13 @@ func buildCreateIndex(stmt *tree.CreateIndex, ctx CompilerContext) (*Plan, error
 	switch stmt.IndexCat {
 	case tree.INDEX_CATEGORY_UNIQUE:
 		uIdx = &tree.UniqueIndex{
-			Name:        indexName,
+			Name:        tree.NewBufString(indexName),
 			KeyParts:    stmt.KeyParts,
 			IndexOption: stmt.IndexOption,
 		}
 	case tree.INDEX_CATEGORY_NONE:
 		sIdx = &tree.Index{
-			Name:        indexName,
+			Name:        tree.NewBufString(indexName),
 			KeyParts:    stmt.KeyParts,
 			IndexOption: stmt.IndexOption,
 		}
@@ -2023,7 +2023,7 @@ func buildAlterTableInplace(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, 
 					return nil, err
 				}
 
-				indexName := def.Name
+				indexName := def.Name.Get()
 
 				constrNames := map[string]bool{}
 				// Check not empty constraint name whether is duplicated.
@@ -2101,14 +2101,14 @@ func buildAlterTableInplace(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, 
 			}
 
 		case *tree.TableOptionComment:
-			if getNumOfCharacters(opt.Comment) > maxLengthOfTableComment {
+			if getNumOfCharacters(opt.Comment.Get()) > maxLengthOfTableComment {
 				return nil, moerr.NewInvalidInput(ctx.GetContext(), "comment for field '%s' is too long", alterTable.TableDef.Name)
 			}
-			comment = opt.Comment
+			comment = opt.Comment.Get()
 			alterTable.Actions[i] = &plan.AlterTable_Action{
 				Action: &plan.AlterTable_Action_AlterComment{
 					AlterComment: &plan.AlterTableComment{
-						NewComment: opt.Comment,
+						NewComment: opt.Comment.Get(),
 					},
 				},
 			}
@@ -2364,7 +2364,7 @@ func getForeignKeyData(ctx CompilerContext, tableDef *TableDef, def *tree.Foreig
 	refer := def.Refer
 	fkData := fkData{
 		Def: &plan.ForeignKeyDef{
-			Name:        def.ConstraintSymbol,
+			Name:        def.ConstraintSymbol.Get(),
 			Cols:        make([]uint64, len(def.KeyParts)),
 			OnDelete:    getRefAction(refer.OnDelete),
 			OnUpdate:    getRefAction(refer.OnUpdate),

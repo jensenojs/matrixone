@@ -24,7 +24,7 @@ type CreateStage struct {
 	statementImpl
 	IfNotExists bool
 	Name        *BufIdentifier
-	Url         string
+	Url         *BufString
 	Credentials StageCredentials
 	Status      StageStatus
 	Comment     StageComment
@@ -33,11 +33,11 @@ type CreateStage struct {
 func NewCreateStage(ifs bool, name Identifier, url string, cs StageCredentials, st StageStatus, co StageComment, buf *buffer.Buffer) *CreateStage {
 	cr := buffer.Alloc[CreateStage](buf)
 	n := NewBufIdentifier(name)
-	buf.Pin(n)
-
+	burl := NewBufString(url)
+	buf.Pin(n, burl)
 	cr.IfNotExists = ifs
 	cr.Name = n
-	cr.Url = url
+	cr.Url = burl
 	cr.Credentials = cs
 	cr.Status = st
 	cr.Comment = co
@@ -52,7 +52,7 @@ func (node *CreateStage) Format(ctx *FmtCtx) {
 	node.Name.Format(ctx)
 
 	ctx.WriteString(" url=")
-	ctx.WriteString(fmt.Sprintf("'%s'", node.Url))
+	ctx.WriteString(fmt.Sprintf("'%s'", node.Url.Get()))
 
 	node.Credentials.Format(ctx)
 	node.Status.Format(ctx)
@@ -170,32 +170,41 @@ func (node *StageStatus) Format(ctx *FmtCtx) {
 
 type StageComment struct {
 	Exist   bool
-	Comment string
+	Comment *BufString
 }
 
 func NewStageComment(e bool, c string, buf *buffer.Buffer) *StageComment {
 	s := buffer.Alloc[StageComment](buf)
 	s.Exist = e
-	s.Comment = c
+	bc := NewBufString(c)
+	buf.Pin(bc)
+	s.Comment = bc
 	return s
 }
 
 func (node *StageComment) Format(ctx *FmtCtx) {
 	if node.Exist {
 		ctx.WriteString(" comment ")
-		ctx.WriteString(fmt.Sprintf("'%s'", node.Comment))
+		ctx.WriteString(fmt.Sprintf("'%s'", node.Comment.Get()))
 	}
 }
 
 type StageCredentials struct {
 	Exist       bool
-	Credentials []string
+	Credentials []string // do NOT reassign after NewStageCredentials
 }
 
 func NewStageCredentials(e bool, cs []string, buf *buffer.Buffer) *StageCredentials {
 	s := buffer.Alloc[StageCredentials](buf)
 	s.Exist = e
-	s.Credentials = cs
+
+	if cs != nil {
+		s.Credentials = buffer.MakeSlice[string](buf)
+		for _, c := range cs {
+			s.Credentials = buffer.AppendSlice[string](buf, s.Credentials, buf.CopyString(c))
+		}
+	}
+
 	return s
 }
 
@@ -218,20 +227,22 @@ func (node *StageCredentials) Format(ctx *FmtCtx) {
 
 type StageUrl struct {
 	Exist bool
-	Url   string
+	Url   *BufString
 }
 
 func NewStageUrl(e bool, u string, buf *buffer.Buffer) *StageUrl {
 	s := buffer.Alloc[StageUrl](buf)
 	s.Exist = e
-	s.Url = u
+	bu := NewBufString(u)
+	buf.Pin(bu)
+	s.Url = bu
 	return s
 }
 
 func (node *StageUrl) Format(ctx *FmtCtx) {
 	if node.Exist {
 		ctx.WriteString(" url=")
-		ctx.WriteString(fmt.Sprintf("'%s'", node.Url))
+		ctx.WriteString(fmt.Sprintf("'%s'", node.Url.Get()))
 	}
 }
 

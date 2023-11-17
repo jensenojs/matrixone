@@ -58,19 +58,21 @@ func (ko KillOption) Format(ctx *FmtCtx) {
 
 type StatementOption struct {
 	Exist       bool
-	StatementId string
+	StatementId *BufString
 }
 
 func NewStatementOption(e bool, i string, buf *buffer.Buffer) StatementOption {
 	s := buffer.Alloc[StatementOption](buf)
 	s.Exist = e
-	s.StatementId = i
+	bStatementId := NewBufString(i)
+	buf.Pin(bStatementId)
+	s.StatementId = bStatementId
 	return *s
 }
 
 func (so StatementOption) Format(ctx *FmtCtx) {
 	if so.Exist {
-		ctx.WriteString(so.StatementId)
+		ctx.WriteString(so.StatementId.Get())
 	}
 }
 
@@ -100,7 +102,7 @@ func (k *Kill) Format(ctx *FmtCtx) {
 	if k.StmtOption.Exist {
 		ctx.WriteByte(' ')
 		ctx.WriteByte('"')
-		ctx.WriteString(k.StmtOption.StatementId)
+		ctx.WriteString(k.StmtOption.StatementId.Get())
 		ctx.WriteByte('"')
 	}
 }

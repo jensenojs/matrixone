@@ -61,7 +61,7 @@ type PersistentUserDefinedTypeMetadata struct {
 type InternalType struct {
 	//the group of types that are compatible with each other
 	Family       Family
-	FamilyString string
+	FamilyString *BufString
 	/*
 		From: https://dev.mysql.com/doc/refman/8.0/en/numeric-type-syntax.html
 
@@ -130,7 +130,7 @@ type InternalType struct {
 }
 
 func (node *InternalType) Format(ctx *FmtCtx) {
-	fs := strings.ToLower(node.FamilyString)
+	fs := strings.ToLower(node.FamilyString.Get())
 	ctx.WriteString(fs)
 
 	if node.Unsigned {
@@ -207,7 +207,10 @@ type T struct {
 func NewSQLType(family Family, familystring string, width int32, local string, oid uint32, buf *buffer.Buffer) *T {
 	t := buffer.Alloc[T](buf)
 	t.InternalType.Family = family
-	t.InternalType.FamilyString = familystring
+	bfamilystring := NewBufString(familystring)
+	buf.Pin(bfamilystring, &local)
+	t.InternalType.FamilyString = bfamilystring
+
 	t.InternalType.Width = width
 	t.InternalType.Locale = &local
 	t.InternalType.Oid = oid
@@ -217,7 +220,10 @@ func NewSQLType(family Family, familystring string, width int32, local string, o
 func NewSQLTypeWithDisplayScale(family Family, familystring string, width int32, local string, oid uint32, displaywith, scale int32, buf *buffer.Buffer) *T {
 	t := buffer.Alloc[T](buf)
 	t.InternalType.Family = family
-	t.InternalType.FamilyString = familystring
+	bfamilystring := NewBufString(familystring)
+	buf.Pin(bfamilystring, &local)
+	t.InternalType.FamilyString = bfamilystring
+
 	t.InternalType.Width = width
 	t.InternalType.Locale = &local
 	t.InternalType.Oid = oid

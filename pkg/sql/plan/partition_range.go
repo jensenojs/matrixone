@@ -111,7 +111,7 @@ func (rpb *rangePartitionBuilder) buildPartitionDefs(ctx context.Context, partit
 
 		for _, tableOption := range partition.Options {
 			if opComment, ok := tableOption.(*tree.TableOptionComment); ok {
-				partitionItem.Comment = opComment.Comment
+				partitionItem.Comment = opComment.Comment.Get()
 			}
 		}
 		partitionDef.Partitions[i] = partitionItem

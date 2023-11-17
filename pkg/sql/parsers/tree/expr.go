@@ -964,7 +964,7 @@ func (node *ResolvableFunctionReference) Format(ctx *FmtCtx) {
 
 func FuncName2ResolvableFunctionReference(funcName *UnresolvedName, buf *buffer.Buffer) ResolvableFunctionReference {
 	if buf != nil {
-		r := buffer.Alloc[ResolvableFunctionReference](buf)	
+		r := buffer.Alloc[ResolvableFunctionReference](buf)
 		r.FunctionReference = funcName
 		return *r
 	}
@@ -1619,7 +1619,7 @@ System Variable: Global System Variable, Session System Variable
 
 type VarExpr struct {
 	exprImpl
-	Name   string
+	Name   *BufString
 	System bool
 	Global bool
 	Expr   Expr
@@ -1627,12 +1627,12 @@ type VarExpr struct {
 
 // incomplete
 func (node *VarExpr) Format(ctx *FmtCtx) {
-	if node.Name != "" {
+	if node.Name.Get() != "" {
 		ctx.WriteByte('@')
 		if node.System {
 			ctx.WriteByte('@')
 		}
-		ctx.WriteString(node.Name)
+		ctx.WriteString(node.Name.Get())
 	}
 }
 
@@ -1643,7 +1643,9 @@ func (node *VarExpr) Accept(v Visitor) (Expr, bool) {
 
 func NewVarExpr(n string, sys, glob bool, buf *buffer.Buffer) *VarExpr {
 	v := buffer.Alloc[VarExpr](buf)
-	v.Name = n
+	bn := NewBufString(n)
+	buf.Pin(bn)
+	v.Name = bn
 	v.System = sys
 	v.Global = glob
 	return v

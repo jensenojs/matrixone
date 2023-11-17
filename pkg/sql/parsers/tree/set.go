@@ -53,7 +53,7 @@ type VarAssignmentExpr struct {
 	NodeFormatter
 	System   bool
 	Global   bool
-	Name     string
+	Name     *BufString
 	Value    Expr
 	Reserved Expr
 }
@@ -62,7 +62,7 @@ func (node *VarAssignmentExpr) Format(ctx *FmtCtx) {
 	if node.Global {
 		ctx.WriteString("global ")
 	}
-	ctx.WriteString(node.Name)
+	ctx.WriteString(node.Name.Get())
 	ctx.WriteString(" =")
 	if node.Value != nil {
 		ctx.WriteByte(' ')
@@ -78,7 +78,9 @@ func NewVarAssignmentExpr(s bool, g bool, n string, v Expr, r Expr, buf *buffer.
 	va := buffer.Alloc[VarAssignmentExpr](buf)
 	va.System = s
 	va.Global = g
-	va.Name = n
+	bn := NewBufString(n)
+	buf.Pin(bn)
+	va.Name = bn
 	va.Value = v
 	va.Reserved = r
 	return va
@@ -183,7 +185,7 @@ func (node *SetRole) GetQueryType() string     { return QueryTypeOth }
 type SetPassword struct {
 	statementImpl
 	User     *User
-	Password string
+	Password *BufString
 }
 
 func (node *SetPassword) Format(ctx *FmtCtx) {
@@ -193,12 +195,14 @@ func (node *SetPassword) Format(ctx *FmtCtx) {
 		node.User.Format(ctx)
 	}
 	ctx.WriteString(" = ")
-	ctx.WriteString(node.Password)
+	ctx.WriteString(node.Password.Get())
 }
 func NewSetPassword(u *User, p string, buf *buffer.Buffer) *SetPassword {
 	sp := buffer.Alloc[SetPassword](buf)
 	sp.User = u
-	sp.Password = p
+	bp := NewBufString(p)
+	buf.Pin(bp)
+	sp.Password = bp
 	return sp
 }
 

@@ -1466,7 +1466,7 @@ load_fields:
             yylex.(*Lexer).buf,
         )
         for _, f := range $2 {
-            if f.Terminated != "" {
+            if f.Terminated.Get() != "" {
                 res.Terminated = f.Terminated
             }
             if f.Optionally {
@@ -2493,12 +2493,12 @@ var_name_list:
     var_name
     {
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, $1)
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, yylex.(*Lexer).buf.CopyString($1))
     }
 |   var_name_list ',' var_name
     {
-        $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, $3)
+        /* $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf) */
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, yylex.(*Lexer).buf.CopyString($3))
     }
 
 transaction_stmt:
@@ -3673,8 +3673,8 @@ show_grants_stmt:
     {
         // Username HostName Roles ShowGrantType
         $$ = tree.NewShowGrants(
-            $4.Username,
-            $4.Hostname,
+            $4.Username.Get(),
+            $4.Hostname.Get(),
             $5,
             tree.GrantForUser,
             yylex.(*Lexer).buf,
@@ -4192,16 +4192,11 @@ show_servers_stmt:
 table_name_unresolved:
     ident
     {
-        s := buffer.Alloc[[3]string](yylex.(*Lexer).buf)
-        s[0] = $1.Compare()
-        $$ = tree.SetUnresolvedObjectName(1, *s, yylex.(*Lexer).buf)
+        $$ = tree.SetUnresolvedObjectName(1, [3]string{$1.Compare()}, yylex.(*Lexer).buf)
     }
 |   ident '.' ident
     {
-        s := buffer.Alloc[[3]string](yylex.(*Lexer).buf)
-        s[0] = $3.Compare()
-        s[1] = $1.Compare()
-        $$ = tree.SetUnresolvedObjectName(2, *s, yylex.(*Lexer).buf)
+        $$ = tree.SetUnresolvedObjectName(2, [3]string{$3.Compare(), $1.Compare()}, yylex.(*Lexer).buf)
     }
 
 db_name:
@@ -4213,24 +4208,15 @@ db_name:
 unresolved_object_name:
     ident
     {
-        s := buffer.Alloc[[3]string](yylex.(*Lexer).buf)
-        s[0] = $1.Compare()
-        $$ = tree.SetUnresolvedObjectName(1, *s, yylex.(*Lexer).buf)
+        $$ = tree.SetUnresolvedObjectName(1, [3]string{$1.Compare()}, yylex.(*Lexer).buf)
     }
 |   ident '.' ident
     {
-        s := buffer.Alloc[[3]string](yylex.(*Lexer).buf)
-        s[0] = $3.Compare()
-        s[1] = $1.Compare()
-        $$ = tree.SetUnresolvedObjectName(2, *s, yylex.(*Lexer).buf)
+        $$ = tree.SetUnresolvedObjectName(2, [3]string{$3.Compare(), $1.Compare()}, yylex.(*Lexer).buf)
     }
 |   ident '.' ident '.' ident
     {
-        s := buffer.Alloc[[3]string](yylex.(*Lexer).buf)
-        s[0] = $5.Compare()
-        s[1] = $3.Compare()
-        s[2] = $1.Compare()
-        $$ = tree.SetUnresolvedObjectName(3, *s, yylex.(*Lexer).buf)
+        $$ = tree.SetUnresolvedObjectName(3, [3]string{$5.Compare(), $3.Compare(), $1.Compare()}, yylex.(*Lexer).buf)
     }
 
 truncate_table_stmt:
@@ -4312,8 +4298,8 @@ drop_user_spec:
     {
         // UserName HostName AuthOption
         $$ = tree.NewUser(
-            $1.Username,
-            $1.Hostname,
+            $1.Username.Get(),
+            $1.Hostname.Get(),
             nil,
             yylex.(*Lexer).buf,
         )
@@ -4974,12 +4960,12 @@ force_quote_list:
     ident
     {
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, $1.Compare())
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, yylex.(*Lexer).buf.CopyString($1.Compare()))
     }
 |   force_quote_list ',' ident
     {
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, $3.Compare())
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, yylex.(*Lexer).buf.CopyString($3.Compare()))
     }
 
 select_stmt:
@@ -5907,23 +5893,23 @@ index_name_list:
 |	ident
 	{
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, $1.Compare())
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, yylex.(*Lexer).buf.CopyString($1.Compare()))
 
 	}
 |	index_name_list ',' ident
 	{
-        $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, $3.Compare())
+        /* $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf) */
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, yylex.(*Lexer).buf.CopyString($3.Compare()))
 	}
 |	PRIMARY
 	{
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, $1)
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, yylex.(*Lexer).buf.CopyString($1))
 	}
 |	index_name_list ',' PRIMARY
 	{
-        $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-		$$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, $3)
+        /* $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf) */
+		$$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, yylex.(*Lexer).buf.CopyString($3))
 	}
 
 as_opt_id:
@@ -6529,7 +6515,7 @@ credentialsparams:
     }
 |   credentialsparams ',' credentialsparam
     {
-        $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, $3...)
     }
 
@@ -6540,7 +6526,7 @@ credentialsparam:
 |   STRING '=' STRING
     {
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, $1, $3)
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, yylex.(*Lexer).buf.CopyString($1), yylex.(*Lexer).buf.CopyString($3))
     }
 
 urlparams:
@@ -6809,8 +6795,8 @@ user_spec_with_identified:
     {
         // Username Hostname AuthOption
         $$ = tree.NewUser(
-            $1.Username,
-            $1.Hostname,
+            $1.Username.Get(),
+            $1.Hostname.Get(),
             $2,
             yylex.(*Lexer).buf,
         )
@@ -6833,8 +6819,8 @@ user_spec:
     {
         // Username Hostname AuthOption
         $$ = tree.NewUser(
-            $1.Username,
-            $1.Hostname,
+            $1.Username.Get(),
+            $1.Hostname.Get(),
             $2,
             yylex.(*Lexer).buf,
         )
@@ -7019,11 +7005,11 @@ index_option_list:
         } else {
             opt1 := $1
             opt2 := $2
-            if len(opt2.Comment) > 0 {
+            if len(opt2.Comment.Get()) > 0 {
                 opt1.Comment = opt2.Comment
             } else if opt2.KeyBlockSize > 0 {
                 opt1.KeyBlockSize = opt2.KeyBlockSize
-            } else if len(opt2.ParserName) > 0 {
+            } else if len(opt2.ParserName.Get()) > 0 {
                 opt1.ParserName = opt2.ParserName
             } else if opt2.Visible != tree.VISIBLE_TYPE_INVALID {
                 opt1.Visible = opt2.Visible
@@ -7524,7 +7510,7 @@ infile_or_s3_param:
 |   STRING '=' STRING
     {
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, $1, $3)
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, yylex.(*Lexer).buf.CopyString($1), yylex.(*Lexer).buf.CopyString($3))
     }
 
 tail_param_opt:
@@ -8534,11 +8520,17 @@ constaint_def:
         if $1 != "" {
             switch v := $2.(type) {
             case *tree.PrimaryKeyIndex:
-                v.ConstraintSymbol = $1
+                bc := tree.NewBufString($1)
+                yylex.(*Lexer).buf.Pin(bc)
+                v.ConstraintSymbol = bc
             case *tree.ForeignKey:
-                v.ConstraintSymbol = $1
+                bf := tree.NewBufString($1)
+                yylex.(*Lexer).buf.Pin(bf)
+                v.ConstraintSymbol = bf
             case *tree.UniqueIndex:
-                v.ConstraintSymbol = $1
+                bn := tree.NewBufString($1)
+                yylex.(*Lexer).buf.Pin(bn)
+                v.ConstraintSymbol = bn
             }
         }
         $$ = $2
@@ -8638,17 +8630,17 @@ index_name_and_type_opt:
     index_name
     {
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, $1, "")
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, yylex.(*Lexer).buf.CopyString($1), yylex.(*Lexer).buf.CopyString(""))
     }
 |   index_name USING index_type
     {
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, $1, $3)
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, yylex.(*Lexer).buf.CopyString($1), yylex.(*Lexer).buf.CopyString($3))
     }
 |   ident TYPE index_type
     {
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, $1.Compare(), $3)
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, yylex.(*Lexer).buf.CopyString($1.Compare()), yylex.(*Lexer).buf.CopyString($3))
     }
 
 index_type:
@@ -9248,12 +9240,14 @@ mo_cast_type:
     column_type
 {
    t := $$
-   str := strings.ToLower(t.InternalType.FamilyString)
+   str := strings.ToLower(t.InternalType.FamilyString.Get())
    if str == "binary" {
         t.InternalType.Scale = -1
    } else if str == "char" {
    	if t.InternalType.DisplayWith == -1 {
-   		t.InternalType.FamilyString = "varchar"
+   		bf := tree.NewBufString("varchar")
+        yylex.(*Lexer).buf.Pin(bf)
+   		t.InternalType.FamilyString = bf
    		t.InternalType.Oid = uint32(defines.MYSQL_TYPE_VARCHAR)
    	}
    }
@@ -11053,12 +11047,12 @@ enum_values:
     STRING
     {
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, $1)
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $$, yylex.(*Lexer).buf.CopyString($1))
     }
 |   enum_values ',' STRING
     {
         $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, $3)
+        $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, yylex.(*Lexer).buf.CopyString($3))
     }
 
 length_opt:

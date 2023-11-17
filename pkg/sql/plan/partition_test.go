@@ -586,10 +586,8 @@ func mockPartitionBinder(tableDef *plan.TableDef) (*PartitionBinder, error) {
 	return NewPartitionBinder(builder, bindContext, builder.compCtx.GetBuffer()), err
 }
 
-func mockExpr(t *testing.T, s string) (tree.Expr, error) {
+func mockExpr(t *testing.T, s string, buf *buffer.Buffer) (tree.Expr, error) {
 	selStr := "select " + s
-	buf := buffer.New()
-	defer buf.Free()
 	one, err := parsers.ParseOne(context.TODO(), dialect.MYSQL, selStr, 1, buf)
 	require.Nil(t, err)
 	return one.(*tree.Select).Select.(*tree.SelectClause).Exprs[0].Expr, err
@@ -600,6 +598,8 @@ func Test_checkPartitionKeys(t *testing.T) {
 		tableDef.Cols = append(tableDef.Cols, col)
 	}
 
+	buf :=  buffer.New()
+	defer buf.Free()
 	/*
 		table test:
 		col1 int32 pk
@@ -672,7 +672,7 @@ func Test_checkPartitionKeys(t *testing.T) {
 		pb, err := mockPartitionBinder(tableDef)
 		require.Nil(t, err)
 
-		astExpr, err := mockExpr(t, "col1+1+col2")
+		astExpr, err := mockExpr(t, "col1+1+col2", buf)
 		require.Nil(t, err)
 
 		expr, err := pb.BindExpr(astExpr, 0, true)
@@ -691,7 +691,7 @@ func Test_checkPartitionKeys(t *testing.T) {
 		pb, err := mockPartitionBinder(tableDef)
 		require.Nil(t, err)
 
-		astExpr, err := mockExpr(t, "col1+1")
+		astExpr, err := mockExpr(t, "col1+1", buf)
 		require.Nil(t, err)
 
 		expr, err := pb.BindExpr(astExpr, 0, true)
@@ -710,7 +710,7 @@ func Test_checkPartitionKeys(t *testing.T) {
 		pb, err := mockPartitionBinder(tableDef)
 		require.Nil(t, err)
 
-		astExpr, err := mockExpr(t, "1")
+		astExpr, err := mockExpr(t, "1", buf)
 		require.Nil(t, err)
 
 		expr, err := pb.BindExpr(astExpr, 0, true)
@@ -729,7 +729,7 @@ func Test_checkPartitionKeys(t *testing.T) {
 		pb, err := mockPartitionBinder(tableDef2)
 		require.Nil(t, err)
 
-		astExpr, err := mockExpr(t, "col1+1+col2")
+		astExpr, err := mockExpr(t, "col1+1+col2", buf)
 		require.Nil(t, err)
 
 		expr, err := pb.BindExpr(astExpr, 0, true)
@@ -749,7 +749,7 @@ func Test_checkPartitionKeys(t *testing.T) {
 		pb, err := mockPartitionBinder(tableDef2)
 		require.Nil(t, err)
 
-		astExpr, err := mockExpr(t, "col1+1+col2")
+		astExpr, err := mockExpr(t, "col1+1+col2", buf)
 		require.Nil(t, err)
 
 		expr, err := pb.BindExpr(astExpr, 0, true)
@@ -768,7 +768,7 @@ func Test_checkPartitionKeys(t *testing.T) {
 		pb, err := mockPartitionBinder(tableDef2)
 		require.Nil(t, err)
 
-		astExpr, err := mockExpr(t, "col2")
+		astExpr, err := mockExpr(t, "col2", buf)
 		require.Nil(t, err)
 
 		expr, err := pb.BindExpr(astExpr, 0, true)
@@ -833,6 +833,8 @@ func addCol(tableDef *TableDef, col *ColDef) {
 }
 
 func Test_checkPartitionExprType(t *testing.T) {
+	buf :=  buffer.New()
+	defer buf.Free()
 	/*
 		table test:
 		col1 int32 pk
@@ -863,7 +865,7 @@ func Test_checkPartitionExprType(t *testing.T) {
 		pb, err := mockPartitionBinder(tableDef)
 		require.Nil(t, err)
 
-		astExpr, err := mockExpr(t, "col1")
+		astExpr, err := mockExpr(t, "col1", buf)
 		require.Nil(t, err)
 
 		expr, err := pb.BindExpr(astExpr, 0, true)
@@ -882,7 +884,7 @@ func Test_checkPartitionExprType(t *testing.T) {
 		pb, err := mockPartitionBinder(tableDef)
 		require.Nil(t, err)
 
-		astExpr, err := mockExpr(t, "col1 / 3")
+		astExpr, err := mockExpr(t, "col1 / 3", buf)
 		require.Nil(t, err)
 
 		expr, err := pb.BindExpr(astExpr, 0, true)
@@ -1033,12 +1035,15 @@ func TestCheckPartitionFuncValid(t *testing.T) {
 		wantPartitionExprTypeErr bool
 	}
 
+	buf := buffer.New()
+	defer buf.Free()
+
 	checkFunc := func(k kase) {
 		//fmt.Println(k.s)
 		pb, err := mockPartitionBinder(tableDef)
 		require.Nil(t, err)
 
-		astExpr, err := mockExpr(t, k.s)
+		astExpr, err := mockExpr(t, k.s, buf)
 		require.Nil(t, err)
 
 		partitionDef := &PartitionByDef{

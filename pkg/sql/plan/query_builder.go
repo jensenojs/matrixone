@@ -2088,9 +2088,9 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 				Exprs: tree.Exprs{tree.NewComparisonExpr(tree.LESS_THAN, tree.SetUnresolvedName(nil, ctx.cteName, moRecursiveLevelCol), tree.NewNumValWithType(constant.MakeInt64(moDefaultRecursionMax), fmt.Sprintf("%d", moDefaultRecursionMax), false, tree.P_int64, nil), nil)},
 			}
 			if clause.Where != nil {
-				clause.Where = &tree.Where{Type: tree.AstWhere, Expr: tree.NewAndExpr(clause.Where.Expr, f, nil)}
+				clause.Where = &tree.Where{Type: tree.NewBufString(tree.AstWhere), Expr: tree.NewAndExpr(clause.Where.Expr, f, nil)}
 			} else {
-				clause.Where = &tree.Where{Type: tree.AstWhere, Expr: f}
+				clause.Where = &tree.Where{Type: tree.NewBufString(tree.AstWhere), Expr: f}
 			}
 		}
 		if clause.Where != nil {
@@ -2567,7 +2567,7 @@ func (builder *QueryBuilder) checkRecursiveTable(stmt tree.TableExpr, name strin
 
 	case *tree.JoinTableExpr:
 		var err, err0 error
-		if tbl.JoinType == tree.JOIN_TYPE_LEFT || tbl.JoinType == tree.JOIN_TYPE_RIGHT || tbl.JoinType == tree.JOIN_TYPE_NATURAL_LEFT || tbl.JoinType == tree.JOIN_TYPE_NATURAL_RIGHT {
+		if tbl.JoinType.Get() == tree.JOIN_TYPE_LEFT || tbl.JoinType.Get() == tree.JOIN_TYPE_RIGHT || tbl.JoinType.Get() == tree.JOIN_TYPE_NATURAL_LEFT || tbl.JoinType.Get() == tree.JOIN_TYPE_NATURAL_RIGHT {
 			err0 = moerr.NewParseError(builder.GetContext(), "unsupport LEFT, RIGHT or OUTER JOIN in recursive CTE: %T", stmt)
 		}
 		c1, err1 := builder.checkRecursiveTable(tbl.Left, name)
@@ -3086,7 +3086,7 @@ func (builder *QueryBuilder) addBinding(nodeID int32, alias tree.AliasClause, ct
 			return nil
 		}
 		if len(alias.Cols) > len(node.TableDef.Cols) {
-			return moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", alias.Alias, len(node.TableDef.Cols), len(alias.Cols))
+			return moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", alias.Alias.Get(), len(node.TableDef.Cols), len(alias.Cols))
 		}
 
 		if alias.Alias.Get() != "" {
@@ -3193,7 +3193,7 @@ func (builder *QueryBuilder) buildJoinTable(tbl *tree.JoinTableExpr, ctx *BindCo
 	buf := builder.compCtx.GetBuffer()
 	var joinType plan.Node_JoinType
 
-	switch tbl.JoinType {
+	switch tbl.JoinType.Get() {
 	case tree.JOIN_TYPE_CROSS, tree.JOIN_TYPE_INNER, tree.JOIN_TYPE_NATURAL:
 		joinType = plan.Node_INNER
 	case tree.JOIN_TYPE_LEFT, tree.JOIN_TYPE_NATURAL_LEFT:
@@ -3259,7 +3259,7 @@ func (builder *QueryBuilder) buildJoinTable(tbl *tree.JoinTableExpr, ctx *BindCo
 		}
 
 	default:
-		if tbl.JoinType == tree.JOIN_TYPE_NATURAL || tbl.JoinType == tree.JOIN_TYPE_NATURAL_LEFT || tbl.JoinType == tree.JOIN_TYPE_NATURAL_RIGHT {
+		if tbl.JoinType.Get() == tree.JOIN_TYPE_NATURAL || tbl.JoinType.Get() == tree.JOIN_TYPE_NATURAL_LEFT || tbl.JoinType.Get() == tree.JOIN_TYPE_NATURAL_RIGHT {
 			leftCols := make(map[string]any)
 			for _, binding := range leftCtx.bindings {
 				for i, col := range binding.cols {

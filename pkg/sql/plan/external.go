@@ -187,7 +187,7 @@ func getExternalStats(node *plan.Node, builder *QueryBuilder) *Stats {
 	}
 
 	//read one line
-	fs, readPath, err := GetForETLWithType(param, param.Filepath)
+	fs, readPath, err := GetForETLWithType(param, param.Filepath.Get())
 	if err != nil {
 		return DefaultHugeStats()
 	}

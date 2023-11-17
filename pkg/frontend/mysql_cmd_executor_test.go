@@ -26,7 +26,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/clusterservice"
-	"github.com/matrixorigin/matrixone/pkg/common/buffer"
+	mobuf "github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/runtime"
 	"github.com/matrixorigin/matrixone/pkg/config"
@@ -77,10 +77,10 @@ func Test_mce(t *testing.T) {
 		ctx, rsStubs := mockRecordStatement(ctx)
 		defer rsStubs.Reset()
 
-		buffer := buffer.New()
+		buffer := mobuf.New()
 		defer buffer.Free()
 
-		srStub := gostub.Stub(&parsers.HandleSqlForRecord, func(sql string) []string {
+		srStub := gostub.Stub(&parsers.HandleSqlForRecord, func(sql string, buf *mobuf.Buffer) []string {
 			return make([]string, 7)
 		})
 		defer srStub.Reset()
@@ -831,7 +831,7 @@ func Test_GetComputationWrapper(t *testing.T) {
 		var eng engine.Engine
 		proc := &process.Process{}
 		InitGlobalSystemVariables(GSysVariables)
-		ses := &Session{planCache: newPlanCache(1), gSysVars: GSysVariables}
+		ses := &Session{planCache: newPlanCache(1), gSysVars: GSysVariables, buf : NewSessionBuf()}
 		cw, err := GetComputationWrapper(db, &UserInput{sql: sql}, user, eng, proc, ses)
 		convey.So(cw, convey.ShouldNotBeEmpty)
 		convey.So(err, convey.ShouldBeNil)
@@ -875,7 +875,7 @@ func runTestHandle(funName string, t *testing.T, handleFun func(*MysqlCmdExecuto
 
 func Test_HandlePrepareStmt(t *testing.T) {
 	ctx := context.TODO()
-	buf := buffer.New()
+	buf := mobuf.New()
 	defer buf.Free()
 	stmt, err := parsers.ParseOne(ctx, dialect.MYSQL, "Prepare stmt1 from select 1, 2", 1, buf)
 	if err != nil {
@@ -890,7 +890,7 @@ func Test_HandlePrepareStmt(t *testing.T) {
 
 func Test_HandleDeallocate(t *testing.T) {
 	ctx := context.TODO()
-	buf := buffer.New()
+	buf := mobuf.New()
 	defer buf.Free()
 	stmt, err := parsers.ParseOne(ctx, dialect.MYSQL, "deallocate Prepare stmt1", 1, buf)
 	if err != nil {
@@ -1061,7 +1061,7 @@ func TestSerializePlanToJson(t *testing.T) {
 }
 
 func buildSingleSql(opt plan.Optimizer, t *testing.T, sql string) (*plan.Plan, error) {
-	buf := buffer.New()
+	buf := mobuf.New()
 	defer buf.Free()
 	stmts, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1, buf)
 	if err != nil {
@@ -1116,7 +1116,7 @@ func TestProcessLoadLocal(t *testing.T) {
 	convey.Convey("call processLoadLocal func", t, func() {
 		param := &tree.ExternParam{
 			ExParamConst: tree.ExParamConst{
-				Filepath: "test.csv",
+				Filepath: tree.NewBufString("test.csv"),
 			},
 		}
 		proc := testutil.NewProc()

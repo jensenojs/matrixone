@@ -27,13 +27,13 @@ func checkConstraintNames(uniqueConstraints []*tree.UniqueIndex, indexConstraint
 	constrNames := map[string]bool{}
 	// Check not empty constraint name whether is duplicated.
 	for _, constr := range indexConstraints {
-		err := checkDuplicateConstraint(constrNames, constr.Name, false, ctx)
+		err := checkDuplicateConstraint(constrNames, constr.Name.Get(), false, ctx)
 		if err != nil {
 			return err
 		}
 	}
 	for _, constr := range uniqueConstraints {
-		err := checkDuplicateConstraint(constrNames, constr.Name, false, ctx)
+		err := checkDuplicateConstraint(constrNames, constr.Name.Get(), false, ctx)
 		if err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ func checkDuplicateConstraint(namesMap map[string]bool, name string, foreign boo
 
 // setEmptyUniqueIndexName Set name for unqiue index constraint with an empty name
 func setEmptyUniqueIndexName(namesMap map[string]bool, indexConstr *tree.UniqueIndex) {
-	if indexConstr.Name == "" && len(indexConstr.KeyParts) > 0 {
+	if indexConstr.Name.Get() == "" && len(indexConstr.KeyParts) > 0 {
 		colName := indexConstr.KeyParts[0].ColName.Parts[0]
 		constrName := colName
 		i := 2
@@ -79,14 +79,14 @@ func setEmptyUniqueIndexName(namesMap map[string]bool, indexConstr *tree.UniqueI
 			constrName = fmt.Sprintf("%s_%d", colName, i)
 			i++
 		}
-		indexConstr.Name = constrName
+		indexConstr.Name = indexConstr.Name.Set(constrName)
 		namesMap[constrName] = true
 	}
 }
 
 // setEmptyIndexName Set name for index constraint with an empty name
 func setEmptyIndexName(namesMap map[string]bool, indexConstr *tree.Index) {
-	if indexConstr.Name == "" && len(indexConstr.KeyParts) > 0 {
+	if indexConstr.Name.Get() == "" && len(indexConstr.KeyParts) > 0 {
 		var colName string
 		if colName == "" {
 			colName = indexConstr.KeyParts[0].ColName.Parts[0]
@@ -102,7 +102,7 @@ func setEmptyIndexName(namesMap map[string]bool, indexConstr *tree.Index) {
 			constrName = fmt.Sprintf("%s_%d", colName, i)
 			i++
 		}
-		indexConstr.Name = constrName
+		indexConstr.Name = indexConstr.Name.Set(constrName)
 		namesMap[constrName] = true
 	}
 }

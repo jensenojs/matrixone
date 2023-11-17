@@ -279,7 +279,7 @@ func buildPartitionDefs(ctx context.Context,
 			comment := ""
 			for _, option := range syntaxDefs[i].Options {
 				if commentOpt, ok := option.(*tree.TableOptionComment); ok {
-					comment = commentOpt.Comment
+					comment = commentOpt.Comment.Get()
 				}
 			}
 
@@ -323,7 +323,7 @@ func getPrimaryKeyAndUniqueKey(defs tree.TableDefs) (primaryKeys []*tree.Unresol
 					}
 					uniqueKey := &tree.UniqueIndex{
 						KeyParts: []*tree.KeyPart{part},
-						Name:     "",
+						Name:     tree.NewBufString(""),
 						Empty:    true,
 					}
 					uniqueIndexs = append(uniqueIndexs, uniqueKey)

@@ -18,32 +18,42 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 
 type BackupStart struct {
 	statementImpl
-	Timestamp string
+	Timestamp *BufString
 	IsS3      bool
-	Dir       string
+	Dir       *BufString
 	//s3 option
-	Option []string
+	Option []string // do NOT reassign after NewBackupStart
 }
 
 func NewBackupStart(ts string, isS3 bool, dir string, option []string, buf *buffer.Buffer) *BackupStart {
 	b := buffer.Alloc[BackupStart](buf)
-	b.Timestamp = ts
+	bTimestamp := NewBufString(ts)
+	bDir := NewBufString(dir)
+	buf.Pin(bTimestamp, bDir)
+	b.Timestamp = bTimestamp
+	b.Dir = bDir
 	b.IsS3 = isS3
-	b.Dir = dir
-	b.Option = option
+	
+	if option != nil {
+		b.Option = buffer.MakeSlice[string](buf)
+		for _, o := range option {
+			b.Option = buffer.AppendSlice[string](buf, b.Option, buf.CopyString(o))
+		}
+	}
+
 	return b
 }
 
 func (node *BackupStart) Format(ctx *FmtCtx) {
 	ctx.WriteString("backup ")
-	ctx.WriteString(node.Timestamp)
+	ctx.WriteString(node.Timestamp.Get())
 	ctx.WriteString(" ")
 	if node.IsS3 {
 		ctx.WriteString("s3option ")
 		formatS3option(ctx, node.Option)
 	} else {
 		ctx.WriteString("filesystem ")
-		ctx.WriteString(node.Dir)
+		ctx.WriteString(node.Dir.Get())
 	}
 }
 

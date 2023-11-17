@@ -22,7 +22,7 @@ type Prepare interface {
 
 type prepareImpl struct {
 	Prepare
-	Format string
+	Format *BufString
 }
 
 type PrepareStmt struct {
@@ -34,7 +34,7 @@ type PrepareStmt struct {
 type PrepareString struct {
 	prepareImpl
 	Name *BufIdentifier
-	Sql  string
+	Sql  *BufString
 }
 
 func (node *PrepareStmt) Format(ctx *FmtCtx) {
@@ -48,7 +48,7 @@ func (node *PrepareString) Format(ctx *FmtCtx) {
 	ctx.WriteString("prepare ")
 	node.Name.Format(ctx)
 	ctx.WriteString(" from ")
-	ctx.WriteString(node.Sql)
+	ctx.WriteString(node.Sql.Get())
 }
 
 func (node *PrepareStmt) GetStatementType() string   { return "Prepare" }
@@ -70,6 +70,8 @@ func NewPrepareString(name Identifier, sql string, buf *buffer.Buffer) *PrepareS
 	n := NewBufIdentifier(name)
 	buf.Pin(n)
 	ps.Name = n
-	ps.Sql = sql
+	bsql := NewBufString(sql)
+	buf.Pin(bsql)
+	ps.Sql = bsql
 	return ps
 }

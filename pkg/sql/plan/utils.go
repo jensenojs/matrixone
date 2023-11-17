@@ -1322,34 +1322,34 @@ func InitInfileParam(param *tree.ExternParam) error {
 	for i := 0; i < len(param.Option); i += 2 {
 		switch strings.ToLower(param.Option[i]) {
 		case "filepath":
-			param.Filepath = param.Option[i+1]
+			param.Filepath = param.Filepath.Set(param.Option[i+1])
 		case "compression":
-			param.CompressType = param.Option[i+1]
+			param.CompressType = param.CompressType.Set(param.Option[i+1])
 		case "format":
 			format := strings.ToLower(param.Option[i+1])
 			if format != tree.CSV && format != tree.JSONLINE {
 				return moerr.NewBadConfig(param.Ctx, "the format '%s' is not supported", format)
 			}
-			param.Format = format
+			param.Format = param.Format.Set(format)
 		case "jsondata":
 			jsondata := strings.ToLower(param.Option[i+1])
 			if jsondata != tree.OBJECT && jsondata != tree.ARRAY {
 				return moerr.NewBadConfig(param.Ctx, "the jsondata '%s' is not supported", jsondata)
 			}
-			param.JsonData = jsondata
-			param.Format = tree.JSONLINE
+			param.JsonData = param.JsonData.Set(jsondata)
+			param.Format = param.Format.Set(tree.JSONLINE)
 		default:
 			return moerr.NewBadConfig(param.Ctx, "the keyword '%s' is not support", strings.ToLower(param.Option[i]))
 		}
 	}
-	if len(param.Filepath) == 0 {
+	if len(param.Filepath.Get()) == 0 {
 		return moerr.NewBadConfig(param.Ctx, "the filepath must be specified")
 	}
-	if param.Format == tree.JSONLINE && len(param.JsonData) == 0 {
+	if param.Format.Get() == tree.JSONLINE && len(param.JsonData.Get()) == 0 {
 		return moerr.NewBadConfig(param.Ctx, "the jsondata must be specified")
 	}
-	if len(param.Format) == 0 {
-		param.Format = tree.CSV
+	if len(param.Format.Get()) == 0 {
+		param.Format = param.Format.Set(tree.CSV)
 	}
 	return nil
 }
@@ -1369,9 +1369,9 @@ func InitS3Param(param *tree.ExternParam) error {
 		case "bucket":
 			param.S3Param.Bucket = param.Option[i+1]
 		case "filepath":
-			param.Filepath = param.Option[i+1]
+			param.Filepath = param.Filepath.Set(param.Option[i+1])
 		case "compression":
-			param.CompressType = param.Option[i+1]
+			param.CompressType = param.CompressType.Set(param.Option[i+1])
 		case "provider":
 			param.S3Param.Provider = param.Option[i+1]
 		case "role_arn":
@@ -1383,24 +1383,24 @@ func InitS3Param(param *tree.ExternParam) error {
 			if format != tree.CSV && format != tree.JSONLINE {
 				return moerr.NewBadConfig(param.Ctx, "the format '%s' is not supported", format)
 			}
-			param.Format = format
+			param.Format = param.Format.Set(format)
 		case "jsondata":
 			jsondata := strings.ToLower(param.Option[i+1])
 			if jsondata != tree.OBJECT && jsondata != tree.ARRAY {
 				return moerr.NewBadConfig(param.Ctx, "the jsondata '%s' is not supported", jsondata)
 			}
-			param.JsonData = jsondata
-			param.Format = tree.JSONLINE
+			param.JsonData = param.JsonData.Set(jsondata)
+			param.Format = param.Format.Set(tree.JSONLINE)
 
 		default:
 			return moerr.NewBadConfig(param.Ctx, "the keyword '%s' is not support", strings.ToLower(param.Option[i]))
 		}
 	}
-	if param.Format == tree.JSONLINE && len(param.JsonData) == 0 {
+	if param.Format.Get() == tree.JSONLINE && len(param.JsonData.Get()) == 0 {
 		return moerr.NewBadConfig(param.Ctx, "the jsondata must be specified")
 	}
-	if len(param.Format) == 0 {
-		param.Format = tree.CSV
+	if len(param.Format.Get()) == 0 {
+		param.Format = param.Format.Set(tree.CSV)
 	}
 	return nil
 }
@@ -1428,7 +1428,7 @@ func GetForETLWithType(param *tree.ExternParam, prefix string) (res fileservice.
 
 // ReadDir support "etl:" and "/..." absolute path, NOT support relative path.
 func ReadDir(param *tree.ExternParam) (fileList []string, fileSize []int64, err error) {
-	filePath := strings.TrimSpace(param.Filepath)
+	filePath := strings.TrimSpace(param.Filepath.Get())
 	if strings.HasPrefix(filePath, "etl:") {
 		filePath = path.Clean(filePath)
 	} else {

@@ -90,16 +90,16 @@ func Prepare(proc *process.Process, arg any) error {
 		}
 		param.Extern.FileService = proc.FileService
 	}
-	if param.Extern.Format == tree.JSONLINE {
-		if param.Extern.JsonData != tree.OBJECT && param.Extern.JsonData != tree.ARRAY {
+	if param.Extern.Format.Get() == tree.JSONLINE {
+		if param.Extern.JsonData.Get() != tree.OBJECT && param.Extern.JsonData.Get() != tree.ARRAY {
 			param.Fileparam.End = true
-			return moerr.NewNotSupported(proc.Ctx, "the jsonline format '%s' is not supported now", param.Extern.JsonData)
+			return moerr.NewNotSupported(proc.Ctx, "the jsonline format '%s' is not supported now", param.Extern.JsonData.Get())
 		}
 	}
 	param.IgnoreLineTag = int(param.Extern.Tail.IgnoredLines)
 	param.IgnoreLine = param.IgnoreLineTag
 	if len(param.FileList) == 0 && param.Extern.ScanType != tree.INLINE {
-		logutil.Warnf("no such file '%s'", param.Extern.Filepath)
+		logutil.Warnf("no such file '%s'", param.Extern.Filepath.Get())
 		param.Fileparam.End = true
 	}
 	param.Fileparam.FileCnt = len(param.FileList)
@@ -284,7 +284,7 @@ func FilterFileList(ctx context.Context, node *plan.Node, proc *process.Process,
 
 func readFile(param *ExternalParam, proc *process.Process) (io.ReadCloser, error) {
 	if param.Extern.ScanType == tree.INLINE {
-		return io.NopCloser(bytes.NewReader(util.UnsafeStringToBytes(param.Extern.Data))), nil
+		return io.NopCloser(bytes.NewReader(util.UnsafeStringToBytes(param.Extern.Data.Get()))), nil
 	}
 	if param.Extern.Local {
 		return io.NopCloser(proc.LoadLocalReader), nil
@@ -325,7 +325,7 @@ func readFile(param *ExternalParam, proc *process.Process) (io.ReadCloser, error
 func ReadFileOffset(param *tree.ExternParam, mcpu int, fileSize int64) ([]int64, error) {
 	arr := make([]int64, 0)
 
-	fs, readPath, err := plan2.GetForETLWithType(param, param.Filepath)
+	fs, readPath, err := plan2.GetForETLWithType(param, param.Filepath.Get())
 	if err != nil {
 		return nil, err
 	}
@@ -368,8 +368,9 @@ func ReadFileOffset(param *tree.ExternParam, mcpu int, fileSize int64) ([]int64,
 }
 
 func GetCompressType(param *tree.ExternParam, filepath string) string {
-	if param.CompressType != "" && param.CompressType != tree.AUTO {
-		return param.CompressType
+	c := param.CompressType.Get()
+	if c != "" && c != tree.AUTO {
+		return c
 	}
 	index := strings.LastIndex(filepath, ".")
 	if index == -1 {
@@ -403,9 +404,9 @@ func getUnCompressReader(param *tree.ExternParam, filepath string, r io.ReadClos
 	case tree.LZ4:
 		return io.NopCloser(lz4.NewReader(r)), nil
 	case tree.LZW:
-		return nil, moerr.NewInternalError(param.Ctx, "the compress type '%s' is not support now", param.CompressType)
+		return nil, moerr.NewInternalError(param.Ctx, "the compress type '%s' is not support now", param.CompressType.Get())
 	default:
-		return nil, moerr.NewInternalError(param.Ctx, "the compress type '%s' is not support now", param.CompressType)
+		return nil, moerr.NewInternalError(param.Ctx, "the compress type '%s' is not support now", param.CompressType.Get())
 	}
 }
 
@@ -464,8 +465,8 @@ func getBatchData(param *ExternalParam, plh *ParseLineHandler, proc *process.Pro
 	unexpectEOF := false
 	for rowIdx := 0; rowIdx < plh.batchSize; rowIdx++ {
 		line := plh.moCsvLineArray[rowIdx]
-		if param.Extern.Format == tree.JSONLINE {
-			line, err = transJson2Lines(proc.Ctx, line[0], param.Attrs, param.Cols, param.Extern.JsonData, param)
+		if param.Extern.Format.Get() == tree.JSONLINE {
+			line, err = transJson2Lines(proc.Ctx, line[0], param.Attrs, param.Cols, param.Extern.JsonData.Get(), param)
 			if err != nil {
 				if errors.Is(err, io.ErrUnexpectedEOF) {
 					logutil.Infof("unexpected EOF, wait for next batch")
@@ -521,10 +522,10 @@ func getMOCSVReader(param *ExternalParam, proc *process.Process) (*ParseLineHand
 		cma = ','
 		param.Close = 0
 	} else {
-		cma = param.Extern.Tail.Fields.Terminated[0]
+		cma = param.Extern.Tail.Fields.Terminated.Get()[0]
 		param.Close = param.Extern.Tail.Fields.EnclosedBy
 	}
-	if param.Extern.Format == tree.JSONLINE {
+	if param.Extern.Format.Get() == tree.JSONLINE {
 		cma = '\t'
 	}
 	plh := &ParseLineHandler{
@@ -1137,7 +1138,7 @@ func getOneRowData(bat *batch.Batch, line []string, rowIdx int, param *ExternalP
 			buf.Reset()
 		case types.T_json:
 			var jsonBytes []byte
-			if param.Extern.Format != tree.CSV {
+			if param.Extern.Format.Get() != tree.CSV {
 				jsonBytes = []byte(field)
 			} else {
 				byteJson, err := types.ParseStringToByteJson(field)

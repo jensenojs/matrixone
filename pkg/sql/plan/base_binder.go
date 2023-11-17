@@ -260,7 +260,7 @@ func (b *baseBinder) baseBindVar(astExpr *tree.VarExpr, depth int32, isRoot bool
 		Typ: makePlan2Type(&typ),
 		Expr: &plan.Expr_V{
 			V: &plan.VarRef{
-				Name:   astExpr.Name,
+				Name:   astExpr.Name.Get(),
 				System: astExpr.System,
 				Global: astExpr.Global,
 			},

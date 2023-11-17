@@ -72,7 +72,7 @@ func getTypeFromAst(ctx context.Context, typ tree.ResolvableTypeReference) (*pla
 			// for char type,if we didn't specify the length,
 			// the default width should be 1, and for varchar,it's
 			// the defaultMaxLength
-			fstr := strings.ToLower(n.InternalType.FamilyString)
+			fstr := strings.ToLower(n.InternalType.FamilyString.Get())
 			if width == -1 {
 				// create table t1(a char) -> DisplayWith = -1；but get width=1 in MySQL and PgSQL
 				if fstr == "char" {
@@ -96,7 +96,7 @@ func getTypeFromAst(ctx context.Context, typ tree.ResolvableTypeReference) (*pla
 			// the default width should be 1, and for varchar,it's
 			// the defaultMaxLength
 			// Should always specify length to varbinary.
-			fstr := strings.ToLower(n.InternalType.FamilyString)
+			fstr := strings.ToLower(n.InternalType.FamilyString.Get())
 			// Check explicit casting.
 			if fstr == "binary" && n.InternalType.Scale == -1 {
 				r := &plan.Type{Id: int32(types.T_binary), Width: width}

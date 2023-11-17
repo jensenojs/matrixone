@@ -99,16 +99,16 @@ func Test_Prepare(t *testing.T) {
 			param := tcs.arg.Es
 			extern := &tree.ExternParam{
 				ExParamConst: tree.ExParamConst{
-					Filepath: "",
+					Filepath: tree.NewBufString(""),
 					Tail: &tree.TailParameter{
 						IgnoredLines: 0,
 					},
-					Format: tcs.format,
+					Format: tree.NewBufString(tcs.format),
 					Option: defaultOption,
 				},
 				ExParam: tree.ExParam{
 					FileService: tcs.proc.FileService,
-					JsonData:    tcs.jsondata,
+					JsonData:    tree.NewBufString(tcs.jsondata),
 					Ctx:         context.Background(),
 				},
 			}
@@ -123,7 +123,7 @@ func Test_Prepare(t *testing.T) {
 			convey.So(param.FileList, convey.ShouldBeNil)
 			convey.So(param.Fileparam.FileCnt, convey.ShouldEqual, 0)
 
-			extern.Format = "test"
+			extern.Format = tree.NewBufString("test")
 			json_byte, err = json.Marshal(extern)
 			convey.So(err, convey.ShouldBeNil)
 			param.CreateSql = string(json_byte)
@@ -133,15 +133,15 @@ func Test_Prepare(t *testing.T) {
 			if tcs.format == tree.JSONLINE {
 				extern = &tree.ExternParam{
 					ExParamConst: tree.ExParamConst{
-						Filepath: "",
+						Filepath: tree.NewBufString(""),
 						Tail: &tree.TailParameter{
 							IgnoredLines: 0,
 						},
-						Format: tcs.format,
+						Format: tree.NewBufString(tcs.format),
 						Option: defaultOption,
 					},
 				}
-				extern.JsonData = tcs.jsondata
+				extern.JsonData = tree.NewBufString(tcs.jsondata)
 				json_byte, err = json.Marshal(extern)
 				convey.So(err, convey.ShouldBeNil)
 				param.CreateSql = string(json_byte)
@@ -168,15 +168,15 @@ func Test_Call(t *testing.T) {
 			param := tcs.arg.Es
 			extern := &tree.ExternParam{
 				ExParamConst: tree.ExParamConst{
-					Filepath: "",
+					Filepath: tree.NewBufString(""),
 					Tail: &tree.TailParameter{
 						IgnoredLines: 0,
 					},
-					Format: tcs.format,
+					Format: tree.NewBufString(tcs.format),
 				},
 				ExParam: tree.ExParam{
 					FileService: tcs.proc.FileService,
-					JsonData:    tcs.jsondata,
+					JsonData:    tree.NewBufString(tcs.jsondata),
 					Ctx:         context.Background(),
 				},
 			}
@@ -210,34 +210,34 @@ func Test_getCompressType(t *testing.T) {
 	convey.Convey("getCompressType succ", t, func() {
 		param := &tree.ExternParam{
 			ExParamConst: tree.ExParamConst{
-				CompressType: tree.GZIP,
+				CompressType: tree.NewBufString(tree.GZIP),
 			},
 			ExParam: tree.ExParam{
 				Ctx: context.Background(),
 			},
 		}
-		compress := GetCompressType(param, param.Filepath)
-		convey.So(compress, convey.ShouldEqual, param.CompressType)
+		compress := GetCompressType(param, param.Filepath.Get())
+		convey.So(compress, convey.ShouldEqual, param.CompressType.Get())
 
-		param.CompressType = tree.AUTO
-		param.Filepath = "a.gz"
-		compress = GetCompressType(param, param.Filepath)
+		param.CompressType = param.CompressType.Set(tree.AUTO)
+		param.Filepath = param.Filepath.Set("a.gz")
+		compress = GetCompressType(param, param.Filepath.Get())
 		convey.So(compress, convey.ShouldEqual, tree.GZIP)
 
-		param.Filepath = "a.bz2"
-		compress = GetCompressType(param, param.Filepath)
+		param.Filepath = param.Filepath.Set("a.bz2")
+		compress = GetCompressType(param, param.Filepath.Get())
 		convey.So(compress, convey.ShouldEqual, tree.BZIP2)
 
-		param.Filepath = "a.lz4"
-		compress = GetCompressType(param, param.Filepath)
+		param.Filepath = param.Filepath.Set("a.lz4")
+		compress = GetCompressType(param, param.Filepath.Get())
 		convey.So(compress, convey.ShouldEqual, tree.LZ4)
 
-		param.Filepath = "a.csv"
-		compress = GetCompressType(param, param.Filepath)
+		param.Filepath = param.Filepath.Set("a.csv")
+		compress = GetCompressType(param, param.Filepath.Get())
 		convey.So(compress, convey.ShouldEqual, tree.NOCOMPRESS)
 
-		param.Filepath = "a"
-		compress = GetCompressType(param, param.Filepath)
+		param.Filepath = param.Filepath.Set("a")
+		compress = GetCompressType(param, param.Filepath.Get())
 		convey.So(compress, convey.ShouldEqual, tree.NOCOMPRESS)
 	})
 }
@@ -246,38 +246,38 @@ func Test_getUnCompressReader(t *testing.T) {
 	convey.Convey("getUnCompressReader succ", t, func() {
 		param := &tree.ExternParam{
 			ExParamConst: tree.ExParamConst{
-				CompressType: tree.NOCOMPRESS,
+				CompressType: tree.NewBufString(tree.NOCOMPRESS),
 			},
 			ExParam: tree.ExParam{
 				Ctx: context.Background(),
 			},
 		}
-		read, err := getUnCompressReader(param, param.Filepath, nil)
+		read, err := getUnCompressReader(param, param.Filepath.Get(), nil)
 		convey.So(read, convey.ShouldBeNil)
 		convey.So(err, convey.ShouldBeNil)
 
-		param.CompressType = tree.BZIP2
-		read, err = getUnCompressReader(param, param.Filepath, &os.File{})
+		param.CompressType.Set(tree.BZIP2)
+		read, err = getUnCompressReader(param, param.Filepath.Get(), &os.File{})
 		convey.So(read, convey.ShouldNotBeNil)
 		convey.So(err, convey.ShouldBeNil)
 
-		param.CompressType = tree.FLATE
-		read, err = getUnCompressReader(param, param.Filepath, &os.File{})
+		param.CompressType.Set(tree.FLATE)
+		read, err = getUnCompressReader(param, param.Filepath.Get(), &os.File{})
 		convey.So(read, convey.ShouldNotBeNil)
 		convey.So(err, convey.ShouldBeNil)
 
-		param.CompressType = tree.LZ4
-		read, err = getUnCompressReader(param, param.Filepath, &os.File{})
+		param.CompressType.Set(tree.LZ4)
+		read, err = getUnCompressReader(param, param.Filepath.Get(), &os.File{})
 		convey.So(read, convey.ShouldNotBeNil)
 		convey.So(err, convey.ShouldBeNil)
 
-		param.CompressType = tree.LZW
-		read, err = getUnCompressReader(param, param.Filepath, &os.File{})
+		param.CompressType.Set(tree.LZW)
+		read, err = getUnCompressReader(param, param.Filepath.Get(), &os.File{})
 		convey.So(read, convey.ShouldBeNil)
 		convey.So(err, convey.ShouldNotBeNil)
 
-		param.CompressType = "abc"
-		read, err = getUnCompressReader(param, param.Filepath, &os.File{})
+		param.CompressType.Set("abc")
+		read, err = getUnCompressReader(param, param.Filepath.Get(), &os.File{})
 		convey.So(read, convey.ShouldBeNil)
 		convey.So(err, convey.ShouldNotBeNil)
 	})
@@ -617,7 +617,7 @@ func TestReadDirSymlink(t *testing.T) {
 	fooPathInB := filepath.Join(root, "a", "b", "d", "foo")
 	files, _, err := plan2.ReadDir(&tree.ExternParam{
 		ExParamConst: tree.ExParamConst{
-			Filepath: fooPathInB,
+			Filepath: tree.NewBufString(fooPathInB),
 		},
 		ExParam: tree.ExParam{
 			Ctx: ctx,
@@ -630,7 +630,7 @@ func TestReadDirSymlink(t *testing.T) {
 	path1 := root + "/a//b/./../b/c/foo"
 	files1, _, err := plan2.ReadDir(&tree.ExternParam{
 		ExParamConst: tree.ExParamConst{
-			Filepath: path1,
+			Filepath: tree.NewBufString(path1),
 		},
 		ExParam: tree.ExParam{
 			Ctx: ctx,

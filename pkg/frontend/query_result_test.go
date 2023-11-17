@@ -187,14 +187,14 @@ func Test_saveQueryResultMeta(t *testing.T) {
 	exportFilePath := fileservice.JoinPath(defines.SharedFileServiceName, "/block3.csv")
 	ep := &tree.ExportParam{
 		Outfile:  true,
-		QueryId:  testUUID.String(),
-		FilePath: exportFilePath,
+		QueryId:  tree.NewBufString(testUUID.String()),
+		FilePath: tree.NewBufString(exportFilePath),
 		Fields: &tree.Fields{
-			Terminated: ",",
+			Terminated: tree.NewBufString(","),
 			EnclosedBy: '"',
 		},
 		Lines: &tree.Lines{
-			TerminatedBy: "\n",
+			TerminatedBy: tree.NewBufString("\n"),
 		},
 		MaxFileSize: 0,
 		Header:      false,

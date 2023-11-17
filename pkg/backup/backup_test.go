@@ -544,7 +544,7 @@ func TestBackup(t *testing.T) {
 
 	bs := &tree.BackupStart{
 		IsS3: false,
-		Dir:  tDir,
+		Dir:  tree.NewBufString(tDir),
 	}
 
 	//backup configs

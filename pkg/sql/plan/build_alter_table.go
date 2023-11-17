@@ -59,8 +59,8 @@ func buildAlterTableCopy(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, err
 	validAlterSpecs := stmt.Options
 	for _, spec := range validAlterSpecs {
 		if alterOpt, ok := spec.(*tree.AlterOptionAdd); ok {
-			if foreignKey, ok2 := alterOpt.Def.(*tree.ForeignKey); ok2 && foreignKey.Name == "" {
-				foreignKey.Name = fmt.Sprintf("fk_%d", tmpForeignKeyId)
+			if foreignKey, ok2 := alterOpt.Def.(*tree.ForeignKey); ok2 && foreignKey.Name.Get() == "" {
+				foreignKey.Name = foreignKey.Name.Set(fmt.Sprintf("fk_%d", tmpForeignKeyId))
 			}
 		}
 	}
@@ -380,7 +380,7 @@ func restoreDDL(ctx CompilerContext, tableDef *TableDef, schemaName string, tblN
 		if err != nil {
 			return "", err
 		}
-		createStr += fmt.Sprintf(" INFILE{'FILEPATH'='%s','COMPRESSION'='%s','FORMAT'='%s','JSONDATA'='%s'}", param.Filepath, param.CompressType, param.Format, param.JsonData)
+		createStr += fmt.Sprintf(" INFILE{'FILEPATH'='%s','COMPRESSION'='%s','FORMAT'='%s','JSONDATA'='%s'}", param.Filepath.Get(), param.CompressType.Get(), param.Format.Get(), param.JsonData.Get())
 
 		escapedby := ""
 		if param.Tail.Fields.EscapedBy != byte(0) {
@@ -388,14 +388,14 @@ func restoreDDL(ctx CompilerContext, tableDef *TableDef, schemaName string, tblN
 		}
 
 		line := ""
-		if param.Tail.Lines.StartingBy != "" {
-			line = fmt.Sprintf(" LINE STARTING BY '%s'", param.Tail.Lines.StartingBy)
+		if param.Tail.Lines.StartingBy.Get() != "" {
+			line = fmt.Sprintf(" LINE STARTING BY '%s'", param.Tail.Lines.StartingBy.Get())
 		}
 		lineEnd := ""
-		if param.Tail.Lines.TerminatedBy == "\n" || param.Tail.Lines.TerminatedBy == "\r\n" {
+		if param.Tail.Lines.TerminatedBy.Get() == "\n" || param.Tail.Lines.TerminatedBy.Get() == "\r\n" {
 			lineEnd = " TERMINATED BY '\\\\n'"
 		} else {
-			lineEnd = fmt.Sprintf(" TERMINATED BY '%s'", param.Tail.Lines.TerminatedBy)
+			lineEnd = fmt.Sprintf(" TERMINATED BY '%s'", param.Tail.Lines.TerminatedBy.Get())
 		}
 		if len(line) > 0 {
 			line += lineEnd
@@ -403,7 +403,7 @@ func restoreDDL(ctx CompilerContext, tableDef *TableDef, schemaName string, tblN
 			line = " LINES" + lineEnd
 		}
 
-		createStr += fmt.Sprintf(" FIELDS TERMINATED BY '%s' ENCLOSED BY '%c'%s", param.Tail.Fields.Terminated, rune(param.Tail.Fields.EnclosedBy), escapedby)
+		createStr += fmt.Sprintf(" FIELDS TERMINATED BY '%s' ENCLOSED BY '%c'%s", param.Tail.Fields.Terminated.Get(), rune(param.Tail.Fields.EnclosedBy), escapedby)
 		createStr += line
 		if param.Tail.IgnoredLines > 0 {
 			createStr += fmt.Sprintf(" IGNORE %d LINES", param.Tail.IgnoredLines)

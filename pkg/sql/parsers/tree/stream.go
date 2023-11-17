@@ -29,7 +29,7 @@ type CreateStream struct {
 }
 
 func NewCreateStream(replace, source, ifNotExists bool, streamName *TableName, defs TableDefs, colNames IdentifierList, asSource *Select, options []TableOption, buf *buffer.Buffer) *CreateStream {
-	c := buffer.Alloc[CreateStream](buf)	
+	c := buffer.Alloc[CreateStream](buf)
 	c.Replace = replace
 	c.Source = source
 	c.IfNotExists = ifNotExists
@@ -121,18 +121,20 @@ func NewCreateStreamWithOption(k Identifier, v Expr, buf *buffer.Buffer) *Create
 
 type AttributeHeader struct {
 	columnAttributeImpl
-	Key string
+	Key *BufString
 }
 
 func (node *AttributeHeader) Format(ctx *FmtCtx) {
 	ctx.WriteString("header(")
-	ctx.WriteString(node.Key)
+	ctx.WriteString(node.Key.Get())
 	ctx.WriteByte(')')
 }
 
 func NewAttributeHeader(key string, buf *buffer.Buffer) *AttributeHeader {
 	ah := buffer.Alloc[AttributeHeader](buf)
-	ah.Key = key
+	bkey := NewBufString(key)
+	buf.Pin(bkey)
+	ah.Key = bkey
 	return ah
 }
 

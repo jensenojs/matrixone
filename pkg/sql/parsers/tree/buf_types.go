@@ -18,7 +18,7 @@ import "go/constant"
 
 // TODO: need comment here
 type BufString struct {
-	s *string
+	S *string
 }
 
 func NewBufString(s string) *BufString {
@@ -26,16 +26,19 @@ func NewBufString(s string) *BufString {
 }
 
 func (b *BufString) Get() string {
-	if b != nil && b.s != nil {
-		return *b.s
+	if b != nil && b.S != nil {
+		return *b.S
 	}
 	return ""
 }
 
-func (b *BufString) Set(s string) {
+func (b *BufString) Set(s string) *BufString {
 	if b != nil {
-		b.s = &s
+		b.S = &s
+	} else {
+		return &BufString{&s}
 	}
+	return b
 }
 
 type BufConstant struct {

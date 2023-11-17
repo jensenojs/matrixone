@@ -21,24 +21,33 @@ import (
 )
 
 type CStr struct {
-	o string
-	c string
+	o *BufString
+	c *BufString
 	// quote bool
+
+	buf *buffer.Buffer
 }
 
 func NewCStr(str string, lower int64, buf *buffer.Buffer) *CStr {
 	var cs *CStr
+	o := NewBufString(str)
 	if buf != nil {
 		cs = buffer.Alloc[CStr](buf)
+		cs.buf = buf
+		buf.Pin(o)
 	} else {
 		cs = new(CStr)
 	}
-	cs.o = str
+	cs.o = o
 	if lower == 0 {
 		cs.c = cs.o
 		return cs
 	}
-	cs.c = strings.ToLower(cs.o)
+	c := NewBufString(strings.ToLower(cs.o.Get()))
+	if buf != nil {
+		buf.Pin(c)
+	}
+	cs.c = c
 	return cs
 }
 
@@ -47,21 +56,25 @@ func (cs *CStr) SetConfig(lower int64) {
 		cs.c = cs.o
 		return
 	}
-	cs.c = strings.ToLower(cs.o)
+	c := NewBufString(strings.ToLower(cs.o.Get()))
+	if cs.buf != nil {
+		cs.buf.Pin(c)
+	}
+	cs.c = c
 }
 
 func (cs *CStr) ToLower() string {
-	return strings.ToLower(cs.o)
+	return strings.ToLower(cs.o.Get())
 }
 
 func (cs *CStr) Origin() string {
-	return cs.o
+	return cs.o.Get()
 }
 
 func (cs *CStr) Compare() string {
-	return cs.c
+	return cs.c.Get()
 }
 
 func (cs *CStr) Empty() bool {
-	return len(cs.o) == 0
+	return len(cs.o.Get()) == 0
 }

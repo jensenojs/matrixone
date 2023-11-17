@@ -19,16 +19,23 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 // Declare statement
 type Declare struct {
 	statementImpl
-	Variables  []string
+	Variables  []string // do NOT reassign after NewDeclare
 	ColumnType *T
 	DefaultVal Expr
 }
 
 func NewDeclare(vs []string, ct *T, dv Expr, buf *buffer.Buffer) *Declare {
 	d := buffer.Alloc[Declare](buf)
-	d.Variables = vs
 	d.ColumnType = ct
 	d.DefaultVal = dv
+
+	if vs != nil {
+		d.Variables = buffer.MakeSlice[string](buf)
+		for _, v := range vs {
+			d.Variables = buffer.AppendSlice[string](buf, d.Variables, buf.CopyString(v))
+		}
+	}
+
 	return d
 }
 

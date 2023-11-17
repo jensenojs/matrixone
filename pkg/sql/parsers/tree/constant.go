@@ -54,7 +54,7 @@ type NumVal struct {
 	negative bool
 
 	// origString is the "original" string literals that should remain sign-less.
-	origString string
+	origString *BufString
 
 	//converted result
 	resInt   int64
@@ -63,11 +63,11 @@ type NumVal struct {
 }
 
 func (n *NumVal) OrigString() string {
-	return n.origString
+	return n.origString.Get()
 }
 
 func (n *NumVal) Format(ctx *FmtCtx) {
-	s := n.origString
+	s := n.origString.Get()
 	if s != "" {
 		ctx.WriteValue(n.ValType, FormatString(s))
 		return
@@ -124,7 +124,7 @@ func FormatString(str string) string {
 }
 
 func (n *NumVal) String() string {
-	return n.origString
+	return n.origString.Get()
 }
 
 func (n *NumVal) Negative() bool {
@@ -142,22 +142,23 @@ func NewNumVal(value constant.Value, origString string, negative bool, buf *buff
 	}
 	n.negative = negative
 	n.Value = mv
-	n.origString = origString
+	n.origString = NewBufString(origString)
 	return n
 }
 
 func NewNumValWithType(value constant.Value, origString string, negative bool, typ P_TYPE, buf *buffer.Buffer) *NumVal {
 	var n *NumVal
 	mv := NewBufConstant(value)
+	or := NewBufString(origString)
 	if buf != nil {
 		n = buffer.Alloc[NumVal](buf)
-		buf.Pin(mv)
+		buf.Pin(mv, or)
 	} else {
 		n = new(NumVal)
 	}
+	n.origString = or
 	n.negative = negative
 	n.Value = mv
-	n.origString = origString
 	n.ValType = typ
 	return n
 }
@@ -165,13 +166,14 @@ func NewNumValWithType(value constant.Value, origString string, negative bool, t
 func NewNumValWithResInt(value constant.Value, origString string, negative bool, resInt int64, buf *buffer.Buffer) *NumVal {
 	var n *NumVal
 	mv := NewBufConstant(value)
+	or := NewBufString(origString)
 	if buf != nil {
 		n = buffer.Alloc[NumVal](buf)
-		buf.Pin(mv)
+		buf.Pin(mv, or)
 	} else {
 		n = new(NumVal)
 	}
-	n.origString = origString
+	n.origString = or
 	n.Value = mv
 	n.negative = negative
 	n.resInt = resInt
@@ -181,13 +183,14 @@ func NewNumValWithResInt(value constant.Value, origString string, negative bool,
 func NewNumValWithResFoalt(value constant.Value, origString string, negative bool, resFloat float64, buf *buffer.Buffer) *NumVal {
 	var n *NumVal
 	mv := NewBufConstant(value)
+	or := NewBufString(origString)
 	if buf != nil {
 		n = buffer.Alloc[NumVal](buf)
-		buf.Pin(mv)
+		buf.Pin(mv, or)
 	} else {
 		n = new(NumVal)
 	}
-	n.origString = origString
+	n.origString = or
 	n.Value = mv
 	n.negative = negative
 	n.resFloat = resFloat
@@ -197,11 +200,11 @@ func NewNumValWithResFoalt(value constant.Value, origString string, negative boo
 // StrVal represents a constant string value.
 type StrVal struct {
 	Constant
-	str string
+	str *BufString
 }
 
 func (node *StrVal) Format(ctx *FmtCtx) {
-	ctx.WriteString(node.str)
+	ctx.WriteString(node.str.Get())
 }
 
 // Accept implements NodeChecker Accept interface.
@@ -216,6 +219,6 @@ func NewStrVal(str string, buf *buffer.Buffer) *StrVal {
 	} else {
 		s = new(StrVal)
 	}
-	s.str = str
+	s.str = NewBufString(str)
 	return s
 }

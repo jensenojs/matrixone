@@ -119,9 +119,9 @@ func initExportFileParam(ep *ExportConfig, mrs *MysqlResultSet) {
 	}
 	ep.Symbol = make([][]byte, n)
 	for i := 0; i < n-1; i++ {
-		ep.Symbol[i] = []byte(ep.userConfig.Fields.Terminated)
+		ep.Symbol[i] = []byte(ep.userConfig.Fields.Terminated.Get())
 	}
-	ep.Symbol[n-1] = []byte(ep.userConfig.Lines.TerminatedBy)
+	ep.Symbol[n-1] = []byte(ep.userConfig.Lines.TerminatedBy.Get())
 	ep.ColumnFlag = make([]bool, len(mrs.Name2Index))
 	for i := 0; i < len(ep.userConfig.ForceQuote); i++ {
 		col, ok := mrs.Name2Index[ep.userConfig.ForceQuote[i]]
@@ -137,10 +137,10 @@ var openNewFile = func(ctx context.Context, ep *ExportConfig, mrs *MysqlResultSe
 	ep.CurFileSize = 0
 	if !ep.UseFileService {
 		var filePath string
-		if len(ep.userConfig.StageFilePath) != 0 {
-			filePath = getExportFilePath(ep.userConfig.StageFilePath, ep.FileCnt)
+		if len(ep.userConfig.StageFilePath.Get()) != 0 {
+			filePath = getExportFilePath(ep.userConfig.StageFilePath.Get(), ep.FileCnt)
 		} else {
-			filePath = getExportFilePath(ep.userConfig.FilePath, ep.FileCnt)
+			filePath = getExportFilePath(ep.userConfig.FilePath.Get(), ep.FileCnt)
 		}
 		ep.File, err = OpenFile(filePath, os.O_RDWR|os.O_EXCL|os.O_CREATE, 0o666)
 		if err != nil {
@@ -155,7 +155,7 @@ var openNewFile = func(ctx context.Context, ep *ExportConfig, mrs *MysqlResultSe
 			ep.LineBuffer.Reset()
 		}
 		ep.AsyncReader, ep.AsyncWriter = io.Pipe()
-		filePath := getExportFilePath(ep.userConfig.FilePath, ep.FileCnt)
+		filePath := getExportFilePath(ep.userConfig.FilePath.Get(), ep.FileCnt)
 
 		asyncWriteFunc := func() error {
 			vec := fileservice.IOVector{
@@ -187,9 +187,9 @@ var openNewFile = func(ctx context.Context, ep *ExportConfig, mrs *MysqlResultSe
 			return nil
 		}
 		for i := 0; i < n-1; i++ {
-			header += mrs.Columns[i].Name() + ep.userConfig.Fields.Terminated
+			header += mrs.Columns[i].Name() + ep.userConfig.Fields.Terminated.Get()
 		}
-		header += mrs.Columns[n-1].Name() + ep.userConfig.Lines.TerminatedBy
+		header += mrs.Columns[n-1].Name() + ep.userConfig.Lines.TerminatedBy.Get()
 		if ep.userConfig.MaxFileSize != 0 && uint64(len(header)) >= ep.userConfig.MaxFileSize {
 			return moerr.NewInternalError(ctx, "the header line size is over the maxFileSize")
 		}

@@ -130,9 +130,9 @@ func TestCompile(t *testing.T) {
 		_, err = c.Run(0)
 		require.NoError(t, err)
 		// Enable memory check
+		tc.proc.SessionInfo.QueryBuf.Free()
 		tc.proc.FreeVectors()
 		require.Equal(t, int64(0), tc.proc.Mp().CurrNB())
-		tc.proc.SessionInfo.QueryBuf.Free()
 	}
 }
 

@@ -334,34 +334,34 @@ func runOneStmt(opt plan.Optimizer, t *testing.T, sql string) error {
 	if stmt, ok := stmts[0].(*tree.ExplainStmt); ok {
 		es := NewExplainDefaultOptions()
 		for _, v := range stmt.Options {
-			if strings.EqualFold(v.Name, "VERBOSE") {
-				if strings.EqualFold(v.Value, "TRUE") || v.Value == "NULL" {
+			if strings.EqualFold(v.Name.Get(), "VERBOSE") {
+				if strings.EqualFold(v.Value.Get(), "TRUE") || v.Value.Get() == "NULL" {
 					es.Verbose = true
-				} else if strings.EqualFold(v.Value, "FALSE") {
+				} else if strings.EqualFold(v.Value.Get(), "FALSE") {
 					es.Verbose = false
 				} else {
-					return moerr.NewInvalidInput(ctx, "boolean value %v", v.Value)
+					return moerr.NewInvalidInput(ctx, "boolean value %v", v.Value.Get())
 				}
-			} else if strings.EqualFold(v.Name, "ANALYZE") {
-				if strings.EqualFold(v.Value, "TRUE") || v.Value == "NULL" {
+			} else if strings.EqualFold(v.Name.Get(), "ANALYZE") {
+				if strings.EqualFold(v.Value.Get(), "TRUE") || v.Value.Get() == "NULL" {
 					es.Analyze = true
-				} else if strings.EqualFold(v.Value, "FALSE") {
+				} else if strings.EqualFold(v.Value.Get(), "FALSE") {
 					es.Analyze = false
 				} else {
-					return moerr.NewInvalidInput(ctx, "boolean value %v", v.Value)
+					return moerr.NewInvalidInput(ctx, "boolean value %v", v.Value.Get())
 				}
-			} else if strings.EqualFold(v.Name, "FORMAT") {
-				if v.Name == "NULL" {
-					return moerr.NewInvalidInput(ctx, "parameter name %v", v.Name)
-				} else if strings.EqualFold(v.Value, "TEXT") {
+			} else if strings.EqualFold(v.Name.Get(), "FORMAT") {
+				if v.Name.Get() == "NULL" {
+					return moerr.NewInvalidInput(ctx, "parameter name %v", v.Name.Get())
+				} else if strings.EqualFold(v.Value.Get(), "TEXT") {
 					es.Format = EXPLAIN_FORMAT_TEXT
-				} else if strings.EqualFold(v.Value, "JSON") {
+				} else if strings.EqualFold(v.Value.Get(), "JSON") {
 					es.Format = EXPLAIN_FORMAT_JSON
 				} else {
-					return moerr.NewInvalidInput(ctx, "explain format %v", v.Value)
+					return moerr.NewInvalidInput(ctx, "explain format %v", v.Value.Get())
 				}
 			} else {
-				return moerr.NewInvalidInput(ctx, "EXPLAIN option %v", v.Name)
+				return moerr.NewInvalidInput(ctx, "EXPLAIN option %v", v.Name.Get())
 			}
 		}
 

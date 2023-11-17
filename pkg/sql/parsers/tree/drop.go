@@ -194,13 +194,13 @@ func NewDropUser(ifExists bool, users []*User, buf *buffer.Buffer) *DropUser {
 type DropAccount struct {
 	statementImpl
 	IfExists bool
-	Name     string
+	Name     *BufString
 }
 
 func NewDropAccount(i bool, n string, buf *buffer.Buffer) *DropAccount {
 	d := buffer.Alloc[DropAccount](buf)
 	d.IfExists = i
-	d.Name = n
+	d.Name = NewBufString(n)
 	return d
 }
 
@@ -210,7 +210,7 @@ func (node *DropAccount) Format(ctx *FmtCtx) {
 		ctx.WriteString(" if exists")
 	}
 	ctx.WriteString(" ")
-	ctx.WriteString(node.Name)
+	ctx.WriteString(node.Name.Get())
 }
 
 func (node *DropAccount) GetStatementType() string { return "Drop Account" }

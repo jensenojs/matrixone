@@ -306,7 +306,7 @@ func getExprValue(e tree.Expr, mce *MysqlCmdExecutor, ses *Session) (interface{}
 			From: &tree.From{
 				Tables: tree.TableExprs{
 					&tree.JoinTableExpr{
-						JoinType: tree.JOIN_TYPE_CROSS,
+						JoinType: tree.NewBufString(tree.JOIN_TYPE_CROSS),
 						Left: &tree.AliasedTableExpr{
 							Expr: table,
 						},

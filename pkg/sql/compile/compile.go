@@ -1420,12 +1420,12 @@ func (c *Compile) compileExternScan(ctx context.Context, n *plan.Node) ([]*Scope
 		}
 	} else {
 		param.ScanType = int(n.ExternScan.Type)
-		param.Data = n.ExternScan.Data
-		param.Format = n.ExternScan.Format
+		param.Data = param.Data.Set(n.ExternScan.Data)
+		param.Format = param.Format.Set(n.ExternScan.Format)
 		param.Tail = new(tree.TailParameter)
 		param.Tail.IgnoredLines = n.ExternScan.IgnoredLines
 		param.Tail.Fields = &tree.Fields{
-			Terminated: n.ExternScan.Terminated,
+			Terminated: tree.NewBufString(n.ExternScan.Terminated),
 			EnclosedBy: n.ExternScan.EnclosedBy[0],
 		}
 	}
@@ -1461,7 +1461,7 @@ func (c *Compile) compileExternScan(ctx context.Context, n *plan.Node) ([]*Scope
 	var fileSize []int64
 	if !param.Local {
 		if param.QueryResult {
-			fileList = strings.Split(param.Filepath, ",")
+			fileList = strings.Split(param.Filepath.Get(), ",")
 			for i := range fileList {
 				fileList[i] = strings.TrimSpace(fileList[i])
 			}
@@ -1482,7 +1482,7 @@ func (c *Compile) compileExternScan(ctx context.Context, n *plan.Node) ([]*Scope
 			return nil, moerr.NewInvalidInput(ctx, "the file does not exist in load flow")
 		}
 	} else {
-		fileList = []string{param.Filepath}
+		fileList = []string{param.Filepath.Get()}
 	}
 
 	if len(fileList) == 0 {
@@ -1500,7 +1500,7 @@ func (c *Compile) compileExternScan(ctx context.Context, n *plan.Node) ([]*Scope
 
 	var fileOffset [][]int64
 	for i := 0; i < len(fileList); i++ {
-		param.Filepath = fileList[i]
+		param.Filepath = param.Filepath.Set(fileList[i])
 		if param.Parallel {
 			arr, err := external.ReadFileOffset(param, mcpu, fileSize[i])
 			fileOffset = append(fileOffset, arr)

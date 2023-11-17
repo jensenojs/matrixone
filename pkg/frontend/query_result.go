@@ -436,11 +436,11 @@ func doDumpQueryResult(ctx context.Context, ses *Session, eParam *tree.ExportPar
 	var files []resultFileInfo
 
 	//step1: open file handler
-	if columnDefs, err = openResultMeta(ctx, ses, eParam.QueryId); err != nil {
+	if columnDefs, err = openResultMeta(ctx, ses, eParam.QueryId.Get()); err != nil {
 		return err
 	}
 
-	if files, err = getResultFiles(ctx, ses, eParam.QueryId); err != nil {
+	if files, err = getResultFiles(ctx, ses, eParam.QueryId.Get()); err != nil {
 		return err
 	}
 

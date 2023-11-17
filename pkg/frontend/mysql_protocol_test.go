@@ -2072,7 +2072,7 @@ func TestSendPrepareResponse(t *testing.T) {
 		proto.SetSession(&Session{})
 
 		st := tree.NewPrepareString(tree.Identifier(getPrepareStmtName(1)), "select ?, 1", buf)
-		stmts, err := mysql.Parse(ctx, st.Sql, 1, buf)
+		stmts, err := mysql.Parse(ctx, st.Sql.Get(), 1, buf)
 		if err != nil {
 			t.Error(err)
 		}
@@ -2108,7 +2108,7 @@ func TestSendPrepareResponse(t *testing.T) {
 		proto := NewMysqlClientProtocol(0, ioses, 1024, sv)
 
 		st := tree.NewPrepareString("stmt1", "select ?, 1", buf)
-		stmts, err := mysql.Parse(ctx, st.Sql, 1, buf)
+		stmts, err := mysql.Parse(ctx, st.Sql.Get(), 1, buf)
 		if err != nil {
 			t.Error(err)
 		}
@@ -2150,7 +2150,7 @@ func FuzzParseExecuteData(f *testing.F) {
 	proto := NewMysqlClientProtocol(0, ioses, 1024, sv)
 
 	st := tree.NewPrepareString(tree.Identifier(getPrepareStmtName(1)), "select ?, 1", buf)
-	stmts, err := mysql.Parse(ctx, st.Sql, 1, buf)
+	stmts, err := mysql.Parse(ctx, st.Sql.Get(), 1, buf)
 	if err != nil {
 		f.Error(err)
 	}

@@ -78,7 +78,7 @@ func NewShowCreateView(n *UnresolvedObjectName, buf *buffer.Buffer) *ShowCreateV
 type ShowCreateDatabase struct {
 	showImpl
 	IfNotExists bool
-	Name        string
+	Name        *BufString
 }
 
 func (node *ShowCreateDatabase) Format(ctx *FmtCtx) {
@@ -87,7 +87,7 @@ func (node *ShowCreateDatabase) Format(ctx *FmtCtx) {
 		ctx.WriteString(" if not exists")
 	}
 	ctx.WriteByte(' ')
-	ctx.WriteString(string(node.Name))
+	ctx.WriteString(string(node.Name.Get()))
 }
 func (node *ShowCreateDatabase) GetStatementType() string { return "Show Create View" }
 func (node *ShowCreateDatabase) GetQueryType() string     { return QueryTypeOth }
@@ -95,7 +95,9 @@ func (node *ShowCreateDatabase) GetQueryType() string     { return QueryTypeOth 
 func NewShowCreateDatabase(i bool, n string, buf *buffer.Buffer) *ShowCreateDatabase {
 	scd := buffer.Alloc[ShowCreateDatabase](buf)
 	scd.IfNotExists = i
-	scd.Name = n
+	bName := NewBufString(n)
+	buf.Pin(bName)
+	scd.Name = bName
 	return scd
 }
 
@@ -106,7 +108,7 @@ type ShowColumns struct {
 	Full    bool
 	Table   *UnresolvedObjectName
 	ColName *UnresolvedName
-	DBName  string
+	DBName  *BufString
 	Like    *ComparisonExpr
 	Where   *Where
 }
@@ -124,9 +126,9 @@ func (node *ShowColumns) Format(ctx *FmtCtx) {
 		ctx.WriteString(" from ")
 		node.Table.Format(ctx)
 	}
-	if node.DBName != "" {
+	if node.DBName.Get() != "" {
 		ctx.WriteString(" from ")
-		ctx.WriteString(node.DBName)
+		ctx.WriteString(node.DBName.Get())
 	}
 	if node.Like != nil {
 		ctx.WriteByte(' ')
@@ -152,7 +154,9 @@ func NewShowColumns2(e bool, f bool, t *UnresolvedObjectName, d string, l *Compa
 	sc.Ext = e
 	sc.Full = f
 	sc.Table = t
-	sc.DBName = d
+	bDBName := NewBufString(d)
+	buf.Pin(bDBName)
+	sc.DBName = bDBName
 	sc.Like = l
 	sc.Where = w
 	return sc
@@ -232,7 +236,7 @@ type ShowTarget struct {
 	showImpl
 	Global bool
 	Type   ShowType
-	DbName string
+	DbName *BufString
 	Like   *ComparisonExpr
 	Where  *Where
 }
@@ -240,7 +244,9 @@ type ShowTarget struct {
 func NewShowTarget(n string, t ShowType, buf *buffer.Buffer) *ShowTarget {
 	sh := buffer.Alloc[ShowTarget](buf)
 	sh.Type = t
-	sh.DbName = n
+	bDbName := NewBufString(n)
+	buf.Pin(bDbName)
+	sh.DbName = bDbName
 	return sh
 }
 
@@ -250,9 +256,9 @@ func (node *ShowTarget) Format(ctx *FmtCtx) {
 		ctx.WriteString("global ")
 	}
 	ctx.WriteString(node.Type.String())
-	if node.DbName != "" {
+	if node.DbName.Get() != "" {
 		ctx.WriteString(" from ")
-		ctx.WriteString(node.DbName)
+		ctx.WriteString(node.DbName.Get())
 	}
 	if node.Like != nil {
 		ctx.WriteByte(' ')
@@ -268,14 +274,16 @@ func (node *ShowTarget) GetQueryType() string     { return QueryTypeOth }
 
 type ShowTableStatus struct {
 	showImpl
-	DbName string
+	DbName *BufString
 	Like   *ComparisonExpr
 	Where  *Where
 }
 
 func NewShowTableStatus(dbName string, l *ComparisonExpr, w *Where, buf *buffer.Buffer) *ShowTableStatus {
 	st := buffer.Alloc[ShowTableStatus](buf)
-	st.DbName = dbName
+	bDbName := NewBufString(dbName)
+	buf.Pin(bDbName)
+	st.DbName = bDbName
 	st.Like = l
 	st.Where = w
 	return st
@@ -283,9 +291,9 @@ func NewShowTableStatus(dbName string, l *ComparisonExpr, w *Where, buf *buffer.
 
 func (node *ShowTableStatus) Format(ctx *FmtCtx) {
 	ctx.WriteString("show table status")
-	if node.DbName != "" {
+	if node.DbName.Get() != "" {
 		ctx.WriteString(" from ")
-		ctx.WriteString(node.DbName)
+		ctx.WriteString(node.DbName.Get())
 	}
 	if node.Like != nil {
 		ctx.WriteByte(' ')
@@ -301,16 +309,19 @@ func (node *ShowTableStatus) GetQueryType() string     { return QueryTypeOth }
 
 type ShowGrants struct {
 	showImpl
-	Username      string
-	Hostname      string
+	Username      *BufString
+	Hostname      *BufString
 	Roles         []*Role
 	ShowGrantType ShowGrantType
 }
 
 func NewShowGrants(u, h string, rs []*Role, s ShowGrantType, buf *buffer.Buffer) *ShowGrants {
 	sh := buffer.Alloc[ShowGrants](buf)
-	sh.Username = u
-	sh.Hostname = h
+	bUsername := NewBufString(u)
+	bHostname := NewBufString(h)
+	buf.Pin(bUsername, bHostname)
+	sh.Username = bUsername
+	sh.Hostname = bHostname
 	sh.ShowGrantType = s
 	sh.Roles = rs
 	return sh
@@ -329,16 +340,16 @@ func (node *ShowGrants) Format(ctx *FmtCtx) {
 		if node.Roles != nil {
 			ctx.WriteString("for")
 			ctx.WriteString(" ")
-			ctx.WriteString(node.Roles[0].UserName)
+			ctx.WriteString(node.Roles[0].UserName.Get())
 		}
 	} else {
 		ctx.WriteString("show grants")
-		if node.Username != "" {
+		if node.Username.Get() != "" {
 			ctx.WriteString(" for ")
-			ctx.WriteString(node.Username)
-			if node.Hostname != "" {
+			ctx.WriteString(node.Username.Get())
+			if node.Hostname.Get() != "" {
 				ctx.WriteString("@")
-				ctx.WriteString(node.Hostname)
+				ctx.WriteString(node.Hostname.Get())
 			}
 		}
 		if node.Roles != nil {
@@ -357,22 +368,24 @@ func (node *ShowGrants) GetQueryType() string     { return QueryTypeOth }
 // SHOW SEQUENCES statement.
 type ShowSequences struct {
 	showImpl
-	DBName string
+	DBName *BufString
 	Where  *Where
 }
 
 func NewShowSequences(dbName string, where *Where, buf *buffer.Buffer) *ShowSequences {
 	sh := buffer.Alloc[ShowSequences](buf)
-	sh.DBName = dbName
+	bDBName := NewBufString(dbName)
+	buf.Pin(bDBName)
+	sh.DBName = bDBName
 	sh.Where = where
 	return sh
 }
 
 func (node *ShowSequences) Format(ctx *FmtCtx) {
 	ctx.WriteString("show sequences")
-	if node.DBName != "" {
+	if node.DBName.Get() != "" {
 		ctx.WriteString(" from ")
-		ctx.WriteString(node.DBName)
+		ctx.WriteString(node.DBName.Get())
 	}
 	if node.Where != nil {
 		ctx.WriteByte(' ')
@@ -388,7 +401,7 @@ type ShowTables struct {
 	Ext    bool
 	Open   bool
 	Full   bool
-	DBName string
+	DBName *BufString
 	Like   *ComparisonExpr
 	Where  *Where
 }
@@ -402,9 +415,9 @@ func (node *ShowTables) Format(ctx *FmtCtx) {
 		ctx.WriteString(" full")
 	}
 	ctx.WriteString(" tables")
-	if node.DBName != "" {
+	if node.DBName.Get() != "" {
 		ctx.WriteString(" from ")
-		ctx.WriteString(node.DBName)
+		ctx.WriteString(node.DBName.Get())
 	}
 	if node.Like != nil {
 		ctx.WriteByte(' ')
@@ -422,7 +435,9 @@ func NewShowTables(o, f bool, n string, l *ComparisonExpr, w *Where, buf *buffer
 	st := buffer.Alloc[ShowTables](buf)
 	st.Open = o
 	st.Full = f
-	st.DBName = n
+	bDBName := NewBufString(n)
+	buf.Pin(bDBName)	
+	st.DBName = bDBName
 	st.Like = l
 	st.Where = w
 	return st
@@ -677,14 +692,14 @@ func NewShowLocks(buf *buffer.Buffer) *ShowLocks {
 // show table number
 type ShowTableNumber struct {
 	showImpl
-	DbName string
+	DbName *BufString
 }
 
 func (node *ShowTableNumber) Format(ctx *FmtCtx) {
 	ctx.WriteString("show table number")
-	if node.DbName != "" {
+	if node.DbName.Get() != "" {
 		ctx.WriteString(" from ")
-		ctx.WriteString(node.DbName)
+		ctx.WriteString(node.DbName.Get())
 	}
 }
 func (node *ShowTableNumber) GetStatementType() string { return "Show Table Number" }
@@ -692,7 +707,9 @@ func (node *ShowTableNumber) GetQueryType() string     { return QueryTypeOth }
 
 func NewShowTableNumber(dbname string, buf *buffer.Buffer) *ShowTableNumber {
 	stn := buffer.Alloc[ShowTableNumber](buf)
-	stn.DbName = dbname
+	bDbName := NewBufString(dbname)
+	buf.Pin(bDbName)
+	stn.DbName = bDbName
 	return stn
 }
 
@@ -700,7 +717,7 @@ func NewShowTableNumber(dbname string, buf *buffer.Buffer) *ShowTableNumber {
 type ShowColumnNumber struct {
 	showImpl
 	Table  *UnresolvedObjectName
-	DbName string
+	DbName *BufString
 }
 
 func (node *ShowColumnNumber) Format(ctx *FmtCtx) {
@@ -709,9 +726,9 @@ func (node *ShowColumnNumber) Format(ctx *FmtCtx) {
 		ctx.WriteString(" from ")
 		node.Table.Format(ctx)
 	}
-	if node.DbName != "" {
+	if node.DbName.Get() != "" {
 		ctx.WriteString(" from ")
-		ctx.WriteString(node.DbName)
+		ctx.WriteString(node.DbName.Get())
 	}
 }
 func (node *ShowColumnNumber) GetStatementType() string { return "Show Column Number" }
@@ -720,7 +737,9 @@ func (node *ShowColumnNumber) GetQueryType() string     { return QueryTypeOth }
 func NewShowColumnNumber(table *UnresolvedObjectName, dbname string, buf *buffer.Buffer) *ShowColumnNumber {
 	scn := buffer.Alloc[ShowColumnNumber](buf)
 	scn.Table = table
-	scn.DbName = dbname
+	bDbName := NewBufString(dbname)
+	buf.Pin(bDbName)
+	scn.DbName = bDbName
 	return scn
 }
 
@@ -728,7 +747,7 @@ func NewShowColumnNumber(table *UnresolvedObjectName, dbname string, buf *buffer
 type ShowTableValues struct {
 	showImpl
 	Table  *UnresolvedObjectName
-	DbName string
+	DbName *BufString
 }
 
 func (node *ShowTableValues) Format(ctx *FmtCtx) {
@@ -737,9 +756,9 @@ func (node *ShowTableValues) Format(ctx *FmtCtx) {
 		ctx.WriteString(" from ")
 		node.Table.Format(ctx)
 	}
-	if node.DbName != "" {
+	if node.DbName.Get() != "" {
 		ctx.WriteString(" from ")
-		ctx.WriteString(node.DbName)
+		ctx.WriteString(node.DbName.Get())
 	}
 }
 func (node *ShowTableValues) GetStatementType() string { return "Show Table Values" }
@@ -748,7 +767,9 @@ func (node *ShowTableValues) GetQueryType() string     { return QueryTypeOth }
 func NewShowTableValues(table *UnresolvedObjectName, dbname string, buf *buffer.Buffer) *ShowTableValues {
 	stv := buffer.Alloc[ShowTableValues](buf)
 	stv.Table = table
-	stv.DbName = dbname
+	bDbName := NewBufString(dbname)
+	buf.Pin(bDbName)
+	stv.DbName = bDbName
 	return stv
 }
 
@@ -819,18 +840,20 @@ func (node *ShowSubscriptions) GetQueryType() string     { return QueryTypeOth }
 
 type ShowCreatePublications struct {
 	showImpl
-	Name string
+	Name *BufString
 }
 
 func NewShowCreatePublications(n string, buf *buffer.Buffer) *ShowCreatePublications {
 	s := buffer.Alloc[ShowCreatePublications](buf)
-	s.Name = n
+	bName := NewBufString(n)
+	buf.Pin(bName)
+	s.Name = bName
 	return s
 }
 
 func (node *ShowCreatePublications) Format(ctx *FmtCtx) {
 	ctx.WriteString("show create publication ")
-	ctx.WriteString(node.Name)
+	ctx.WriteString(node.Name.Get())
 }
 func (node *ShowCreatePublications) GetStatementType() string { return "Show Create Publication" }
 func (node *ShowCreatePublications) GetQueryType() string     { return QueryTypeOth }
@@ -838,7 +861,7 @@ func (node *ShowCreatePublications) GetQueryType() string     { return QueryType
 type ShowTableSize struct {
 	showImpl
 	Table  *UnresolvedObjectName
-	DbName string
+	DbName *BufString
 }
 
 func (node *ShowTableSize) Format(ctx *FmtCtx) {
@@ -847,9 +870,9 @@ func (node *ShowTableSize) Format(ctx *FmtCtx) {
 		ctx.WriteString(" from ")
 		node.Table.Format(ctx)
 	}
-	if node.DbName != "" {
+	if node.DbName.Get() != "" {
 		ctx.WriteString(" from ")
-		ctx.WriteString(node.DbName)
+		ctx.WriteString(node.DbName.Get())
 	}
 }
 func (node *ShowTableSize) GetStatementType() string { return "Show Table Size" }
@@ -858,7 +881,9 @@ func (node *ShowTableSize) GetQueryType() string     { return QueryTypeDQL }
 func NewShowTableSize(table *UnresolvedObjectName, dbname string, buf *buffer.Buffer) *ShowTableSize {
 	sts := buffer.Alloc[ShowTableSize](buf)
 	sts.Table = table
-	sts.DbName = dbname
+	bDbName := NewBufString(dbname)
+	buf.Pin(bDbName)
+	sts.DbName = bDbName
 	return sts
 }
 

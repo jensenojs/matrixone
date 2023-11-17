@@ -101,6 +101,7 @@ func NewEmptyCompilerContext() *MockCompilerContext {
 		objects: make(map[string]*ObjectRef),
 		tables:  make(map[string]*TableDef),
 		ctx:     context.Background(),
+		buf:     buffer.New(),
 	}
 }
 

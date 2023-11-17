@@ -364,7 +364,7 @@ var RecordStatementTxnID = func(ctx context.Context, ses *Session) {
 }
 
 func handleShowTableStatus(ses *Session, stmt *tree.ShowTableStatus, proc *process.Process) error {
-	db, err := ses.GetStorage().Database(ses.requestCtx, stmt.DbName, proc.TxnOperator)
+	db, err := ses.GetStorage().Database(ses.requestCtx, stmt.DbName.Get(), proc.TxnOperator)
 	if err != nil {
 		return err
 	}
@@ -532,19 +532,19 @@ func (mce *MysqlCmdExecutor) handleSelectVariables(ve *tree.VarExpr, cwIndex, cw
 
 	col := new(MysqlColumn)
 	col.SetColumnType(defines.MYSQL_TYPE_VARCHAR)
-	col.SetName("@@" + ve.Name)
+	col.SetName("@@" + ve.Name.Get())
 	mrs.AddColumn(col)
 
 	row := make([]interface{}, 1)
 	if ve.System {
 		if ve.Global {
-			val, err := ses.GetGlobalVar(ve.Name)
+			val, err := ses.GetGlobalVar(ve.Name.Get())
 			if err != nil {
 				return err
 			}
 			row[0] = val
 		} else {
-			val, err := ses.GetSessionVar(ve.Name)
+			val, err := ses.GetSessionVar(ve.Name.Get())
 			if err != nil {
 				return err
 			}
@@ -552,7 +552,7 @@ func (mce *MysqlCmdExecutor) handleSelectVariables(ve *tree.VarExpr, cwIndex, cw
 		}
 	} else {
 		//user defined variable
-		_, val, err := ses.GetUserDefinedVar(ve.Name)
+		_, val, err := ses.GetUserDefinedVar(ve.Name.Get())
 		if err != nil {
 			return err
 		}
@@ -717,7 +717,7 @@ func doSetVar(ctx context.Context, mce *MysqlCmdExecutor, ses *Session, sv *tree
 		return nil
 	}
 	for _, assign := range sv.Assignments {
-		name := assign.Name
+		name := assign.Name.Get()
 		var value interface{}
 
 		value, err = getExprValue(assign.Value, mce, ses)
@@ -1166,7 +1166,7 @@ func doPrepareString(ctx context.Context, ses *Session, st *tree.PrepareString) 
 	if err != nil {
 		return nil, err
 	}
-	stmts, err := mysql.Parse(ctx, st.Sql, v.(int64), ses.buf.GetSessionLevel())
+	stmts, err := mysql.Parse(ctx, st.Sql.Get(), v.(int64), ses.buf.GetSessionLevel())
 	if err != nil {
 		return nil, err
 	}
@@ -1377,7 +1377,7 @@ func doKill(ctx context.Context, rm *RoutineManager, ses *Session, k *tree.Kill)
 	if !k.Option.Exist || k.Option.Typ == tree.KillTypeConnection {
 		err = rm.kill(ctx, true, idThatKill, k.ConnectionId, "")
 	} else {
-		err = rm.kill(ctx, false, idThatKill, k.ConnectionId, k.StmtOption.StatementId)
+		err = rm.kill(ctx, false, idThatKill, k.ConnectionId, k.StmtOption.StatementId.Get())
 	}
 	return err
 }
@@ -1563,34 +1563,34 @@ func getExplainOption(requestCtx context.Context, options []tree.OptionElem) (*e
 		return es, nil
 	} else {
 		for _, v := range options {
-			if strings.EqualFold(v.Name, "VERBOSE") {
-				if strings.EqualFold(v.Value, "TRUE") || v.Value == "NULL" {
+			if strings.EqualFold(v.Name.Get(), "VERBOSE") {
+				if strings.EqualFold(v.Value.Get(), "TRUE") || v.Value.Get() == "NULL" {
 					es.Verbose = true
-				} else if strings.EqualFold(v.Value, "FALSE") {
+				} else if strings.EqualFold(v.Value.Get(), "FALSE") {
 					es.Verbose = false
 				} else {
-					return nil, moerr.NewInvalidInput(requestCtx, "invalid explain option '%s', valud '%s'", v.Name, v.Value)
+					return nil, moerr.NewInvalidInput(requestCtx, "invalid explain option '%s', valud '%s'", v.Name.Get(), v.Value.Get())
 				}
-			} else if strings.EqualFold(v.Name, "ANALYZE") {
-				if strings.EqualFold(v.Value, "TRUE") || v.Value == "NULL" {
+			} else if strings.EqualFold(v.Name.Get(), "ANALYZE") {
+				if strings.EqualFold(v.Value.Get(), "TRUE") || v.Value.Get() == "NULL" {
 					es.Analyze = true
-				} else if strings.EqualFold(v.Value, "FALSE") {
+				} else if strings.EqualFold(v.Value.Get(), "FALSE") {
 					es.Analyze = false
 				} else {
-					return nil, moerr.NewInvalidInput(requestCtx, "invalid explain option '%s', valud '%s'", v.Name, v.Value)
+					return nil, moerr.NewInvalidInput(requestCtx, "invalid explain option '%s', valud '%s'", v.Name.Get(), v.Value.Get())
 				}
-			} else if strings.EqualFold(v.Name, "FORMAT") {
-				if strings.EqualFold(v.Value, "TEXT") {
+			} else if strings.EqualFold(v.Name.Get(), "FORMAT") {
+				if strings.EqualFold(v.Value.Get(), "TEXT") {
 					es.Format = explain.EXPLAIN_FORMAT_TEXT
-				} else if strings.EqualFold(v.Value, "JSON") {
-					return nil, moerr.NewNotSupported(requestCtx, "Unsupport explain format '%s'", v.Value)
-				} else if strings.EqualFold(v.Value, "DOT") {
-					return nil, moerr.NewNotSupported(requestCtx, "Unsupport explain format '%s'", v.Value)
+				} else if strings.EqualFold(v.Value.Get(), "JSON") {
+					return nil, moerr.NewNotSupported(requestCtx, "Unsupport explain format '%s'", v.Value.Get())
+				} else if strings.EqualFold(v.Value.Get(), "DOT") {
+					return nil, moerr.NewNotSupported(requestCtx, "Unsupport explain format '%s'", v.Value.Get())
 				} else {
-					return nil, moerr.NewInvalidInput(requestCtx, "invalid explain option '%s', valud '%s'", v.Name, v.Value)
+					return nil, moerr.NewInvalidInput(requestCtx, "invalid explain option '%s', valud '%s'", v.Name.Get(), v.Value.Get())
 				}
 			} else {
-				return nil, moerr.NewInvalidInput(requestCtx, "invalid explain option '%s', valud '%s'", v.Name, v.Value)
+				return nil, moerr.NewInvalidInput(requestCtx, "invalid explain option '%s', valud '%s'", v.Name.Get(), v.Value.Get())
 			}
 		}
 		return es, nil
@@ -2454,7 +2454,7 @@ func (mce *MysqlCmdExecutor) processLoadLocal(ctx context.Context, param *tree.E
 	if err != nil {
 		return
 	}
-	err = proto.sendLocalInfileRequest(param.Filepath)
+	err = proto.sendLocalInfileRequest(param.Filepath.Get())
 	if err != nil {
 		return
 	}
@@ -2467,7 +2467,7 @@ func (mce *MysqlCmdExecutor) processLoadLocal(ctx context.Context, param *tree.E
 			return nil
 		}
 		if moerr.IsMoErrCode(err, moerr.ErrInvalidInput) {
-			err = moerr.NewInvalidInput(ctx, "cannot read '%s' from client,please check the file path, user privilege and if client start with --local-infile", param.Filepath)
+			err = moerr.NewInvalidInput(ctx, "cannot read '%s' from client,please check the file path, user privilege and if client start with --local-infile", param.Filepath.Get())
 		}
 		return
 	}
@@ -2497,7 +2497,7 @@ func (mce *MysqlCmdExecutor) processLoadLocal(ctx context.Context, param *tree.E
 		skipWrite = true // next, we just need read the rest of the data,no need to write it to pipe.
 		logError(ses, ses.GetDebugString(),
 			"Failed to load local file",
-			zap.String("path", param.Filepath),
+			zap.String("path", param.Filepath.Get()),
 			zap.Error(err))
 	}
 	epoch, printEvery, minReadTime, maxReadTime, minWriteTime, maxWriteTime := uint64(0), uint64(1024), 24*time.Hour, time.Nanosecond, 24*time.Hour, time.Nanosecond
@@ -2535,7 +2535,7 @@ func (mce *MysqlCmdExecutor) processLoadLocal(ctx context.Context, param *tree.E
 			if err != nil {
 				logError(ses, ses.GetDebugString(),
 					"Failed to load local file",
-					zap.String("path", param.Filepath),
+					zap.String("path", param.Filepath.Get()),
 					zap.Uint64("epoch", epoch),
 					zap.Error(err))
 				skipWrite = true
@@ -2549,12 +2549,12 @@ func (mce *MysqlCmdExecutor) processLoadLocal(ctx context.Context, param *tree.E
 			}
 		}
 		if epoch%printEvery == 0 {
-			logDebugf(ses.GetDebugString(), "load local '%s', epoch: %d, skipWrite: %v, minReadTime: %s, maxReadTime: %s, minWriteTime: %s, maxWriteTime: %s,", param.Filepath, epoch, skipWrite, minReadTime.String(), maxReadTime.String(), minWriteTime.String(), maxWriteTime.String())
+			logDebugf(ses.GetDebugString(), "load local '%s', epoch: %d, skipWrite: %v, minReadTime: %s, maxReadTime: %s, minWriteTime: %s, maxWriteTime: %s,", param.Filepath.Get(), epoch, skipWrite, minReadTime.String(), maxReadTime.String(), minWriteTime.String(), maxWriteTime.String())
 			minReadTime, maxReadTime, minWriteTime, maxWriteTime = 24*time.Hour, time.Nanosecond, 24*time.Hour, time.Nanosecond
 		}
 		epoch += 1
 	}
-	logDebugf(ses.GetDebugString(), "load local '%s', read&write all data from client cost: %s", param.Filepath, time.Since(start))
+	logDebugf(ses.GetDebugString(), "load local '%s', read&write all data from client cost: %s", param.Filepath.Get(), time.Since(start))
 	return
 }
 
@@ -3173,11 +3173,11 @@ func (mce *MysqlCmdExecutor) executeStmt(requestCtx context.Context,
 	case *tree.UnLockTableStmt:
 		selfHandle = true
 	case *tree.ShowGrants:
-		if len(st.Username) == 0 {
-			st.Username = userName
+		if len(st.Username.Get()) == 0 {
+			st.Username = st.Username.Set(userName)
 		}
-		if len(st.Hostname) == 0 || st.Hostname == "%" {
-			st.Hostname = rootHost
+		if len(st.Hostname.Get()) == 0 || st.Hostname.Get() == "%" {
+			st.Hostname = st.Hostname.Set(rootHost)
 		}
 	case *tree.BackupStart:
 		selfHandle = true

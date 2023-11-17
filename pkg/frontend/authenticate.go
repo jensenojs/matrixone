@@ -2605,21 +2605,21 @@ func normalizeName(ctx context.Context, name string) (string, error) {
 }
 
 func normalizeNameOfAccount(ctx context.Context, ca *tree.CreateAccount) error {
-	s := strings.TrimSpace(ca.Name)
+	s := strings.TrimSpace(ca.Name.Get())
 	if len(s) == 0 {
-		return moerr.NewInternalError(ctx, `the name "%s" is invalid`, ca.Name)
+		return moerr.NewInternalError(ctx, `the name "%s" is invalid`, ca.Name.Get())
 	}
 	if accountNameIsInvalid(s) {
-		return moerr.NewInternalError(ctx, `the name "%s" is invalid`, ca.Name)
+		return moerr.NewInternalError(ctx, `the name "%s" is invalid`, ca.Name.Get())
 	}
-	ca.Name = s
+	ca.Name = ca.Name.Set(s)
 	return nil
 }
 
 // normalizeNameOfRole normalizes the name
 func normalizeNameOfRole(ctx context.Context, role *tree.Role) error {
-	var err error
-	role.UserName, err = normalizeName(ctx, role.UserName)
+	s, err := normalizeName(ctx, role.UserName.Get())
+	role.UserName = role.UserName.Set(s)
 	return err
 }
 
@@ -2637,8 +2637,8 @@ func normalizeNamesOfRoles(ctx context.Context, roles []*tree.Role) error {
 
 // normalizeNameOfUser normalizes the name
 func normalizeNameOfUser(ctx context.Context, user *tree.User) error {
-	var err error
-	user.Username, err = normalizeName(ctx, user.Username)
+	s, err := normalizeName(ctx, user.Username.Get())
+	user.Username = user.Username.Set(s)
 	return err
 }
 
@@ -2718,9 +2718,9 @@ func doAlterUser(ctx context.Context, ses *Session, au *tree.AlterUser) (err err
 	defer bh.Close()
 
 	user = au.Users[0]
-	userName = user.Username
-	hostName = user.Hostname
-	password = user.AuthOption.Str
+	userName = user.Username.Get()
+	hostName = user.Hostname.Get()
+	password = user.AuthOption.Str.Get()
 	if len(password) == 0 {
 		return moerr.NewInternalError(ctx, "password is empty string")
 	}
@@ -2756,7 +2756,7 @@ func doAlterUser(ctx context.Context, ses *Session, au *tree.AlterUser) (err err
 		// false : return an error
 		// true : return and  do nothing
 		if !au.IfExists {
-			return moerr.NewInternalError(ctx, "Operation ALTER USER failed for '%s'@'%s', user does't exist", user.Username, user.Hostname)
+			return moerr.NewInternalError(ctx, "Operation ALTER USER failed for '%s'@'%s', user does't exist", user.Username.Get(), user.Hostname.Get())
 		} else {
 			return err
 		}
@@ -2845,21 +2845,24 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 	}
 
 	//normalize the name
-	aa.Name, err = normalizeName(ctx, aa.Name)
+	name , err := normalizeName(ctx, aa.Name.Get())
 	if err != nil {
 		return err
 	}
+	aa.Name = aa.Name.Set(name)
 
 	if aa.AuthOption.Exist {
-		aa.AuthOption.AdminName, err = normalizeName(ctx, aa.AuthOption.AdminName)
+		adminName, err := normalizeName(ctx, aa.AuthOption.AdminName.Get())
 		if err != nil {
 			return err
 		}
+		aa.AuthOption.AdminName = aa.AuthOption.AdminName.Set(adminName)
+
 		if aa.AuthOption.IdentifiedType.Typ != tree.AccountIdentifiedByPassword {
 			return moerr.NewInternalError(ctx, "only support identified by password")
 		}
 
-		if len(aa.AuthOption.IdentifiedType.Str) == 0 {
+		if len(aa.AuthOption.IdentifiedType.Str.Get()) == 0 {
 			err = moerr.NewInternalError(ctx, "password is empty string")
 			return err
 		}
@@ -2867,7 +2870,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 
 	if aa.StatusOption.Exist {
 		//SYS account can not be suspended
-		if isSysTenant(aa.Name) {
+		if isSysTenant(aa.Name.Get()) {
 			return moerr.NewInternalError(ctx, "account sys can not be suspended")
 		}
 	}
@@ -2886,7 +2889,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 
 		//step 1: check account exists or not
 		//get accountID
-		sql, err = getSqlForCheckTenant(ctx, aa.Name)
+		sql, err = getSqlForCheckTenant(ctx, aa.Name.Get())
 		if err != nil {
 			return err
 		}
@@ -2924,7 +2927,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 			// false : return an error
 			// true : skip and do nothing
 			if !aa.IfExists {
-				return moerr.NewInternalError(ctx, "there is no account %s", aa.Name)
+				return moerr.NewInternalError(ctx, "there is no account %s", aa.Name.Get())
 			}
 		}
 
@@ -2935,7 +2938,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 				accountCtx := context.WithValue(ctx, defines.TenantIDKey{}, uint32(targetAccountId))
 
 				//1, check the admin exists or not
-				sql, err = getSqlForPasswordOfUser(ctx, aa.AuthOption.AdminName)
+				sql, err = getSqlForPasswordOfUser(ctx, aa.AuthOption.AdminName.Get())
 				if err != nil {
 					return err
 				}
@@ -2951,13 +2954,13 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 				}
 
 				if !execResultArrayHasData(erArray) {
-					return moerr.NewInternalError(accountCtx, "there is no user %s", aa.AuthOption.AdminName)
+					return moerr.NewInternalError(accountCtx, "there is no user %s", aa.AuthOption.AdminName.Get())
 				}
 
 				//2, update the password
 				//encryption the password
-				encryption := HashPassWord(aa.AuthOption.IdentifiedType.Str)
-				sql, err = getSqlForUpdatePasswordOfUser(ctx, encryption, aa.AuthOption.AdminName)
+				encryption := HashPassWord(aa.AuthOption.IdentifiedType.Str.Get())
+				sql, err = getSqlForUpdatePasswordOfUser(ctx, encryption, aa.AuthOption.AdminName.Get())
 				if err != nil {
 					return err
 				}
@@ -2970,7 +2973,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 
 			//Option 2: alter the comment of the account
 			if aa.Comment.Exist {
-				sql, err = getSqlForUpdateCommentsOfAccount(ctx, aa.Comment.Comment, aa.Name)
+				sql, err = getSqlForUpdateCommentsOfAccount(ctx, aa.Comment.Comment.Get(), aa.Name.Get())
 				if err != nil {
 					return err
 				}
@@ -2984,7 +2987,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 			//Option 3: suspend or resume the account
 			if aa.StatusOption.Exist {
 				if aa.StatusOption.Option == tree.AccountStatusSuspend {
-					sql, err = getSqlForUpdateStatusOfAccount(ctx, aa.StatusOption.Option.String(), types.CurrentTimestamp().String2(time.UTC, 0), aa.Name)
+					sql, err = getSqlForUpdateStatusOfAccount(ctx, aa.StatusOption.Option.String(), types.CurrentTimestamp().String2(time.UTC, 0), aa.Name.Get())
 					if err != nil {
 						return err
 					}
@@ -2994,7 +2997,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 						return err
 					}
 				} else if aa.StatusOption.Option == tree.AccountStatusOpen {
-					sql, err = getSqlForUpdateStatusAndVersionOfAccount(ctx, aa.StatusOption.Option.String(), types.CurrentTimestamp().String2(time.UTC, 0), aa.Name, (version+1)%math.MaxUint64)
+					sql, err = getSqlForUpdateStatusAndVersionOfAccount(ctx, aa.StatusOption.Option.String(), types.CurrentTimestamp().String2(time.UTC, 0), aa.Name.Get(), (version+1)%math.MaxUint64)
 					if err != nil {
 						return err
 					}
@@ -3004,7 +3007,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 						return err
 					}
 				} else if aa.StatusOption.Option == tree.AccountStatusRestricted {
-					sql, err = getSqlForUpdateStatusOfAccount(ctx, aa.StatusOption.Option.String(), types.CurrentTimestamp().String2(time.UTC, 0), aa.Name)
+					sql, err = getSqlForUpdateStatusOfAccount(ctx, aa.StatusOption.Option.String(), types.CurrentTimestamp().String2(time.UTC, 0), aa.Name.Get())
 					if err != nil {
 						return err
 					}
@@ -3029,7 +3032,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 		if aa.StatusOption.Exist && aa.StatusOption.Option == tree.AccountStatusSuspend {
 			ses.getRoutineManager().accountRoutine.EnKillQueue(int64(targetAccountId), version)
 
-			if err := postDropSuspendAccount(ctx, ses, aa.Name, int64(targetAccountId), version); err != nil {
+			if err := postDropSuspendAccount(ctx, ses, aa.Name.Get(), int64(targetAccountId), version); err != nil {
 				logutil.Errorf("post alter account suspend error: %s", err.Error())
 			}
 		}
@@ -3041,7 +3044,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 					rt.setResricted(true)
 				}
 			}
-			err = postAlterSessionStatus(ctx, ses, aa.Name, int64(targetAccountId), tree.AccountStatusRestricted.String())
+			err = postAlterSessionStatus(ctx, ses, aa.Name.Get(), int64(targetAccountId), tree.AccountStatusRestricted.String())
 			if err != nil {
 				logutil.Errorf("post alter account restricted error: %s", err.Error())
 			}
@@ -3054,7 +3057,7 @@ func doAlterAccount(ctx context.Context, ses *Session, aa *tree.AlterAccount) (e
 					rt.setResricted(false)
 				}
 			}
-			err = postAlterSessionStatus(ctx, ses, aa.Name, int64(targetAccountId), tree.AccountStatusOpen.String())
+			err = postAlterSessionStatus(ctx, ses, aa.Name.Get(), int64(targetAccountId), tree.AccountStatusOpen.String())
 			if err != nil {
 				logutil.Errorf("post alter account not restricted error: %s", err.Error())
 			}
@@ -3159,7 +3162,7 @@ func doSwitchRole(ctx context.Context, ses *Session, sr *tree.SetRole) (err erro
 				return err
 			}
 
-			sql, err = getSqlForRoleIdOfRole(ctx, sr.Role.UserName)
+			sql, err = getSqlForRoleIdOfRole(ctx, sr.Role.UserName.Get())
 			if err != nil {
 				return err
 			}
@@ -3179,7 +3182,7 @@ func doSwitchRole(ctx context.Context, ses *Session, sr *tree.SetRole) (err erro
 					return err
 				}
 			} else {
-				return moerr.NewInternalError(ctx, "there is no role %s", sr.Role.UserName)
+				return moerr.NewInternalError(ctx, "there is no role %s", sr.Role.UserName.Get())
 			}
 
 			//step2 : check the role has been granted to the user or not
@@ -3196,7 +3199,7 @@ func doSwitchRole(ctx context.Context, ses *Session, sr *tree.SetRole) (err erro
 			}
 
 			if !execResultArrayHasData(erArray) {
-				return moerr.NewInternalError(ctx, "the role %s has not be granted to the user %s", sr.Role.UserName, account.GetUser())
+				return moerr.NewInternalError(ctx, "the role %s has not be granted to the user %s", sr.Role.UserName.Get(), account.GetUser())
 			}
 			return err
 		}
@@ -3208,7 +3211,7 @@ func doSwitchRole(ctx context.Context, ses *Session, sr *tree.SetRole) (err erro
 
 		//step3 : switch the default role and role id;
 		account.SetDefaultRoleID(uint32(roleId))
-		account.SetDefaultRole(sr.Role.UserName)
+		account.SetDefaultRole(sr.Role.UserName.Get())
 		//then, reset secondary role to none
 		account.SetUseSecondaryRole(false)
 
@@ -3533,10 +3536,10 @@ func doCreateStage(ctx context.Context, ses *Session, cs *tree.CreateStage) erro
 		}
 
 		if cs.Comment.Exist {
-			comment = cs.Comment.Comment
+			comment = cs.Comment.Comment.Get()
 		}
 
-		sql = getSqlForInsertIntoMoStages(ctx, string(cs.Name.Get()), cs.Url, credentials, StageStatus, types.CurrentTimestamp().String2(time.UTC, 0), comment)
+		sql = getSqlForInsertIntoMoStages(ctx, string(cs.Name.Get()), cs.Url.Get(), credentials, StageStatus, types.CurrentTimestamp().String2(time.UTC, 0), comment)
 
 		err = bh.Exec(ctx, sql)
 		if err != nil {
@@ -3571,7 +3574,7 @@ func doCheckFilePath(ctx context.Context, ses *Session, ep *tree.ExportParam) er
 	}
 
 	// detect filepath contain stage or not
-	filePath = ep.FilePath
+	filePath = ep.FilePath.Get()
 	if !strings.Contains(filePath, ":") {
 		// the filepath is the target path
 		sql = getSqlForCheckStageStatus(ctx, "enabled")
@@ -3628,7 +3631,7 @@ func doCheckFilePath(ctx context.Context, ses *Session, ep *tree.ExportParam) er
 				}
 
 				filePath = strings.Replace(filePath, stageName+":", url, 1)
-				ses.ep.userConfig.StageFilePath = filePath
+				ses.ep.userConfig.StageFilePath = tree.NewBufString(filePath)
 			}
 
 		} else {
@@ -3697,7 +3700,7 @@ func doAlterStage(ctx context.Context, ses *Session, as *tree.AlterStage) error 
 		}
 	} else {
 		if as.UrlOption.Exist {
-			sql = getsqlForUpdateStageUrl(string(as.Name.Get()), as.UrlOption.Url)
+			sql = getsqlForUpdateStageUrl(string(as.Name.Get()), as.UrlOption.Url.Get())
 			err = bh.Exec(ctx, sql)
 			if err != nil {
 				return err
@@ -3722,7 +3725,7 @@ func doAlterStage(ctx context.Context, ses *Session, as *tree.AlterStage) error 
 		}
 
 		if as.Comment.Exist {
-			sql = getsqlForUpdateStageComment(string(as.Name.Get()), as.Comment.Comment)
+			sql = getsqlForUpdateStageComment(string(as.Name.Get()), as.Comment.Comment.Get())
 			err = bh.Exec(ctx, sql)
 			if err != nil {
 				return err
@@ -3853,7 +3856,7 @@ func doCreatePublication(ctx context.Context, ses *Session, cp *tree.CreatePubli
 		return moerr.NewInternalError(ctx, "database '%s' is not a user database", cp.Database.Get())
 	}
 	bh.ClearExecResultSet()
-	sql, err = getSqlForInsertIntoMoPubs(ctx, string(cp.Name.Get()), pubDb, datId, allTable, tableList, accountList, tenantInfo.GetDefaultRoleID(), tenantInfo.GetUserID(), cp.Comment, true)
+	sql, err = getSqlForInsertIntoMoPubs(ctx, string(cp.Name.Get()), pubDb, datId, allTable, tableList, accountList, tenantInfo.GetDefaultRoleID(), tenantInfo.GetUserID(), cp.Comment.Get(), true)
 	if err != nil {
 		return err
 	}
@@ -3966,8 +3969,8 @@ func doAlterPublication(ctx context.Context, ses *Session, ap *tree.AlterPublica
 			accountList = strings.Join(accountListSep, ",")
 		}
 	}
-	if ap.Comment != "" {
-		comment = ap.Comment
+	if ap.Comment.Get() != "" {
+		comment = ap.Comment.Get()
 	}
 	sql, err = getSqlForUpdatePubInfo(ctx, string(ap.Name.Get()), accountList, comment, false)
 	if err != nil {
@@ -4056,13 +4059,14 @@ func doDropAccount(ctx context.Context, ses *Session, da *tree.DropAccount) (err
 	var hasAccount = true
 	clusterTables := make(map[string]int)
 
-	da.Name, err = normalizeName(ctx, da.Name)
+	name, err := normalizeName(ctx, da.Name.Get())
 	if err != nil {
 		return err
 	}
+	da.Name = da.Name.Set(name)
 
-	if isSysTenant(da.Name) {
-		return moerr.NewInternalError(ctx, "can not delete the account %s", da.Name)
+	if isSysTenant(da.Name.Get()) {
+		return moerr.NewInternalError(ctx, "can not delete the account %s", da.Name.Get())
 	}
 
 	dropAccountFunc := func() error {
@@ -4075,7 +4079,7 @@ func doDropAccount(ctx context.Context, ses *Session, da *tree.DropAccount) (err
 		}
 
 		//check the account exists or not
-		sql, err = getSqlForCheckTenant(ctx, da.Name)
+		sql, err = getSqlForCheckTenant(ctx, da.Name.Get())
 		if err != nil {
 			return err
 		}
@@ -4102,7 +4106,7 @@ func doDropAccount(ctx context.Context, ses *Session, da *tree.DropAccount) (err
 		} else {
 			//no such account
 			if !da.IfExists { //when the "IF EXISTS" is set, just skip it.
-				return moerr.NewInternalError(ctx, "there is no account %s", da.Name)
+				return moerr.NewInternalError(ctx, "there is no account %s", da.Name.Get())
 			}
 			hasAccount = false
 		}
@@ -4213,7 +4217,7 @@ func doDropAccount(ctx context.Context, ses *Session, da *tree.DropAccount) (err
 		}
 
 		//step 1 : delete the account in the mo_account of the sys account
-		sql, err = getSqlForDeleteAccountFromMoAccount(ctx, da.Name)
+		sql, err = getSqlForDeleteAccountFromMoAccount(ctx, da.Name.Get())
 		if err != nil {
 			return err
 		}
@@ -4266,7 +4270,7 @@ func doDropAccount(ctx context.Context, ses *Session, da *tree.DropAccount) (err
 	//if drop the account, add the account to kill queue
 	ses.getRoutineManager().accountRoutine.EnKillQueue(accountId, version)
 
-	if err := postDropSuspendAccount(ctx, ses, da.Name, accountId, version); err != nil {
+	if err := postDropSuspendAccount(ctx, ses, da.Name.Get(), accountId, version); err != nil {
 		logutil.Errorf("post drop account error: %s", err.Error())
 	}
 
@@ -4350,18 +4354,18 @@ func doDropUser(ctx context.Context, ses *Session, du *tree.DropUser) (err error
 	//step1: check users exists or not.
 	//handle "IF EXISTS"
 	for _, user := range du.Users {
-		sql, err = getSqlForPasswordOfUser(ctx, user.Username)
+		sql, err = getSqlForPasswordOfUser(ctx, user.Username.Get())
 		if err != nil {
 			return err
 		}
-		vr, err = verifyRoleFunc(ctx, bh, sql, user.Username, roleType)
+		vr, err = verifyRoleFunc(ctx, bh, sql, user.Username.Get(), roleType)
 		if err != nil {
 			return err
 		}
 
 		if vr == nil {
 			if !du.IfExists { //when the "IF EXISTS" is set, just skip it.
-				return moerr.NewInternalError(ctx, "there is no user %s", user.Username)
+				return moerr.NewInternalError(ctx, "there is no user %s", user.Username.Get())
 			}
 		}
 
@@ -4372,9 +4376,9 @@ func doDropUser(ctx context.Context, ses *Session, du *tree.DropUser) (err error
 		//if the user is admin user with the role moadmin or accountadmin,
 		//the user can not be deleted.
 		if account.IsSysTenant() {
-			sql, err = getSqlForCheckUserHasRole(ctx, user.Username, moAdminRoleID)
+			sql, err = getSqlForCheckUserHasRole(ctx, user.Username.Get(), moAdminRoleID)
 		} else {
-			sql, err = getSqlForCheckUserHasRole(ctx, user.Username, accountAdminRoleID)
+			sql, err = getSqlForCheckUserHasRole(ctx, user.Username.Get(), accountAdminRoleID)
 		}
 		if err != nil {
 			return err
@@ -4392,7 +4396,7 @@ func doDropUser(ctx context.Context, ses *Session, du *tree.DropUser) (err error
 		}
 
 		if execResultArrayHasData(erArray) {
-			return moerr.NewInternalError(ctx, "can not delete the user %s", user.Username)
+			return moerr.NewInternalError(ctx, "can not delete the user %s", user.Username.Get())
 		}
 
 		//step2 : delete mo_user
@@ -4434,18 +4438,18 @@ func doDropRole(ctx context.Context, ses *Session, dr *tree.DropRole) (err error
 	//step1: check roles exists or not.
 	//handle "IF EXISTS"
 	for _, role := range dr.Roles {
-		sql, err = getSqlForRoleIdOfRole(ctx, role.UserName)
+		sql, err = getSqlForRoleIdOfRole(ctx, role.UserName.Get())
 		if err != nil {
 			return err
 		}
-		vr, err = verifyRoleFunc(ctx, bh, sql, role.UserName, roleType)
+		vr, err = verifyRoleFunc(ctx, bh, sql, role.UserName.Get(), roleType)
 		if err != nil {
 			return err
 		}
 
 		if vr == nil {
 			if !dr.IfExists { //when the "IF EXISTS" is set, just skip it.
-				return moerr.NewInternalError(ctx, "there is no role %s", role.UserName)
+				return moerr.NewInternalError(ctx, "there is no role %s", role.UserName.Get())
 			}
 		}
 
@@ -4662,21 +4666,21 @@ func doRevokePrivilege(ctx context.Context, ses *Session, rp *tree.RevokePrivile
 	//step 1: check roles. exists or not.
 	for i, user := range rp.Roles {
 		//check Revoke privilege on xxx yyy from moadmin(accountadmin)
-		if account.IsNameOfAdminRoles(user.UserName) {
-			return moerr.NewInternalError(ctx, "the privilege can not be revoked from the role %s", user.UserName)
+		if account.IsNameOfAdminRoles(user.UserName.Get()) {
+			return moerr.NewInternalError(ctx, "the privilege can not be revoked from the role %s", user.UserName.Get())
 		}
-		sql, err = getSqlForRoleIdOfRole(ctx, user.UserName)
+		sql, err = getSqlForRoleIdOfRole(ctx, user.UserName.Get())
 		if err != nil {
 			return err
 		}
-		vr, err = verifyRoleFunc(ctx, bh, sql, user.UserName, roleType)
+		vr, err = verifyRoleFunc(ctx, bh, sql, user.UserName.Get(), roleType)
 		if err != nil {
 			return err
 		}
 		verifiedRoles[i] = vr
 		if vr == nil {
 			if !rp.IfExists { //when the "IF EXISTS" is set, just skip it.
-				return moerr.NewInternalError(ctx, "there is no role %s", user.UserName)
+				return moerr.NewInternalError(ctx, "there is no role %s", user.UserName.Get())
 			}
 		}
 	}
@@ -4806,19 +4810,19 @@ func checkPrivilegeObjectTypeAndPrivilegeLevel(ctx context.Context, ses *Session
 			objId = objectIDAll
 		case tree.PRIVILEGE_LEVEL_TYPE_DATABASE_STAR:
 			privLevel = privilegeLevelDatabaseStar
-			objId, err = getDatabaseOrTableId(ctx, bh, true, pl.DbName, "")
+			objId, err = getDatabaseOrTableId(ctx, bh, true, pl.DbName.Get(), "")
 			if err != nil {
 				return 0, 0, err
 			}
 		case tree.PRIVILEGE_LEVEL_TYPE_DATABASE_TABLE:
 			privLevel = privilegeLevelDatabaseTable
-			objId, err = getDatabaseOrTableId(ctx, bh, false, pl.DbName, pl.TblName)
+			objId, err = getDatabaseOrTableId(ctx, bh, false, pl.DbName.Get(), pl.TblName.Get())
 			if err != nil {
 				return 0, 0, err
 			}
 		case tree.PRIVILEGE_LEVEL_TYPE_TABLE:
 			privLevel = privilegeLevelTable
-			objId, err = getDatabaseOrTableId(ctx, bh, false, ses.GetDatabaseName(), pl.TblName)
+			objId, err = getDatabaseOrTableId(ctx, bh, false, ses.GetDatabaseName(), pl.TblName.Get())
 			if err != nil {
 				return 0, 0, err
 			}
@@ -4837,14 +4841,14 @@ func checkPrivilegeObjectTypeAndPrivilegeLevel(ctx context.Context, ses *Session
 		case tree.PRIVILEGE_LEVEL_TYPE_TABLE:
 			//in the syntax, we can not distinguish the table name from the database name.
 			privLevel = privilegeLevelDatabase
-			dbName = pl.TblName
+			dbName = pl.TblName.Get()
 			objId, err = getDatabaseOrTableId(ctx, bh, true, dbName, "")
 			if err != nil {
 				return 0, 0, err
 			}
 		case tree.PRIVILEGE_LEVEL_TYPE_DATABASE:
 			privLevel = privilegeLevelDatabase
-			dbName = pl.DbName
+			dbName = pl.DbName.Get()
 			objId, err = getDatabaseOrTableId(ctx, bh, true, dbName, "")
 			if err != nil {
 				return 0, 0, err
@@ -4939,10 +4943,10 @@ func doGrantPrivilege(ctx context.Context, ses *Session, gp *tree.GrantPrivilege
 
 	for i, role := range gp.Roles {
 		//check Grant privilege on xxx yyy to moadmin(accountadmin)
-		if account != nil && account.IsNameOfAdminRoles(role.UserName) {
-			return moerr.NewInternalError(ctx, "the privilege can not be granted to the role %s", role.UserName)
+		if account != nil && account.IsNameOfAdminRoles(role.UserName.Get()) {
+			return moerr.NewInternalError(ctx, "the privilege can not be granted to the role %s", role.UserName.Get())
 		}
-		sql, err = getSqlForRoleIdOfRole(ctx, role.UserName)
+		sql, err = getSqlForRoleIdOfRole(ctx, role.UserName.Get())
 		if err != nil {
 			return err
 		}
@@ -4965,11 +4969,11 @@ func doGrantPrivilege(ctx context.Context, ses *Session, gp *tree.GrantPrivilege
 				}
 			}
 		} else {
-			return moerr.NewInternalError(ctx, "there is no role %s", role.UserName)
+			return moerr.NewInternalError(ctx, "there is no role %s", role.UserName.Get())
 		}
 		verifiedRoles[i] = &verifiedRole{
 			typ:  roleType,
-			name: role.UserName,
+			name: role.UserName.Get(),
 			id:   roleId,
 		}
 	}
@@ -5093,11 +5097,11 @@ func doRevokeRole(ctx context.Context, ses *Session, rr *tree.RevokeRole) (err e
 	//handle "IF EXISTS"
 	//step1 : check Users are real Users or Roles,  exists or not
 	for i, user := range rr.Users {
-		sql, err = getSqlForRoleIdOfRole(ctx, user.Username)
+		sql, err = getSqlForRoleIdOfRole(ctx, user.Username.Get())
 		if err != nil {
 			return err
 		}
-		vr, err = verifyRoleFunc(ctx, bh, sql, user.Username, roleType)
+		vr, err = verifyRoleFunc(ctx, bh, sql, user.Username.Get(), roleType)
 		if err != nil {
 			return err
 		}
@@ -5105,18 +5109,18 @@ func doRevokeRole(ctx context.Context, ses *Session, rr *tree.RevokeRole) (err e
 			verifiedToRoles[i] = vr
 		} else {
 			//check user
-			sql, err = getSqlForPasswordOfUser(ctx, user.Username)
+			sql, err = getSqlForPasswordOfUser(ctx, user.Username.Get())
 			if err != nil {
 				return err
 			}
-			vr, err = verifyRoleFunc(ctx, bh, sql, user.Username, userType)
+			vr, err = verifyRoleFunc(ctx, bh, sql, user.Username.Get(), userType)
 			if err != nil {
 				return err
 			}
 			verifiedToRoles[i] = vr
 			if vr == nil {
 				if !rr.IfExists { //when the "IF EXISTS" is set, just skip the check
-					return moerr.NewInternalError(ctx, "there is no role or user %s", user.Username)
+					return moerr.NewInternalError(ctx, "there is no role or user %s", user.Username.Get())
 				}
 			}
 		}
@@ -5125,16 +5129,16 @@ func doRevokeRole(ctx context.Context, ses *Session, rr *tree.RevokeRole) (err e
 	//handle "IF EXISTS"
 	//step2 : check roles before the FROM clause
 	for i, role := range rr.Roles {
-		sql, err = getSqlForRoleIdOfRole(ctx, role.UserName)
+		sql, err = getSqlForRoleIdOfRole(ctx, role.UserName.Get())
 		if err != nil {
 			return err
 		}
-		vr, err = verifyRoleFunc(ctx, bh, sql, role.UserName, roleType)
+		vr, err = verifyRoleFunc(ctx, bh, sql, role.UserName.Get(), roleType)
 		if err != nil {
 			return err
 		}
 		if vr == nil {
-			return moerr.NewInternalError(ctx, "there is no role %s", role.UserName)
+			return moerr.NewInternalError(ctx, "there is no role %s", role.UserName.Get())
 		}
 		verifiedFromRoles[i] = vr
 	}
@@ -5258,27 +5262,27 @@ func doGrantRole(ctx context.Context, ses *Session, gr *tree.GrantRole) (err err
 	}
 
 	for i, role := range gr.Roles {
-		sql, err = getSqlForRoleIdOfRole(ctx, role.UserName)
+		sql, err = getSqlForRoleIdOfRole(ctx, role.UserName.Get())
 		if err != nil {
 			return err
 		}
-		vr, err = verifyRoleFunc(ctx, bh, sql, role.UserName, roleType)
+		vr, err = verifyRoleFunc(ctx, bh, sql, role.UserName.Get(), roleType)
 		if err != nil {
 			return err
 		}
 		if vr == nil {
-			return moerr.NewInternalError(ctx, "there is no role %s", role.UserName)
+			return moerr.NewInternalError(ctx, "there is no role %s", role.UserName.Get())
 		}
 		verifiedFromRoles[i] = vr
 	}
 
 	//step2 : check Users are real Users or Roles,  exists or not
 	for i, user := range gr.Users {
-		sql, err = getSqlForRoleIdOfRole(ctx, user.Username)
+		sql, err = getSqlForRoleIdOfRole(ctx, user.Username.Get())
 		if err != nil {
 			return err
 		}
-		vr, err = verifyRoleFunc(ctx, bh, sql, user.Username, roleType)
+		vr, err = verifyRoleFunc(ctx, bh, sql, user.Username.Get(), roleType)
 		if err != nil {
 			return err
 		}
@@ -5286,16 +5290,16 @@ func doGrantRole(ctx context.Context, ses *Session, gr *tree.GrantRole) (err err
 			verifiedToRoles[i] = vr
 		} else {
 			//check user exists or not
-			sql, err = getSqlForPasswordOfUser(ctx, user.Username)
+			sql, err = getSqlForPasswordOfUser(ctx, user.Username.Get())
 			if err != nil {
 				return err
 			}
-			vr, err = verifyRoleFunc(ctx, bh, sql, user.Username, userType)
+			vr, err = verifyRoleFunc(ctx, bh, sql, user.Username.Get(), userType)
 			if err != nil {
 				return err
 			}
 			if vr == nil {
-				return moerr.NewInternalError(ctx, "there is no role or user %s", user.Username)
+				return moerr.NewInternalError(ctx, "there is no role or user %s", user.Username.Get())
 			}
 			verifiedToRoles[i] = vr
 
@@ -6196,12 +6200,12 @@ func determineRoleSetHasPrivilegeSet(ctx context.Context, bh BackgroundExec, ses
 							if yes {
 								from := &verifiedRole{
 									typ:  roleType,
-									name: mi.role.UserName,
+									name: mi.role.UserName.Get(),
 								}
 								for _, user := range mi.users {
 									to := &verifiedRole{
 										typ:  userType,
-										name: user.Username,
+										name: user.Username.Get(),
 									}
 									err = verifySpecialRolesInGrant(ctx, ses.GetTenantInfo(), from, to)
 									if err != nil {
@@ -6491,16 +6495,16 @@ func determineUserCanGrantRolesToOthersInternal(ctx context.Context, bh Backgrou
 	roleSetOfCurrentUser.Insert(int64(account.GetDefaultRoleID()))
 
 	for i, role := range fromRoles {
-		sql, err = getSqlForRoleIdOfRole(ctx, role.UserName)
+		sql, err = getSqlForRoleIdOfRole(ctx, role.UserName.Get())
 		if err != nil {
 			return false, err
 		}
-		vr, err = verifyRoleFunc(ctx, bh, sql, role.UserName, roleType)
+		vr, err = verifyRoleFunc(ctx, bh, sql, role.UserName.Get(), roleType)
 		if err != nil {
 			return false, err
 		}
 		if vr == nil {
-			return false, moerr.NewInternalError(ctx, "there is no role %s", role.UserName)
+			return false, moerr.NewInternalError(ctx, "there is no role %s", role.UserName.Get())
 		}
 		verifiedFromRoles[i] = vr
 	}
@@ -6908,11 +6912,11 @@ func formSqlFromGrantPrivilege(ctx context.Context, ses *Session, gp *tree.Grant
 		case tree.PRIVILEGE_LEVEL_TYPE_STAR_STAR:
 			sql = getSqlForCheckWithGrantOptionForTableStarStar(int64(tenant.GetDefaultRoleID()), privType)
 		case tree.PRIVILEGE_LEVEL_TYPE_DATABASE_STAR:
-			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseStar(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.DbName)
+			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseStar(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.DbName.Get())
 		case tree.PRIVILEGE_LEVEL_TYPE_DATABASE_TABLE:
-			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseTable(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.DbName, gp.Level.TblName)
+			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseTable(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.DbName.Get(), gp.Level.TblName.Get())
 		case tree.PRIVILEGE_LEVEL_TYPE_TABLE:
-			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseTable(ctx, int64(tenant.GetDefaultRoleID()), privType, ses.GetDatabaseName(), gp.Level.TblName)
+			sql, err = getSqlForCheckWithGrantOptionForTableDatabaseTable(ctx, int64(tenant.GetDefaultRoleID()), privType, ses.GetDatabaseName(), gp.Level.TblName.Get())
 		default:
 			return "", moerr.NewInternalError(ctx, "in object type %v privilege level type %v is unsupported", gp.ObjType, gp.Level.Level)
 		}
@@ -6924,9 +6928,9 @@ func formSqlFromGrantPrivilege(ctx context.Context, ses *Session, gp *tree.Grant
 			sql = getSqlForCheckWithGrantOptionForDatabaseStarStar(int64(tenant.GetDefaultRoleID()), privType)
 		case tree.PRIVILEGE_LEVEL_TYPE_TABLE:
 			//in the syntax, we can not distinguish the table name from the database name.
-			sql, err = getSqlForCheckWithGrantOptionForDatabaseDB(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.TblName)
+			sql, err = getSqlForCheckWithGrantOptionForDatabaseDB(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.TblName.Get())
 		case tree.PRIVILEGE_LEVEL_TYPE_DATABASE:
-			sql, err = getSqlForCheckWithGrantOptionForDatabaseDB(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.DbName)
+			sql, err = getSqlForCheckWithGrantOptionForDatabaseDB(ctx, int64(tenant.GetDefaultRoleID()), privType, gp.Level.DbName.Get())
 		default:
 			return "", moerr.NewInternalError(ctx, "in object type %v privilege level type %v is unsupported", gp.ObjType, gp.Level.Level)
 		}
@@ -7609,13 +7613,14 @@ func InitGeneralTenant(ctx context.Context, ses *Session, ca *tree.CreateAccount
 		return err
 	}
 
-	ca.AuthOption.AdminName, err = normalizeName(ctx, ca.AuthOption.AdminName)
+	adminName, err := normalizeName(ctx, ca.AuthOption.AdminName.Get())
 	if err != nil {
 		return err
 	}
+	ca.AuthOption.AdminName = ca.AuthOption.AdminName.Set(adminName)
 
 	if ca.AuthOption.IdentifiedType.Typ == tree.AccountIdentifiedByPassword {
-		if len(ca.AuthOption.IdentifiedType.Str) == 0 {
+		if len(ca.AuthOption.IdentifiedType.Str.Get()) == 0 {
 			return moerr.NewInternalError(ctx, "password is empty string")
 		}
 	}
@@ -7652,14 +7657,14 @@ func InitGeneralTenant(ctx context.Context, ses *Session, ca *tree.CreateAccount
 		}
 
 		// check account exists or not
-		exists, err = checkTenantExistsOrNot(ctx, bh, ca.Name)
+		exists, err = checkTenantExistsOrNot(ctx, bh, ca.Name.Get())
 		if err != nil {
 			return err
 		}
 
 		if exists {
 			if !ca.IfNotExists { //do nothing
-				return moerr.NewInternalError(ctx, "the tenant %s exists", ca.Name)
+				return moerr.NewInternalError(ctx, "the tenant %s exists", ca.Name.Get())
 			}
 			return err
 		} else {
@@ -7745,11 +7750,11 @@ func createTablesInMoCatalogOfGeneralTenant(ctx context.Context, bh BackgroundEx
 	ctx, span := trace.Debug(ctx, "createTablesInMoCatalogOfGeneralTenant")
 	defer span.End()
 
-	if nameIsInvalid(ca.Name) {
+	if nameIsInvalid(ca.Name.Get()) {
 		return nil, nil, moerr.NewInternalError(ctx, "the account name is invalid")
 	}
 
-	if nameIsInvalid(ca.AuthOption.AdminName) {
+	if nameIsInvalid(ca.AuthOption.AdminName.Get()) {
 		return nil, nil, moerr.NewInternalError(ctx, "the admin name is invalid")
 	}
 
@@ -7757,7 +7762,7 @@ func createTablesInMoCatalogOfGeneralTenant(ctx context.Context, bh BackgroundEx
 	// Other operations with a new context with new tenant info
 	//step 1: add new tenant entry to the mo_account
 	if ca.Comment.Exist {
-		comment = ca.Comment.Comment
+		comment = ca.Comment.Comment.Get()
 	}
 
 	//determine the status of the account
@@ -7768,7 +7773,7 @@ func createTablesInMoCatalogOfGeneralTenant(ctx context.Context, bh BackgroundEx
 		}
 	}
 
-	initMoAccount = fmt.Sprintf(initMoAccountWithoutIDFormat, ca.Name, status, types.CurrentTimestamp().String2(time.UTC, 0), comment)
+	initMoAccount = fmt.Sprintf(initMoAccountWithoutIDFormat, ca.Name.Get(), status, types.CurrentTimestamp().String2(time.UTC, 0), comment)
 	//execute the insert
 	err = bh.Exec(ctx, initMoAccount)
 	if err != nil {
@@ -7777,7 +7782,7 @@ func createTablesInMoCatalogOfGeneralTenant(ctx context.Context, bh BackgroundEx
 
 	//query the tenant id
 	bh.ClearExecResultSet()
-	sql, err = getSqlForCheckTenant(ctx, ca.Name)
+	sql, err = getSqlForCheckTenant(ctx, ca.Name.Get())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -7797,14 +7802,14 @@ func createTablesInMoCatalogOfGeneralTenant(ctx context.Context, bh BackgroundEx
 			return nil, nil, err
 		}
 	} else {
-		return nil, nil, moerr.NewInternalError(ctx, "get the id of tenant %s failed", ca.Name)
+		return nil, nil, moerr.NewInternalError(ctx, "get the id of tenant %s failed", ca.Name.Get())
 	}
 
 	newUserId = int64(GetAdminUserId())
 
 	newTenant = &TenantInfo{
-		Tenant:        ca.Name,
-		User:          ca.AuthOption.AdminName,
+		Tenant:        ca.Name.Get(),
+		User:          ca.AuthOption.AdminName.Get(),
 		DefaultRole:   accountAdminRoleName,
 		TenantID:      uint32(newTenantID),
 		UserID:        uint32(newUserId),
@@ -7850,7 +7855,7 @@ func createTablesInMoCatalogOfGeneralTenant2(bh BackgroundExec, ca *tree.CreateA
 		return err
 	}
 	name := ca.AuthOption.AdminName
-	password := ca.AuthOption.IdentifiedType.Str
+	password := ca.AuthOption.IdentifiedType.Str.Get()
 	if len(password) == 0 {
 		err = moerr.NewInternalError(newTenantCtx, "password is empty string")
 		return err
@@ -8064,7 +8069,7 @@ func InitUser(ctx context.Context, ses *Session, tenant *TenantInfo, cu *tree.Cr
 	//TODO: get role and the id of role
 	newRoleId = publicRoleID
 	if cu.Role != nil {
-		sql, err = getSqlForRoleIdOfRole(ctx, cu.Role.UserName)
+		sql, err = getSqlForRoleIdOfRole(ctx, cu.Role.UserName.Get())
 		if err != nil {
 			return err
 		}
@@ -8078,7 +8083,7 @@ func InitUser(ctx context.Context, ses *Session, tenant *TenantInfo, cu *tree.Cr
 			return err
 		}
 		if !execResultArrayHasData(erArray) {
-			return moerr.NewInternalError(ctx, "there is no role %s", cu.Role.UserName)
+			return moerr.NewInternalError(ctx, "there is no role %s", cu.Role.UserName.Get())
 		}
 		newRoleId, err = erArray[0].GetInt64(ctx, 0, 0)
 		if err != nil {
@@ -8087,13 +8092,13 @@ func InitUser(ctx context.Context, ses *Session, tenant *TenantInfo, cu *tree.Cr
 
 		from := &verifiedRole{
 			typ:  roleType,
-			name: cu.Role.UserName,
+			name: cu.Role.UserName.Get(),
 		}
 
 		for _, user := range cu.Users {
 			to := &verifiedRole{
 				typ:  userType,
-				name: user.Username,
+				name: user.Username.Get(),
 			}
 			err = verifySpecialRolesInGrant(ctx, tenant, from, to)
 			if err != nil {
@@ -8112,7 +8117,7 @@ func InitUser(ctx context.Context, ses *Session, tenant *TenantInfo, cu *tree.Cr
 
 	for _, user := range cu.Users {
 		//dedup with user
-		sql, err = getSqlForPasswordOfUser(ctx, user.Username)
+		sql, err = getSqlForPasswordOfUser(ctx, user.Username.Get())
 		if err != nil {
 			return err
 		}
@@ -8133,7 +8138,7 @@ func InitUser(ctx context.Context, ses *Session, tenant *TenantInfo, cu *tree.Cr
 
 		//dedup with the role
 		if exists == 0 {
-			sql, err = getSqlForRoleIdOfRole(ctx, user.Username)
+			sql, err = getSqlForRoleIdOfRole(ctx, user.Username.Get())
 			if err != nil {
 				return err
 			}
@@ -8157,7 +8162,7 @@ func InitUser(ctx context.Context, ses *Session, tenant *TenantInfo, cu *tree.Cr
 				continue
 			}
 			if exists == 1 {
-				err = moerr.NewInternalError(ctx, "the user %s exists", user.Username)
+				err = moerr.NewInternalError(ctx, "the user %s exists", user.Username.Get())
 			} else if exists == 2 {
 				err = moerr.NewInternalError(ctx, "there is a role with the same name as the user")
 			}
@@ -8166,14 +8171,14 @@ func InitUser(ctx context.Context, ses *Session, tenant *TenantInfo, cu *tree.Cr
 		}
 
 		if user.AuthOption == nil {
-			return moerr.NewInternalError(ctx, "the user %s misses the auth_option", user.Username)
+			return moerr.NewInternalError(ctx, "the user %s misses the auth_option", user.Username.Get())
 		}
 
 		if user.AuthOption.Typ != tree.AccountIdentifiedByPassword {
 			return moerr.NewInternalError(ctx, "only support password verification now")
 		}
 
-		password := user.AuthOption.Str
+		password := user.AuthOption.Str.Get()
 		if len(password) == 0 {
 			return moerr.NewInternalError(ctx, "password is empty string")
 		}
@@ -8182,11 +8187,11 @@ func InitUser(ctx context.Context, ses *Session, tenant *TenantInfo, cu *tree.Cr
 		encryption := HashPassWord(password)
 
 		//TODO: get comment or attribute. there is no field in mo_user to store it.
-		host = user.Hostname
-		if len(user.Hostname) == 0 || user.Hostname == "%" {
+		host = user.Hostname.Get()
+		if len(user.Hostname.Get()) == 0 || user.Hostname.Get() == "%" {
 			host = rootHost
 		}
-		initMoUser1 := fmt.Sprintf(initMoUserWithoutIDFormat, host, user.Username, encryption, status,
+		initMoUser1 := fmt.Sprintf(initMoUserWithoutIDFormat, host, user.Username.Get(), encryption, status,
 			types.CurrentTimestamp().String2(time.UTC, 0), rootExpiredTime, rootLoginType,
 			tenant.GetUserID(), tenant.GetDefaultRoleID(), newRoleId)
 
@@ -8198,7 +8203,7 @@ func InitUser(ctx context.Context, ses *Session, tenant *TenantInfo, cu *tree.Cr
 
 		//query the id
 		bh.ClearExecResultSet()
-		sql, err = getSqlForPasswordOfUser(ctx, user.Username)
+		sql, err = getSqlForPasswordOfUser(ctx, user.Username.Get())
 		if err != nil {
 			return err
 		}
@@ -8213,7 +8218,7 @@ func InitUser(ctx context.Context, ses *Session, tenant *TenantInfo, cu *tree.Cr
 		}
 
 		if !execResultArrayHasData(erArray) {
-			return moerr.NewInternalError(ctx, "get the id of user %s failed", user.Username)
+			return moerr.NewInternalError(ctx, "get the id of user %s failed", user.Username.Get())
 		}
 		newUserId, err = erArray[0].GetInt64(ctx, 0, 0)
 		if err != nil {
@@ -8261,11 +8266,11 @@ func InitRole(ctx context.Context, ses *Session, tenant *TenantInfo, cr *tree.Cr
 
 	for _, r := range cr.Roles {
 		exists = 0
-		if isPredefinedRole(r.UserName) {
+		if isPredefinedRole(r.UserName.Get()) {
 			exists = 3
 		} else {
 			//dedup with role
-			sql, err = getSqlForRoleIdOfRole(ctx, r.UserName)
+			sql, err = getSqlForRoleIdOfRole(ctx, r.UserName.Get())
 			if err != nil {
 				return err
 			}
@@ -8285,7 +8290,7 @@ func InitRole(ctx context.Context, ses *Session, tenant *TenantInfo, cr *tree.Cr
 
 			//dedup with user
 			if exists == 0 {
-				sql, err = getSqlForPasswordOfUser(ctx, r.UserName)
+				sql, err = getSqlForPasswordOfUser(ctx, r.UserName.Get())
 				if err != nil {
 					return err
 				}
@@ -8310,17 +8315,17 @@ func InitRole(ctx context.Context, ses *Session, tenant *TenantInfo, cr *tree.Cr
 				continue
 			}
 			if exists == 1 {
-				err = moerr.NewInternalError(ctx, "the role %s exists", r.UserName)
+				err = moerr.NewInternalError(ctx, "the role %s exists", r.UserName.Get())
 			} else if exists == 2 {
-				err = moerr.NewInternalError(ctx, "there is a user with the same name as the role %s", r.UserName)
+				err = moerr.NewInternalError(ctx, "there is a user with the same name as the role %s", r.UserName.Get())
 			} else if exists == 3 {
-				err = moerr.NewInternalError(ctx, "can not use the name %s. it is the name of the predefined role", r.UserName)
+				err = moerr.NewInternalError(ctx, "can not use the name %s. it is the name of the predefined role", r.UserName.Get())
 			}
 
 			return err
 		}
 
-		initMoRole := fmt.Sprintf(initMoRoleWithoutIDFormat, r.UserName, tenant.GetUserID(), tenant.GetDefaultRoleID(),
+		initMoRole := fmt.Sprintf(initMoRoleWithoutIDFormat, r.UserName.Get(), tenant.GetUserID(), tenant.GetDefaultRoleID(),
 			types.CurrentTimestamp().String2(time.UTC, 0), "")
 		err = bh.Exec(ctx, initMoRole)
 		if err != nil {
@@ -8515,7 +8520,7 @@ func doAlterDatabaseConfig(ctx context.Context, ses *Session, ad *tree.AlterData
 		}
 
 		// step1:check database exists or not and get database owner
-		sql, err = getSqlForCheckDatabaseWithOwner(ctx, dbName, int64(ses.GetTenantInfo().GetTenantID()))
+		sql, err = getSqlForCheckDatabaseWithOwner(ctx, dbName.Get(), int64(ses.GetTenantInfo().GetTenantID()))
 		if err != nil {
 			return err
 		}
@@ -8532,7 +8537,7 @@ func doAlterDatabaseConfig(ctx context.Context, ses *Session, ad *tree.AlterData
 		}
 
 		if !execResultArrayHasData(erArray) {
-			return moerr.NewInternalError(ctx, "there is no database %s to change config", dbName)
+			return moerr.NewInternalError(ctx, "there is no database %s to change config", dbName.Get())
 		} else {
 			databaseOwner, err = erArray[0].GetInt64(ctx, 0, 1)
 			if err != nil {
@@ -8546,7 +8551,7 @@ func doAlterDatabaseConfig(ctx context.Context, ses *Session, ad *tree.AlterData
 		}
 
 		// step2: update the mo_mysql_compatibility_mode of that database
-		sql, err = getSqlForupdateConfigurationByDbNameAndAccountName(ctx, updateConfig, accountName, dbName, "version_compatibility")
+		sql, err = getSqlForupdateConfigurationByDbNameAndAccountName(ctx, updateConfig.Get(), accountName, dbName.Get(), "version_compatibility")
 		if err != nil {
 			return err
 		}
@@ -8564,7 +8569,7 @@ func doAlterDatabaseConfig(ctx context.Context, ses *Session, ad *tree.AlterData
 	}
 
 	// step3: update the session verison
-	if len(ses.GetDatabaseName()) != 0 && ses.GetDatabaseName() == dbName {
+	if len(ses.GetDatabaseName()) != 0 && ses.GetDatabaseName() == dbName.Get() {
 		err = changeVersion(ctx, ses, ses.GetDatabaseName())
 		if err != nil {
 			return err
@@ -8602,17 +8607,17 @@ func doAlterAccountConfig(ctx context.Context, ses *Session, stmt *tree.AlterDat
 
 		// step 1: check account exists or not
 		newCtx = context.WithValue(ctx, defines.TenantIDKey{}, catalog.System_Account)
-		isExist, err = checkTenantExistsOrNot(newCtx, bh, accountName)
+		isExist, err = checkTenantExistsOrNot(newCtx, bh, accountName.Get())
 		if err != nil {
 			return err
 		}
 
 		if !isExist {
-			return moerr.NewInternalError(ctx, "there is no account %s to change config", accountName)
+			return moerr.NewInternalError(ctx, "there is no account %s to change config", accountName.Get())
 		}
 
 		// step2: update the config
-		sql, err = getSqlForupdateConfigurationByAccount(ctx, update_config, accountName, "version_compatibility")
+		sql, err = getSqlForupdateConfigurationByAccount(ctx, update_config.Get(), accountName.Get(), "version_compatibility")
 		if err != nil {
 			return err
 		}

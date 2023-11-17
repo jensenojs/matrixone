@@ -26,7 +26,7 @@ import (
 )
 
 func buildLoad(stmt *tree.Load, ctx CompilerContext, isPrepareStmt bool) (*Plan, error) {
-	if stmt.Param.Tail.Lines != nil && stmt.Param.Tail.Lines.StartingBy != "" {
+	if stmt.Param.Tail.Lines != nil && stmt.Param.Tail.Lines.StartingBy.Get() != "" {
 		return nil, moerr.NewBadConfig(ctx.GetContext(), "load operation do not support StartingBy field.")
 	}
 	if stmt.Param.Tail.Fields != nil && stmt.Param.Tail.Fields.EscapedBy != 0 {
@@ -86,7 +86,7 @@ func buildLoad(stmt *tree.Load, ctx CompilerContext, isPrepareStmt bool) (*Plan,
 	enclosedBy := []byte{0}
 	if stmt.Param.Tail.Fields != nil {
 		enclosedBy = []byte{stmt.Param.Tail.Fields.EnclosedBy}
-		terminated = stmt.Param.Tail.Fields.Terminated
+		terminated = stmt.Param.Tail.Fields.Terminated.Get()
 	}
 	externalScanNode := &plan.Node{
 		NodeType:    plan.Node_EXTERNAL_SCAN,
@@ -96,8 +96,8 @@ func buildLoad(stmt *tree.Load, ctx CompilerContext, isPrepareStmt bool) (*Plan,
 		TableDef:    tableDef,
 		ExternScan: &plan.ExternScan{
 			Type:         int32(stmt.Param.ScanType),
-			Data:         stmt.Param.Data,
-			Format:       stmt.Param.Format,
+			Data:         stmt.Param.Data.Get(),
+			Format:       stmt.Param.Format.Get(),
 			IgnoredLines: uint64(stmt.Param.Tail.IgnoredLines),
 			EnclosedBy:   enclosedBy,
 			Terminated:   terminated,
@@ -170,7 +170,7 @@ func checkFileExist(param *tree.ExternParam, ctx CompilerContext) (string, error
 			return "", err
 		}
 	}
-	if len(param.Filepath) == 0 {
+	if len(param.Filepath.Get()) == 0 {
 		return "", nil
 	}
 
@@ -308,8 +308,8 @@ func checkNullMap(stmt *tree.Load, Cols []*ColDef, ctx CompilerContext) error {
 }
 
 func getCompressType(param *tree.ExternParam, filepath string) string {
-	if param.CompressType != "" && param.CompressType != tree.AUTO {
-		return param.CompressType
+	if param.CompressType.Get() != "" && param.CompressType.Get() != tree.AUTO {
+		return param.CompressType.Get()
 	}
 	index := strings.LastIndex(filepath, ".")
 	if index == -1 {

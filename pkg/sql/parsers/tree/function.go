@@ -76,21 +76,23 @@ type CreateFunction struct {
 	Name       *FunctionName
 	Args       FunctionArgs
 	ReturnType *ReturnType
-	Body       string
-	Language   string
+	Body       *BufString
+	Language   *BufString
 }
 
-func NewCreateFunction(n *FunctionName, args FunctionArgs, returnTyp *ReturnType, language , body string, buf *buffer.Buffer) *CreateFunction {
-	c := buffer.Alloc[CreateFunction](buf)	
+func NewCreateFunction(n *FunctionName, args FunctionArgs, returnTyp *ReturnType, language, body string, buf *buffer.Buffer) *CreateFunction {
+	c := buffer.Alloc[CreateFunction](buf)
 	c.Name = n
 	c.Args = args
 	c.ReturnType = returnTyp
-	c.Body = body
-	c.Language = language
+bBody := NewBufString(body)
+buf.Pin(bBody)
+	c.Body = bBody
+bLanguage := NewBufString(language)
+buf.Pin(bLanguage)
+	c.Language = bLanguage
 	return c
 }
-
-
 
 type DropFunction struct {
 	statementImpl
@@ -99,7 +101,7 @@ type DropFunction struct {
 }
 
 func NewDropFunction(n *FunctionName, args FunctionArgs, buf *buffer.Buffer) *DropFunction {
-	drop := buffer.Alloc[DropFunction](buf)	
+	drop := buffer.Alloc[DropFunction](buf)
 	drop.Name = n
 	drop.Args = args
 	return drop
@@ -142,11 +144,11 @@ func (node *CreateFunction) Format(ctx *FmtCtx) {
 	node.ReturnType.Format(ctx)
 
 	ctx.WriteString(" language ")
-	ctx.WriteString(node.Language)
+	ctx.WriteString(node.Language.Get())
 
 	ctx.WriteString(" as '")
 
-	ctx.WriteString(node.Body)
+	ctx.WriteString(node.Body.Get())
 	ctx.WriteString("'")
 }
 

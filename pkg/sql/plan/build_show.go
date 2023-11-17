@@ -37,22 +37,22 @@ const INFORMATION_SCHEMA = "information_schema"
 
 func buildShowCreateDatabase(stmt *tree.ShowCreateDatabase,
 	ctx CompilerContext) (*Plan, error) {
-	if !ctx.DatabaseExists(stmt.Name) {
-		return nil, moerr.NewBadDB(ctx.GetContext(), stmt.Name)
+	if !ctx.DatabaseExists(stmt.Name.Get()) {
+		return nil, moerr.NewBadDB(ctx.GetContext(), stmt.Name.Get())
 	}
 
-	if sub, err := ctx.GetSubscriptionMeta(stmt.Name); err != nil {
+	if sub, err := ctx.GetSubscriptionMeta(stmt.Name.Get()); err != nil {
 		return nil, err
 	} else if sub != nil {
 		accountId := ctx.GetAccountId()
 		// get data from schema
 		//sql := fmt.Sprintf("SELECT md.datname as `Database` FROM %s.mo_database md WHERE md.datname = '%s'", MO_CATALOG_DB_NAME, stmt.Name)
-		sql := fmt.Sprintf("SELECT md.datname as `Database`,dat_createsql as `Create Database` FROM %s.mo_database md WHERE md.datname = '%s' and account_id=%d", MO_CATALOG_DB_NAME, stmt.Name, accountId)
+		sql := fmt.Sprintf("SELECT md.datname as `Database`,dat_createsql as `Create Database` FROM %s.mo_database md WHERE md.datname = '%s' and account_id=%d", MO_CATALOG_DB_NAME, stmt.Name.Get(), accountId)
 		return returnByRewriteSQL(ctx, sql, plan.DataDefinition_SHOW_CREATEDATABASE)
 	}
 
 	sqlStr := "select \"%s\" as `Database`, \"%s\" as `Create Database`"
-	createSql := fmt.Sprintf("CREATE DATABASE `%s`", stmt.Name)
+	createSql := fmt.Sprintf("CREATE DATABASE `%s`", stmt.Name.Get())
 	sqlStr = fmt.Sprintf(sqlStr, stmt.Name, createSql)
 	// logutil.Info(sqlStr)
 
@@ -308,7 +308,7 @@ func buildShowCreateTable(stmt *tree.ShowCreateTable, ctx CompilerContext) (*Pla
 		if err != nil {
 			return nil, err
 		}
-		createStr += fmt.Sprintf(" INFILE{'FILEPATH'='%s','COMPRESSION'='%s','FORMAT'='%s','JSONDATA'='%s'}", param.Filepath, param.CompressType, param.Format, param.JsonData)
+		createStr += fmt.Sprintf(" INFILE{'FILEPATH'='%s','COMPRESSION'='%s','FORMAT'='%s','JSONDATA'='%s'}", param.Filepath.Get(), param.CompressType.Get(), param.Format.Get(), param.JsonData.Get())
 
 		escapedby := ""
 		if param.Tail.Fields.EscapedBy != byte(0) {
@@ -316,14 +316,14 @@ func buildShowCreateTable(stmt *tree.ShowCreateTable, ctx CompilerContext) (*Pla
 		}
 
 		line := ""
-		if param.Tail.Lines.StartingBy != "" {
-			line = fmt.Sprintf(" LINE STARTING BY '%s'", param.Tail.Lines.StartingBy)
+		if param.Tail.Lines.StartingBy.Get() != "" {
+			line = fmt.Sprintf(" LINE STARTING BY '%s'", param.Tail.Lines.StartingBy.Get())
 		}
 		lineEnd := ""
-		if param.Tail.Lines.TerminatedBy == "\n" || param.Tail.Lines.TerminatedBy == "\r\n" {
+		if param.Tail.Lines.TerminatedBy.Get() == "\n" || param.Tail.Lines.TerminatedBy.Get() == "\r\n" {
 			lineEnd = " TERMINATED BY '\\\\n'"
 		} else {
-			lineEnd = fmt.Sprintf(" TERMINATED BY '%s'", param.Tail.Lines.TerminatedBy)
+			lineEnd = fmt.Sprintf(" TERMINATED BY '%s'", param.Tail.Lines.TerminatedBy.Get())
 		}
 		if len(line) > 0 {
 			line += lineEnd
@@ -331,7 +331,7 @@ func buildShowCreateTable(stmt *tree.ShowCreateTable, ctx CompilerContext) (*Pla
 			line = " LINES" + lineEnd
 		}
 
-		createStr += fmt.Sprintf(" FIELDS TERMINATED BY '%s' ENCLOSED BY '%c'%s", param.Tail.Fields.Terminated, rune(param.Tail.Fields.EnclosedBy), escapedby)
+		createStr += fmt.Sprintf(" FIELDS TERMINATED BY '%s' ENCLOSED BY '%c'%s", param.Tail.Fields.Terminated.Get(), rune(param.Tail.Fields.EnclosedBy), escapedby)
 		createStr += line
 		if param.Tail.IgnoredLines > 0 {
 			createStr += fmt.Sprintf(" IGNORE %d LINES", param.Tail.IgnoredLines)
@@ -416,7 +416,7 @@ func buildShowDatabases(stmt *tree.ShowDatabases, ctx CompilerContext) (*Plan, e
 }
 
 func buildShowSequences(stmt *tree.ShowSequences, ctx CompilerContext) (*Plan, error) {
-	dbName, err := databaseIsValid(stmt.DBName, ctx)
+	dbName, err := databaseIsValid(stmt.DBName.Get(), ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +443,7 @@ func buildShowTables(stmt *tree.ShowTables, ctx CompilerContext) (*Plan, error) 
 	}
 
 	accountId := ctx.GetAccountId()
-	dbName, err := databaseIsValid(stmt.DBName, ctx)
+	dbName, err := databaseIsValid(stmt.DBName.Get(), ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +509,7 @@ func buildShowTables(stmt *tree.ShowTables, ctx CompilerContext) (*Plan, error) 
 
 func buildShowTableNumber(stmt *tree.ShowTableNumber, ctx CompilerContext) (*Plan, error) {
 	accountId := ctx.GetAccountId()
-	dbName, err := databaseIsValid(stmt.DbName, ctx)
+	dbName, err := databaseIsValid(stmt.DbName.Get(), ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -754,12 +754,12 @@ func buildShowTableStatus(stmt *tree.ShowTableStatus, ctx CompilerContext) (*Pla
 		return nil, moerr.NewSyntaxError(ctx.GetContext(), "like clause and where clause cannot exist at the same time")
 	}
 
-	dbName, err := databaseIsValid(stmt.DbName, ctx)
+	dbName, err := databaseIsValid(stmt.DbName.Get(), ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	stmt.DbName = dbName
+	stmt.DbName = stmt.DbName.Set(dbName)
 
 	ddlType := plan.DataDefinition_SHOW_TABLE_STATUS
 	accountId := ctx.GetAccountId()
@@ -857,11 +857,11 @@ func buildShowTriggers(stmt *tree.ShowTarget, ctx CompilerContext) (*Plan, error
 		return nil, moerr.NewSyntaxError(ctx.GetContext(), "like clause and where clause cannot exist at the same time")
 	}
 
-	dbName, err := databaseIsValid(stmt.DbName, ctx)
+	dbName, err := databaseIsValid(stmt.DbName.Get(), ctx)
 	if err != nil {
 		return nil, err
 	}
-	stmt.DbName = dbName
+	stmt.DbName = stmt.DbName.Set(dbName)
 
 	ddlType := plan.DataDefinition_SHOW_TARGET
 	sql := fmt.Sprintf("SELECT trigger_name as `Trigger`, event_manipulation as `Event`, event_object_table as `Table`, action_statement as `Statement`, action_timing as `Timing`, created as `Created`, sql_mode, definer as `Definer`, character_set_client, collation_connection, database_collation as `Database Collation` FROM %s.TRIGGERS ", INFORMATION_SCHEMA)
@@ -924,11 +924,11 @@ func buildShowGrants(stmt *tree.ShowGrants, ctx CompilerContext) (*Plan, error) 
 		sql = fmt.Sprintf(sql, role_name, role_name, MO_CATALOG_DB_NAME, role_name)
 		return returnByRewriteSQL(ctx, sql, ddlType)
 	} else {
-		if stmt.Hostname == "" {
-			stmt.Hostname = MO_DEFUALT_HOSTNAME
+		if stmt.Hostname.Get() == "" {
+			stmt.Hostname = stmt.Hostname.Set(MO_DEFUALT_HOSTNAME)
 		}
-		if stmt.Username == "" {
-			stmt.Username = ctx.GetUserName()
+		if stmt.Username.Get() == "" {
+			stmt.Username = stmt.Username.Set(ctx.GetUserName())
 		}
 		sql := "select concat(\"GRANT \", p.privilege_name, ' ON ', p.obj_type, ' ', case p.obj_type when 'account' then '' else p.privilege_level end,   \" `%s`\", \"@\", \"`%s`\")  as `Grants for %s@localhost` from mo_catalog.mo_user as u, mo_catalog.mo_role_privs as p, mo_catalog.mo_user_grant as g where g.role_id = p.role_id and g.user_id = u.user_id and u.user_name = '%s' and u.user_host = '%s';"
 		sql = fmt.Sprintf(sql, stmt.Username, stmt.Hostname, stmt.Username, stmt.Username, stmt.Hostname)
@@ -1035,7 +1035,7 @@ func buildShowPublication(stmt *tree.ShowPublications, ctx CompilerContext) (*Pl
 
 func buildShowCreatePublications(stmt *tree.ShowCreatePublications, ctx CompilerContext) (*Plan, error) {
 	ddlType := plan.DataDefinition_SHOW_TARGET
-	sql := fmt.Sprintf("select pub_name as Publication, 'CREATE PUBLICATION ' || pub_name || ' DATABASE ' || database_name || ' ACCOUNT ' || account_list as 'Create Publication' from mo_catalog.mo_pubs where pub_name='%s';", stmt.Name)
+	sql := fmt.Sprintf("select pub_name as Publication, 'CREATE PUBLICATION ' || pub_name || ' DATABASE ' || database_name || ' ACCOUNT ' || account_list as 'Create Publication' from mo_catalog.mo_pubs where pub_name='%s';", stmt.Name.Get())
 	return returnByRewriteSQL(ctx, sql, ddlType)
 }
 
@@ -1071,12 +1071,12 @@ func returnByLikeAndSQL(ctx CompilerContext, sql string, like *tree.ComparisonEx
 
 	if newStmt.(*tree.Select).Select.(*tree.SelectClause).Where == nil {
 		whereExpr = &tree.Where{
-			Type: "where",
+			Type: tree.NewBufString("where"),
 			Expr: like,
 		}
 	} else {
 		whereExpr = &tree.Where{
-			Type: "where",
+			Type: tree.NewBufString("where"),
 			Expr: &tree.AndExpr{
 				Left:  newStmt.(*tree.Select).Select.(*tree.SelectClause).Where.Expr,
 				Right: like,

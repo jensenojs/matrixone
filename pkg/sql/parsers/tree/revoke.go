@@ -160,9 +160,9 @@ func (node *RevokeRole) GetQueryType() string     { return QueryTypeDCL }
 type PrivilegeLevel struct {
 	NodeFormatter
 	Level       PrivilegeLevelType
-	DbName      string
-	TblName     string
-	RoutineName string
+	DbName      *BufString
+	TblName     *BufString
+	RoutineName *BufString
 }
 
 func (node *PrivilegeLevel) Format(ctx *FmtCtx) {
@@ -172,11 +172,11 @@ func (node *PrivilegeLevel) Format(ctx *FmtCtx) {
 	case PRIVILEGE_LEVEL_TYPE_STAR_STAR:
 		ctx.WriteString("*.*")
 	case PRIVILEGE_LEVEL_TYPE_DATABASE_STAR:
-		ctx.WriteString(fmt.Sprintf("%s.*", node.DbName))
+		ctx.WriteString(fmt.Sprintf("%s.*", node.DbName.Get()))
 	case PRIVILEGE_LEVEL_TYPE_DATABASE_TABLE:
-		ctx.WriteString(fmt.Sprintf("%s.%s", node.DbName, node.TblName))
+		ctx.WriteString(fmt.Sprintf("%s.%s", node.DbName.Get(), node.TblName.Get()))
 	case PRIVILEGE_LEVEL_TYPE_TABLE:
-		ctx.WriteString(node.TblName)
+		ctx.WriteString(node.TblName.Get())
 	}
 }
 
@@ -189,8 +189,11 @@ func (node *PrivilegeLevel) String() string {
 func NewPrivilegeLevel(level PrivilegeLevelType, dbName string, tblName string, buf *buffer.Buffer) *PrivilegeLevel {
 	pl := buffer.Alloc[PrivilegeLevel](buf)
 	pl.Level = level
-	pl.DbName = dbName
-	pl.TblName = tblName
+	bdbName := NewBufString(dbName)
+	btblName := NewBufString(tblName)
+	buf.Pin(bdbName, btblName)
+	pl.DbName = bdbName
+	pl.TblName = btblName
 	return pl
 }
 

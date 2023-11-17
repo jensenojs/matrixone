@@ -27,12 +27,12 @@ func TestQueryType(t *testing.T) {
 	type args struct {
 	}
 	tests := []struct {
-		name   string
+		name   *BufString
 		fields fields
 		args   args
 	}{
 		{
-			name: "normal",
+			name: NewBufString("normal"),
 			fields: fields{
 				types: map[StatementType]string{
 					&Select{}:          QueryTypeDQL,
@@ -131,7 +131,7 @@ func TestQueryType(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t1 *testing.T) {
+		t.Run(tt.name.Get(), func(t1 *testing.T) {
 			for stmt, queryType := range tt.fields.types {
 				require.Equalf(t1, queryType, stmt.GetQueryType(), "statement_type: %s", stmt.GetStatementType())
 			}

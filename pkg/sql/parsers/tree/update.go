@@ -162,27 +162,40 @@ func NewExternParam(ec *ExParamConst, buf *buffer.Buffer) *ExternParam {
 
 type ExParamConst struct {
 	ScanType     int
-	Filepath     string
-	CompressType string
-	Format       string
-	Option       []string
-	Data         string
+	Filepath     *BufString
+	CompressType *BufString
+	Format       *BufString
+	Option       []string // do NOT reassign after NewParamConst
+	Data         *BufString
 	Tail         *TailParameter
 }
 
 func NewExParamConst(scantype int, filepath, compressType, format string, option []string, data string, buf *buffer.Buffer) *ExParamConst {
 	ex := buffer.Alloc[ExParamConst](buf)
 	ex.ScanType = scantype
-	ex.Filepath = filepath
-	ex.CompressType = compressType
-	ex.Format = format
-	ex.Option = option
-	ex.Data = data
+	bFilepath := NewBufString(filepath)
+	bCompressType := NewBufString(compressType)
+	bFormat := NewBufString(format)
+	bData := NewBufString(data)
+	buf.Pin(bFilepath, bCompressType, bFormat, bData)
+
+	ex.Filepath = bFilepath
+	ex.CompressType = bCompressType
+	ex.Format = bFormat
+	ex.Data = bData
+
+	if option != nil {
+		ex.Option = buffer.MakeSlice[string](buf)
+		for _, o := range option {
+			ex.Option = buffer.AppendSlice[string](buf, ex.Option, buf.CopyString(o))
+		}
+	}
+
 	return ex
 }
 
 type ExParam struct {
-	JsonData    string
+	JsonData    *BufString
 	FileService fileservice.FileService
 	NullMap     map[string]([]string)
 	S3Param     *S3Parameter
@@ -256,7 +269,7 @@ func (node *Load) Format(ctx *FmtCtx) {
 
 	if len(node.Param.Option) == 0 {
 		ctx.WriteString(" infile ")
-		ctx.WriteString(node.Param.Filepath)
+		ctx.WriteString(node.Param.Filepath.Get())
 	} else {
 		if node.Param.ScanType == S3 {
 			ctx.WriteString(" url s3option ")
@@ -385,7 +398,7 @@ func NewDuplicateKeyIgnore(buf *buffer.Buffer) *DuplicateKeyIgnore {
 }
 
 type Fields struct {
-	Terminated string
+	Terminated *BufString
 	Optionally bool
 	EnclosedBy byte
 	EscapedBy  byte
@@ -394,9 +407,9 @@ type Fields struct {
 func (node *Fields) Format(ctx *FmtCtx) {
 	ctx.WriteString("fields")
 	prefix := ""
-	if node.Terminated != "" {
+	if node.Terminated.Get() != "" {
 		ctx.WriteString(" terminated by ")
-		ctx.WriteStringQuote(node.Terminated)
+		ctx.WriteStringQuote(node.Terminated.Get())
 		prefix = " "
 	}
 	if node.Optionally {
@@ -417,7 +430,9 @@ func (node *Fields) Format(ctx *FmtCtx) {
 
 func NewFields(t string, o bool, en byte, es byte, buf *buffer.Buffer) *Fields {
 	fields := buffer.Alloc[Fields](buf)
-	fields.Terminated = t
+	bTerminated := NewBufString(t)
+	buf.Pin(bTerminated)
+	fields.Terminated = bTerminated
 	fields.Optionally = o
 	fields.EnclosedBy = en
 	fields.EscapedBy = es
@@ -425,26 +440,29 @@ func NewFields(t string, o bool, en byte, es byte, buf *buffer.Buffer) *Fields {
 }
 
 type Lines struct {
-	StartingBy   string
-	TerminatedBy string
+	StartingBy   *BufString
+	TerminatedBy *BufString
 }
 
 func (node *Lines) Format(ctx *FmtCtx) {
 	ctx.WriteString("lines")
-	if node.StartingBy != "" {
+	if node.StartingBy.Get() != "" {
 		ctx.WriteString(" starting by ")
-		ctx.WriteStringQuote(node.StartingBy)
+		ctx.WriteStringQuote(node.StartingBy.Get())
 	}
-	if node.TerminatedBy != "" {
+	if node.TerminatedBy.Get() != "" {
 		ctx.WriteString(" terminated by ")
-		ctx.WriteStringQuote(node.TerminatedBy)
+		ctx.WriteStringQuote(node.TerminatedBy.Get())
 	}
 }
 
-func NewLines(s string, t string, buf *buffer.Buffer) *Lines {
+func NewLines(s, t string, buf *buffer.Buffer) *Lines {
 	lines := buffer.Alloc[Lines](buf)
-	lines.StartingBy = s
-	lines.TerminatedBy = t
+	bStartingBy := NewBufString(s)
+	bTerminatedBy := NewBufString(t)
+	buf.Pin(bStartingBy, bTerminatedBy)
+	lines.StartingBy = bStartingBy
+	lines.TerminatedBy = bTerminatedBy
 	return lines
 }
 
@@ -457,9 +475,9 @@ type ExportParam struct {
 	// outfile flag
 	Outfile bool
 	// query id
-	QueryId string
+	QueryId *BufString
 	// filename path
-	FilePath string
+	FilePath *BufString
 	// Fields
 	Fields *Fields
 	// Lines
@@ -468,26 +486,36 @@ type ExportParam struct {
 	MaxFileSize uint64
 	// header flag
 	Header     bool
-	ForceQuote []string
+	ForceQuote []string // do NOT reassign afther NewExportParam
 	// stage filename path
-	StageFilePath string
+	StageFilePath *BufString
 }
 
 func NewExportParam(outfile bool, queryid string, filepath string, fields *Fields, lines *Lines, header bool, maxfilesize uint64, forcequote []string, buf *buffer.Buffer) *ExportParam {
 	ep := buffer.Alloc[ExportParam](buf)
 	ep.Outfile = outfile
-	ep.QueryId = queryid
-	ep.FilePath = filepath
+	bQueryId := NewBufString(queryid)
+	bFilePath := NewBufString(filepath)
+	buf.Pin(bQueryId, bFilePath)
+	ep.QueryId = bQueryId
+	ep.FilePath = bFilePath
 	ep.Fields = fields
 	ep.Lines = lines
 	ep.Header = header
 	ep.MaxFileSize = maxfilesize
-	ep.ForceQuote = forcequote
+
+	if forcequote != nil {
+		ep.ForceQuote = buffer.MakeSlice[string](buf)
+		for _, f := range forcequote {
+			ep.ForceQuote = buffer.AppendSlice[string](buf, ep.ForceQuote, buf.CopyString(f))
+		}
+	}
+
 	return ep
 }
 
 func (ep *ExportParam) Format(ctx *FmtCtx) {
-	if ep.FilePath == "" {
+	if ep.FilePath.Get() == "" {
 		return
 	}
 	ep.format(ctx, true)
@@ -499,7 +527,7 @@ func (ep *ExportParam) format(ctx *FmtCtx, withOutfile bool) {
 		ctx.WriteString(" outfile")
 	}
 	ctx.WriteByte(' ')
-	ctx.WriteString(ep.FilePath)
+	ctx.WriteString(ep.FilePath.Get())
 	if ep.Fields != nil {
 		ctx.WriteByte(' ')
 		ep.Fields.Format(ctx)

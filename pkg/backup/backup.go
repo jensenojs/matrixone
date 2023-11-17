@@ -43,12 +43,12 @@ func Backup(ctx context.Context, bs *tree.BackupStart, cfg *Config) error {
 	// step 1 : setup fileservice
 	//1.1 setup ETL fileservice for general usage
 	if !bs.IsS3 {
-		cfg.GeneralDir, _, err = setupFilesystem(ctx, bs.Dir, true)
+		cfg.GeneralDir, _, err = setupFilesystem(ctx, bs.Dir.Get(), true)
 		if err != nil {
 			return err
 		}
 		//for tae hakeeper
-		cfg.TaeDir, _, err = setupFilesystem(ctx, bs.Dir, false)
+		cfg.TaeDir, _, err = setupFilesystem(ctx, bs.Dir.Get(), false)
 		if err != nil {
 			return err
 		}

@@ -31,7 +31,7 @@ func (node *MoDump) Format(ctx *FmtCtx) {
 	ctx.WriteString("modump")
 	ctx.WriteString(" query_result")
 	ctx.WriteByte(' ')
-	ctx.WriteString(node.ExportParams.QueryId)
+	ctx.WriteString(node.ExportParams.QueryId.Get())
 	ctx.WriteByte(' ')
 	node.ExportParams.format(ctx, false)
 }

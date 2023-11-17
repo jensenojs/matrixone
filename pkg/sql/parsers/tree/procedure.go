@@ -121,14 +121,16 @@ type CreateProcedure struct {
 	statementImpl
 	Name *ProcedureName
 	Args ProcedureArgs
-	Body string
+	Body *BufString
 }
 
 func NewCreateProcedure(n *ProcedureName, args ProcedureArgs, body string, buf *buffer.Buffer) *CreateProcedure {
-	drop := buffer.Alloc[CreateProcedure](buf)	
+	drop := buffer.Alloc[CreateProcedure](buf)
 	drop.Name = n
 	drop.Args = args
-	drop.Body = body
+	bBody := NewBufString(body)
+	buf.Pin(bBody)
+	drop.Body = bBody
 	return drop
 }
 
@@ -139,7 +141,7 @@ type DropProcedure struct {
 }
 
 func NewDropProcedure(n *ProcedureName, ifs bool, buf *buffer.Buffer) *DropProcedure {
-	drop := buffer.Alloc[DropProcedure](buf)	
+	drop := buffer.Alloc[DropProcedure](buf)
 	drop.Name = n
 	drop.IfExists = ifs
 	return drop
@@ -160,7 +162,7 @@ func (node *CreateProcedure) Format(ctx *FmtCtx) {
 	}
 	ctx.WriteString(") '")
 
-	ctx.WriteString(node.Body)
+	ctx.WriteString(node.Body.Get())
 	ctx.WriteString("'")
 }
 

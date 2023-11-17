@@ -214,7 +214,7 @@ type SelectClause struct {
 	Where    *Where
 	GroupBy  GroupBy
 	Having   *Where
-	Option   string
+	Option   *BufString
 }
 
 func NewSelectClause(distinct bool, expr SelectExprs, from *From, where *Where, groupby GroupBy, having *Where, opt string, buf *buffer.Buffer) *SelectClause {
@@ -225,7 +225,9 @@ func NewSelectClause(distinct bool, expr SelectExprs, from *From, where *Where, 
 	sec.Where = where
 	sec.GroupBy = groupby
 	sec.Having = having
-	sec.Option = opt
+	bOption := NewBufString(opt)
+	buf.Pin(bOption)
+	sec.Option = bOption
 	return sec
 }
 
@@ -234,8 +236,8 @@ func (node *SelectClause) Format(ctx *FmtCtx) {
 	if node.Distinct {
 		ctx.WriteString("distinct ")
 	}
-	if node.Option != "" {
-		ctx.WriteString(node.Option)
+	if node.Option.Get() != "" {
+		ctx.WriteString(node.Option.Get())
 		ctx.WriteByte(' ')
 	}
 	node.Exprs.Format(ctx)
@@ -274,12 +276,12 @@ func (node *SelectClause) GetQueryType() string     { return QueryTypeDQL }
 
 // WHERE or HAVING clause.
 type Where struct {
-	Type string
+	Type *BufString
 	Expr Expr
 }
 
 func (node *Where) Format(ctx *FmtCtx) {
-	ctx.WriteString(node.Type)
+	ctx.WriteString(node.Type.Get())
 	ctx.WriteByte(' ')
 	node.Expr.Format(ctx)
 }
@@ -291,7 +293,9 @@ const (
 
 func NewWhere(t string, e Expr, buf *buffer.Buffer) *Where {
 	w := buffer.Alloc[Where](buf)
-	w.Type = t
+	bType := NewBufString(t)
+	buf.Pin(bType)
+	w.Type = bType
 	w.Expr = e
 	return w
 }
@@ -343,7 +347,7 @@ func (node *GroupBy) Format(ctx *FmtCtx) {
 
 // func NewGroupBy(es []Expr, buf *buffer.Buffer) *GroupBy {
 // 	g := buffer.Alloc[GroupBy](buf)
-		
+
 // 	return a
 // }
 
@@ -368,7 +372,7 @@ var _ TableExpr = &Subquery{}
 
 type JoinTableExpr struct {
 	TableExpr
-	JoinType string
+	JoinType *BufString
 	Left     TableExpr
 	Right    TableExpr
 	Cond     JoinCond
@@ -378,11 +382,11 @@ func (node *JoinTableExpr) Format(ctx *FmtCtx) {
 	if node.Left != nil {
 		node.Left.Format(ctx)
 	}
-	if node.JoinType != "" && node.Right != nil {
+	if node.JoinType.Get() != "" && node.Right != nil {
 		ctx.WriteByte(' ')
-		ctx.WriteString(strings.ToLower(node.JoinType))
+		ctx.WriteString(strings.ToLower(node.JoinType.Get()))
 	}
-	if node.JoinType != JOIN_TYPE_STRAIGHT && node.Right != nil {
+	if node.JoinType.Get() != JOIN_TYPE_STRAIGHT && node.Right != nil {
 		ctx.WriteByte(' ')
 		ctx.WriteString("join")
 	}
@@ -398,7 +402,9 @@ func (node *JoinTableExpr) Format(ctx *FmtCtx) {
 
 func NewJoinTableExpr(l TableExpr, jt string, r TableExpr, jc JoinCond, buf *buffer.Buffer) *JoinTableExpr {
 	jte := buffer.Alloc[JoinTableExpr](buf)
-	jte.JoinType = jt
+	bJoinType := NewBufString(jt)
+	buf.Pin(bJoinType)
+	jte.JoinType = bJoinType
 	jte.Left = l
 	jte.Right = r
 	jte.Cond = jc
@@ -529,7 +535,7 @@ func (node *AliasedTableExpr) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewAliasedTableExpr(e TableExpr, a *AliasClause, idxs []*IndexHint ,buf *buffer.Buffer) *AliasedTableExpr {
+func NewAliasedTableExpr(e TableExpr, a *AliasClause, idxs []*IndexHint, buf *buffer.Buffer) *AliasedTableExpr {
 	ate := buffer.Alloc[AliasedTableExpr](buf)
 	ate.Expr = e
 	if a != nil {
@@ -598,16 +604,22 @@ const (
 )
 
 type IndexHint struct {
-	IndexNames []string
+	IndexNames []string // do NOT reassign after NewIndexHint
 	HintType   IndexHintType
 	HintScope  IndexHintScope
 }
 
 func NewIndexHint(indexNames []string, hintType IndexHintType, hintScope IndexHintScope, buf *buffer.Buffer) *IndexHint {
 	i := buffer.Alloc[IndexHint](buf)
-	i.IndexNames = indexNames
 	i.HintType = hintType
-	i.HintScope = hintScope	
+	i.HintScope = hintScope
+
+	if indexNames != nil {
+		i.IndexNames = buffer.MakeSlice[string](buf)
+		for _, v := range indexNames {
+			i.IndexNames = buffer.AppendSlice[string](buf, i.IndexNames, buf.CopyString(v))
+		}
+	}
 	return i
 }
 
