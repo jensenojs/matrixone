@@ -50,7 +50,7 @@ func (arg *Argument) String(buf *bytes.Buffer) {
 }
 
 func (arg *Argument) Prepare(proc *process.Process) (err error) {
-	rowCount := int64(arg.N * 1.2)
+	rowCount := int64(arg.N * 1.1)
 	if rowCount < 10000 {
 		rowCount = 10000
 	}
