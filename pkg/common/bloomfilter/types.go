@@ -15,10 +15,17 @@
 package bloomfilter
 
 import (
+	"math"
 	"math/rand"
 
 	"github.com/matrixorigin/matrixone/pkg/common/bitmap"
 )
+
+var constLogValue float64
+
+func init() {
+	constLogValue = math.Log(1 / math.Pow(2, math.Log(2)))
+}
 
 // JoinMap is used for join
 type BloomFilter struct {
@@ -42,22 +49,26 @@ func New(rowCount int64, probability float64) *BloomFilter {
 }
 
 func computeMemAndHashCount(rowCount int64, probability float64) (int64, int) {
-	if rowCount < 10000 {
-		return 10000, 1
+	if rowCount < 10001 {
+		return 64 * 10000, 1
 	} else if rowCount < 100000 {
-		return 100000, 1
+		return 64 * 100001, 1
 	} else if rowCount < 1000000 {
-		return 1000000, 2
+		return 16 * 1000001, 1
 	} else if rowCount < 10000000 {
-		return 10000000, 2
-	} else if rowCount < 10000000 {
-		return 10000000, 3
-	} else if rowCount < 100000000 {
-		return 100000000, 3
-	} else if rowCount < 1000000000 {
-		return 1000000000, 3
-	} else if rowCount < 10000000000 {
-		return 10000000000, 4
+		return 38 * 10000000, 2
+	} else if rowCount < 100000001 {
+		// m := ceil((rowCount * log(0.000001)) / log(1/pow(2, log(2))))
+		m := math.Ceil((float64(rowCount) * math.Log(probability)) / constLogValue)
+		return int64(m), 3
+	} else if rowCount < 1000000001 {
+		// m := ceil((rowCount * log(0.000001)) / log(1/pow(2, log(2))))
+		m := math.Ceil((float64(rowCount) * math.Log(probability)) / constLogValue)
+		return int64(m), 3
+	} else if rowCount < 10000000001 {
+		// m := ceil((rowCount * log(0.000001)) / log(1/pow(2, log(2))))
+		m := math.Ceil((float64(rowCount) * math.Log(probability)) / constLogValue)
+		return int64(m), 4
 	} else {
 		panic("unsupport rowCount")
 	}

@@ -14,7 +14,7 @@
 package fuzzyfilter
 
 import (
-	"github.com/bits-and-blooms/bloom"
+	"github.com/matrixorigin/matrixone/pkg/common/bloomfilter"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -27,7 +27,7 @@ type Argument struct {
 	N float64
 
 	collisionCnt int
-	filter       *bloom.BloomFilter
+	filter       *bloomfilter.BloomFilter
 	rbat         *batch.Batch
 
 	info     *vm.OperatorInfo
@@ -43,8 +43,9 @@ func (arg *Argument) AppendChild(child vm.Operator) {
 }
 
 func (arg *Argument) Free(proc *process.Process, pipelineFailed bool, err error) {
-	arg.filter.ClearAll()
-	arg.filter = nil
+	if arg.filter != nil {
+		arg.filter.Clean()
+	}
 	if arg.rbat != nil {
 		arg.rbat.Clean(proc.GetMPool())
 		arg.rbat = nil

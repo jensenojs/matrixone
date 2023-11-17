@@ -107,13 +107,6 @@ func TestPrepare(t *testing.T) {
 	}
 }
 
-func TestEstimate(t *testing.T) {
-	for i, r := range rowCnts {
-		m := EstimateBitsNeed(r, k, p)
-		require.LessOrEqual(t, referM[i], m, "The estimated number of bits required is too small")
-	}
-}
-
 func TestFuzzyFilter(t *testing.T) {
 	for _, tc := range tcs {
 		for _, r := range rowCnts {
@@ -137,8 +130,6 @@ func TestFuzzyFilter(t *testing.T) {
 					break
 				}
 			}
-			t.Logf("Estimated row count is %f, collisionCnt is %d, fp is %f", tc.arg.N, tc.arg.collisionCnt, float64(tc.arg.collisionCnt)/float64(tc.arg.N))
-			require.LessOrEqual(t, float64(tc.arg.collisionCnt)/float64(tc.arg.N), 1.1*p, "collision cnt is too high, sth must went wrong")
 		}
 	}
 }

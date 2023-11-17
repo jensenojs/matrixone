@@ -16,10 +16,8 @@ package fuzzyfilter
 import (
 	"bytes"
 	// "fmt"
-	"math"
 
-	"github.com/bits-and-blooms/bloom"
-	"github.com/matrixorigin/matrixone/pkg/common/moerr"
+	"github.com/matrixorigin/matrixone/pkg/common/bloomfilter"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/vm"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -47,32 +45,27 @@ Note:
     on duplicate key update
 */
 
-const (
-	// Probability of false positives
-	p float64 = 0.00001
-	// Number of hash functions
-	k uint = 3
-)
-
-// EstimateBitsNeed return the Number of bits should have in the filter
-// by the formula: p = pow(1 - exp(-k / (m / n)), k)
-//
-//	==> m = - kn / ln(1 - p^(1/k)), use k * (1.001 * n) instead of kn to overcome floating point errors
-func EstimateBitsNeed(n float64, k uint, p float64) float64 {
-	return -float64(k) * math.Ceil(1.001*n) / math.Log(1-math.Pow(p, 1.0/float64(k)))
-}
-
 func (arg *Argument) String(buf *bytes.Buffer) {
 	buf.WriteString(" fuzzy check duplicate constraint")
 }
 
 func (arg *Argument) Prepare(proc *process.Process) (err error) {
-	e := EstimateBitsNeed(arg.N, k, p)
-	m := uint(math.Ceil(e))
-	if float64(m) < e {
-		return moerr.NewInternalErrorNoCtx("Overflow occurred when estimating size of fuzzy filter")
+	rowCount := int64(arg.N * 1.1)
+	if rowCount < 10000 {
+		rowCount = 10000
 	}
-	arg.filter = bloom.New(m, k)
+	probability := 0.000001
+	if rowCount < 10000001 {
+		probability = 0.00001
+	} else if rowCount < 100000001 {
+		probability = 0.000001
+	} else if rowCount < 1000000001 {
+		probability = 0.0000005
+	} else {
+		probability = 0.0000001
+	}
+	arg.filter = bloomfilter.New(rowCount, probability)
+
 	return nil
 }
 
@@ -119,13 +112,13 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 	}
 
 	pkCol := bat.GetVector(0)
-	for i := 0; i < rowCnt; i++ {
-		var bytes = pkCol.GetRawBytesAt(i)
-		if arg.filter.TestAndAdd(bytes) {
+	arg.filter.TestAndAddForVector(pkCol, func(exist bool, i int) {
+		if exist {
 			appendCollisionKey(proc, arg, i, bat)
 			arg.collisionCnt++
 		}
-	}
+	})
+
 	result.Batch = batch.EmptyBatch
 	return result, nil
 }

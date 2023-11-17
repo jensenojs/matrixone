@@ -65,14 +65,13 @@ func fillGroupStr(keys [][]byte, vec *vector.Vector, n int, sz int, start int) {
 	}
 }
 
-func encodeHashKeys(keys [][]byte, vecs []*vector.Vector, start, count int) {
-	for _, vec := range vecs {
-		if vec.GetType().IsFixedLen() {
-			fillGroupStr(keys, vec, count, vec.GetType().TypeSize(), start)
-		} else {
-			fillStringGroupStr(keys, vec, count, start)
-		}
+func encodeHashKeys(keys [][]byte, vec *vector.Vector, start, count int) {
+	if vec.GetType().IsFixedLen() {
+		fillGroupStr(keys, vec, count, vec.GetType().TypeSize(), start)
+	} else {
+		fillStringGroupStr(keys, vec, count, start)
 	}
+
 	for i := 0; i < count; i++ {
 		if l := len(keys[i]); l < 16 {
 			keys[i] = append(keys[i], hashtable.StrKeyPadding[l:]...)
