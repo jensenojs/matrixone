@@ -65,26 +65,22 @@ func New(rowCount int64, probability float64) *BloomFilter {
 }
 
 func computeMemAndHashCount(rowCount int64, probability float64) (int64, int) {
+	m := int64(math.Ceil((float64(rowCount) * math.Log(probability)) / constLogValue))
+
 	if rowCount < 10001 {
-		return 64 * 10000, 1
+		return m, 1
 	} else if rowCount < 100001 {
-		return 64 * 100000, 1
+		return m, 1
 	} else if rowCount < 1000001 {
-		return 16 * 1000000, 1
+		return m, 1
 	} else if rowCount < 10000001 {
-		return 38 * 10000000, 2
+		return m, 2
 	} else if rowCount < 100000001 {
-		// m := ceil((rowCount * log(0.000001)) / log(1/pow(2, log(2))))
-		m := math.Ceil((float64(rowCount) * math.Log(probability)) / constLogValue)
-		return int64(m), 3
+		return m, 3
 	} else if rowCount < 1000000001 {
-		// m := ceil((rowCount * log(0.000001)) / log(1/pow(2, log(2))))
-		m := math.Ceil((float64(rowCount) * math.Log(probability)) / constLogValue)
-		return int64(m), 3
+		return m, 3
 	} else if rowCount < 10000000001 {
-		// m := ceil((rowCount * log(0.000001)) / log(1/pow(2, log(2))))
-		m := math.Ceil((float64(rowCount) * math.Log(probability)) / constLogValue)
-		return int64(m), 4
+		return m, 3
 	} else {
 		panic("unsupport rowCount")
 	}
