@@ -93,7 +93,7 @@ func GenerateFunctionStrParameter(v *Vector) FunctionParameterWrapper[types.Varl
 			sourceVector: v,
 		}
 	}
-	cols := toTypedSlice[types.Varlena](&v.col)
+	cols := v.col.([]types.Varlena)
 	if v.IsConst() {
 		return &FunctionParameterScalar[types.Varlena]{
 			typ:          *t,

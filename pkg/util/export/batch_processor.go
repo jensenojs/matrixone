@@ -32,7 +32,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/util/batchpipe"
 	"github.com/matrixorigin/matrixone/pkg/util/errutil"
 	"github.com/matrixorigin/matrixone/pkg/util/export/table"
-	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 	"github.com/matrixorigin/matrixone/pkg/util/trace"
 	"github.com/matrixorigin/matrixone/pkg/util/trace/impl/motrace"
 
@@ -254,10 +253,6 @@ type MOCollector struct {
 	collectorCnt int // WithCollectorCnt
 	generatorCnt int // WithGeneratorCnt
 	exporterCnt  int // WithExporterCnt
-	// num % of (#cpu * 0.1)
-	collectorCntP int // default: 10
-	generatorCntP int // default: 20
-	exporterCntP  int // default: 80
 	// pipeImplHolder hold implement
 	pipeImplHolder *PipeImplHolder
 
@@ -286,9 +281,9 @@ func NewMOCollector(ctx context.Context, opts ...MOCollectorOption) *MOCollector
 		awakeGenerate:  make(chan generateReq, 16),
 		awakeBatch:     make(chan exportReq),
 		stopCh:         make(chan struct{}),
-		collectorCntP:  10,
-		generatorCntP:  20,
-		exporterCntP:   80,
+		collectorCnt:   runtime.NumCPU(),
+		generatorCnt:   runtime.NumCPU(),
+		exporterCnt:    runtime.NumCPU(),
 		pipeImplHolder: newPipeImplHolder(),
 		statsInterval:  time.Minute,
 		maxBufferCnt:   int32(runtime.NumCPU()),
@@ -297,73 +292,17 @@ func NewMOCollector(ctx context.Context, opts ...MOCollectorOption) *MOCollector
 	for _, opt := range opts {
 		opt(c)
 	}
-	// calculate collectorCnt, generatorCnt, exporterCnt
-	c.calculateDefaultWorker(runtime.NumCPU())
 	return c
 }
 
-const maxPercentValue = 1000
-
-// calculateDefaultWorker
-// totalNum = int( #cpu * 0.1 + 0.5 )
-// default collectorCntP : generatorCntP : exporterCntP = 10 : 20 : 80.
-// It means collectorCnt = int( $totalNum * $collectorCntP / 100 + 0.5 )
-//
-// For example
-// | #cpu | #totalNum | collectorCnt | generatorCnt | exporterCnt |
-// | --   | --        | --           | --           | --          |
-// | 6    | 0.6 =~ 1  | 1            | 1            | 3           |
-// | 30   | 3.0       | 1            | 1            | 2           |
-// | 50   | 5.0       | 1            | 1            | 4           |
-// | 60   | 6.0       | 1            | 2            | 5           |
-func (c *MOCollector) calculateDefaultWorker(numCpu int) {
-	var totalNum = math.Ceil(float64(numCpu) * 0.1)
-	unit := float64(totalNum) / (100.0)
-	// set default value if non-set
-	c.collectorCnt = int(math.Round(unit * float64(c.collectorCntP)))
-	c.generatorCnt = int(math.Round(unit * float64(c.generatorCntP)))
-	c.exporterCnt = int(math.Round(unit * float64(c.exporterCntP)))
-	if c.collectorCnt <= 0 {
-		c.collectorCnt = 1
-	}
-	if c.generatorCnt <= 0 {
-		c.generatorCnt = 1
-	}
-	if c.exporterCnt <= 0 {
-		c.exporterCnt = 1
-	}
-
-	// check max value < numCpu
-	if c.collectorCnt > numCpu {
-		c.collectorCnt = numCpu
-	}
-	if c.generatorCnt > numCpu {
-		c.generatorCnt = numCpu
-	}
-	if c.exporterCnt > numCpu {
-		c.exporterCnt = numCpu
-	}
-
-	// last check: disable calculation
-	if c.collectorCnt >= maxPercentValue {
-		c.collectorCnt = numCpu
-	}
-	if c.generatorCntP >= maxPercentValue {
-		c.generatorCnt = numCpu
-	}
-	if c.exporterCnt >= maxPercentValue {
-		c.generatorCnt = numCpu
-	}
+func WithCollectorCnt(cnt int) MOCollectorOption {
+	return MOCollectorOption(func(c *MOCollector) { c.collectorCnt = cnt })
 }
-
-func WithCollectorCntP(p int) MOCollectorOption {
-	return MOCollectorOption(func(c *MOCollector) { c.collectorCntP = p })
+func WithGeneratorCnt(cnt int) MOCollectorOption {
+	return MOCollectorOption(func(c *MOCollector) { c.generatorCnt = cnt })
 }
-func WithGeneratorCnt(p int) MOCollectorOption {
-	return MOCollectorOption(func(c *MOCollector) { c.generatorCntP = p })
-}
-func WithExporterCnt(p int) MOCollectorOption {
-	return MOCollectorOption(func(c *MOCollector) { c.exporterCntP = p })
+func WithExporterCnt(cnt int) MOCollectorOption {
+	return MOCollectorOption(func(c *MOCollector) { c.exporterCnt = cnt })
 }
 
 func WithOBCollectorConfig(cfg *config.OBCollectorConfig) MOCollectorOption {
@@ -375,9 +314,6 @@ func WithOBCollectorConfig(cfg *config.OBCollectorConfig) MOCollectorOption {
 		} else if c.maxBufferCnt == 0 {
 			c.maxBufferCnt = int32(runtime.NumCPU())
 		}
-		c.collectorCntP = cfg.CollectorCntPercent
-		c.generatorCntP = cfg.GeneratorCntPercent
-		c.exporterCntP = cfg.ExporterCntPercent
 	})
 }
 
@@ -481,7 +417,6 @@ loop:
 	for {
 		select {
 		case i := <-c.awakeCollect:
-			start := time.Now()
 			c.mux.RLock()
 			if buf, has := c.buffers[i.GetName()]; !has {
 				c.logger.Debug("doCollect: init buffer", zap.Int("idx", idx), zap.String("item", i.GetName()))
@@ -503,7 +438,6 @@ loop:
 				buf.Add(i)
 				c.mux.RUnlock()
 			}
-			v2.TraceCollectorCollectDurationHistogram.Observe(time.Since(start).Seconds())
 		case <-c.stopCh:
 			break loop
 		}
@@ -524,10 +458,6 @@ type exportReq interface {
 // awakeBufferFactory frozen buffer, send GenRequest to awake
 var awakeBufferFactory = func(c *MOCollector) func(holder *bufferHolder) {
 	return func(holder *bufferHolder) {
-		start := time.Now()
-		defer func() {
-			v2.TraceCollectorGenerateAwareDurationHistogram.Observe(time.Since(start).Seconds())
-		}()
 		req := holder.getGenerateReq()
 		if req == nil {
 			return
@@ -552,7 +482,6 @@ var awakeBufferFactory = func(c *MOCollector) func(holder *bufferHolder) {
 		if r, ok := req.(*bufferGenerateReq); ok {
 			r.b.discardBuffer(r.buffer)
 		}
-		v2.TraceCollectorGenerateAwareDiscardDurationHistogram.Observe(time.Since(start).Seconds())
 	}
 }
 
@@ -566,24 +495,17 @@ loop:
 	for {
 		select {
 		case req := <-c.awakeGenerate:
-			start := time.Now()
 			if req == nil {
 				c.logger.Warn("generate req is nil")
 			} else if exportReq, err := req.handle(buf); err != nil {
 				req.callback(err)
-				v2.TraceCollectorGenerateDurationHistogram.Observe(time.Since(start).Seconds())
 			} else {
-				startDelay := time.Now()
 				select {
 				case c.awakeBatch <- exportReq:
 				case <-c.stopCh:
 				case <-time.After(time.Second * 10):
 					c.logger.Info("awakeBatch: timeout after 10 seconds")
-					v2.TraceCollectorGenerateDiscardDurationHistogram.Observe(time.Since(start).Seconds())
 				}
-				end := time.Now()
-				v2.TraceCollectorGenerateDelayDurationHistogram.Observe(end.Sub(startDelay).Seconds())
-				v2.TraceCollectorGenerateDurationHistogram.Observe(end.Sub(start).Seconds())
 			}
 		case <-c.stopCh:
 			break loop
@@ -600,13 +522,11 @@ loop:
 	for {
 		select {
 		case req := <-c.awakeBatch:
-			start := time.Now()
 			if req == nil {
 				c.logger.Warn("export req is nil")
 			} else if err := req.handle(); err != nil {
 				req.callback(err)
 			}
-			v2.TraceCollectorExportDurationHistogram.Observe(time.Since(start).Seconds())
 		case <-c.stopCh:
 			c.mux.Lock()
 			for len(c.awakeBatch) > 0 {

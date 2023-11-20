@@ -68,7 +68,7 @@ func (b *baseBinder) baseBindExpr(astExpr tree.Expr, depth int32, isRoot bool) (
 				return
 			}
 
-			expr, err = BindFuncExprImplByPlanExpr(b.GetContext(), "not", []*plan.Expr{expr})
+			expr, err = bindFuncExprImplByPlanExpr(b.GetContext(), "not", []*plan.Expr{expr})
 		}
 
 	case *tree.AndExpr:
@@ -373,7 +373,7 @@ func (b *baseBinder) baseBindColRef(astExpr *tree.UnresolvedName, depth int32, i
 			},
 		}
 
-		return BindFuncExprImplByPlanExpr(b.GetContext(), moEnumCastIndexToValueFun, args)
+		return bindFuncExprImplByPlanExpr(b.GetContext(), moEnumCastIndexToValueFun, args)
 	}
 
 	if colPos != NotFound {
@@ -581,7 +581,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 						if err != nil {
 							return nil, err
 						}
-						expr1, err = BindFuncExprImplByPlanExpr(b.GetContext(), "and", []*plan.Expr{expr1, expr2})
+						expr1, err = bindFuncExprImplByPlanExpr(b.GetContext(), "and", []*plan.Expr{expr1, expr2})
 						if err != nil {
 							return nil, err
 						}
@@ -613,7 +613,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 						if err != nil {
 							return nil, err
 						}
-						expr1, err = BindFuncExprImplByPlanExpr(b.GetContext(), "and", []*plan.Expr{expr1, expr2})
+						expr1, err = bindFuncExprImplByPlanExpr(b.GetContext(), "and", []*plan.Expr{expr1, expr2})
 						if err != nil {
 							return nil, err
 						}
@@ -621,7 +621,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 						if err != nil {
 							return nil, err
 						}
-						expr1, err = BindFuncExprImplByPlanExpr(b.GetContext(), "or", []*plan.Expr{expr1, expr2})
+						expr1, err = bindFuncExprImplByPlanExpr(b.GetContext(), "or", []*plan.Expr{expr1, expr2})
 						if err != nil {
 							return nil, err
 						}
@@ -653,7 +653,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 						if err != nil {
 							return nil, err
 						}
-						expr1, err = BindFuncExprImplByPlanExpr(b.GetContext(), "and", []*plan.Expr{expr1, expr2})
+						expr1, err = bindFuncExprImplByPlanExpr(b.GetContext(), "and", []*plan.Expr{expr1, expr2})
 						if err != nil {
 							return nil, err
 						}
@@ -661,7 +661,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 						if err != nil {
 							return nil, err
 						}
-						expr1, err = BindFuncExprImplByPlanExpr(b.GetContext(), "or", []*plan.Expr{expr1, expr2})
+						expr1, err = bindFuncExprImplByPlanExpr(b.GetContext(), "or", []*plan.Expr{expr1, expr2})
 						if err != nil {
 							return nil, err
 						}
@@ -693,7 +693,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 						if err != nil {
 							return nil, err
 						}
-						expr1, err = BindFuncExprImplByPlanExpr(b.GetContext(), "and", []*plan.Expr{expr1, expr2})
+						expr1, err = bindFuncExprImplByPlanExpr(b.GetContext(), "and", []*plan.Expr{expr1, expr2})
 						if err != nil {
 							return nil, err
 						}
@@ -701,7 +701,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 						if err != nil {
 							return nil, err
 						}
-						expr1, err = BindFuncExprImplByPlanExpr(b.GetContext(), "or", []*plan.Expr{expr1, expr2})
+						expr1, err = bindFuncExprImplByPlanExpr(b.GetContext(), "or", []*plan.Expr{expr1, expr2})
 						if err != nil {
 							return nil, err
 						}
@@ -733,7 +733,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 						if err != nil {
 							return nil, err
 						}
-						expr1, err = BindFuncExprImplByPlanExpr(b.GetContext(), "and", []*plan.Expr{expr1, expr2})
+						expr1, err = bindFuncExprImplByPlanExpr(b.GetContext(), "and", []*plan.Expr{expr1, expr2})
 						if err != nil {
 							return nil, err
 						}
@@ -741,7 +741,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 						if err != nil {
 							return nil, err
 						}
-						expr1, err = BindFuncExprImplByPlanExpr(b.GetContext(), "or", []*plan.Expr{expr1, expr2})
+						expr1, err = bindFuncExprImplByPlanExpr(b.GetContext(), "or", []*plan.Expr{expr1, expr2})
 						if err != nil {
 							return nil, err
 						}
@@ -773,7 +773,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 						if err != nil {
 							return nil, err
 						}
-						expr1, err = BindFuncExprImplByPlanExpr(b.GetContext(), "or", []*plan.Expr{expr1, expr2})
+						expr1, err = bindFuncExprImplByPlanExpr(b.GetContext(), "or", []*plan.Expr{expr1, expr2})
 						if err != nil {
 							return nil, err
 						}
@@ -836,7 +836,7 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 
 				return rightArg, nil
 			} else {
-				return BindFuncExprImplByPlanExpr(b.GetContext(), "in", []*plan.Expr{leftArg, rightArg})
+				return bindFuncExprImplByPlanExpr(b.GetContext(), "in", []*plan.Expr{leftArg, rightArg})
 			}
 		}
 
@@ -877,12 +877,12 @@ func (b *baseBinder) bindComparisonExpr(astExpr *tree.ComparisonExpr, depth int3
 
 				return rightArg, nil
 			} else {
-				expr, err := BindFuncExprImplByPlanExpr(b.GetContext(), "in", []*plan.Expr{leftArg, rightArg})
+				expr, err := bindFuncExprImplByPlanExpr(b.GetContext(), "in", []*plan.Expr{leftArg, rightArg})
 				if err != nil {
 					return nil, err
 				}
 
-				return BindFuncExprImplByPlanExpr(b.GetContext(), "not", []*plan.Expr{expr})
+				return bindFuncExprImplByPlanExpr(b.GetContext(), "not", []*plan.Expr{expr})
 			}
 		}
 	case tree.REG_MATCH:
@@ -1080,7 +1080,7 @@ func (b *baseBinder) bindFuncExprImplByAstExpr(name string, astArgs []tree.Expr,
 	} else {
 		// return bindFuncExprImplByPlanExpr(b.GetContext(), name, args)
 		// first look for builtin func
-		builtinExpr, err := BindFuncExprImplByPlanExpr(b.GetContext(), name, args)
+		builtinExpr, err := bindFuncExprImplByPlanExpr(b.GetContext(), name, args)
 		if err == nil {
 			return builtinExpr, nil
 		}
@@ -1178,11 +1178,11 @@ func (b *baseBinder) bindPythonUdf(udf *function.Udf, astArgs []tree.Expr, depth
 	fRetType := udf.GetRetPlanType()
 	args[2*len(astArgs)+1] = &Expr{Typ: fRetType}
 
-	return BindFuncExprImplByPlanExpr(b.GetContext(), "python_user_defined_function", args)
+	return bindFuncExprImplByPlanExpr(b.GetContext(), "python_user_defined_function", args)
 }
 
 func bindFuncExprAndConstFold(ctx context.Context, proc *process.Process, name string, args []*Expr) (*plan.Expr, error) {
-	retExpr, err := BindFuncExprImplByPlanExpr(ctx, name, args)
+	retExpr, err := bindFuncExprImplByPlanExpr(ctx, name, args)
 	switch name {
 	case "+", "-", "*", "/", "unary_minus", "unary_plus", "unary_tilde", "in":
 		if err == nil && proc != nil {
@@ -1195,7 +1195,9 @@ func bindFuncExprAndConstFold(ctx context.Context, proc *process.Process, name s
 	return retExpr, err
 }
 
-func BindFuncExprImplByPlanExpr(ctx context.Context, name string, args []*Expr) (*plan.Expr, error) {
+var BindFuncExprImplByPlanExpr = bindFuncExprImplByPlanExpr
+
+func bindFuncExprImplByPlanExpr(ctx context.Context, name string, args []*Expr) (*plan.Expr, error) {
 	var err error
 
 	// deal with some special function
@@ -1544,20 +1546,20 @@ func BindFuncExprImplByPlanExpr(ctx context.Context, name string, args []*Expr) 
 			//expand the in list to col=a or col=b or ......
 			if name == "in" {
 				for _, expr := range orExprList {
-					tmpExpr, _ := BindFuncExprImplByPlanExpr(ctx, "=", []*Expr{DeepCopyExpr(args[0]), expr})
+					tmpExpr, _ := bindFuncExprImplByPlanExpr(ctx, "=", []*Expr{DeepCopyExpr(args[0]), expr})
 					if newExpr == nil {
 						newExpr = tmpExpr
 					} else {
-						newExpr, _ = BindFuncExprImplByPlanExpr(ctx, "or", []*Expr{newExpr, tmpExpr})
+						newExpr, _ = bindFuncExprImplByPlanExpr(ctx, "or", []*Expr{newExpr, tmpExpr})
 					}
 				}
 			} else {
 				for _, expr := range orExprList {
-					tmpExpr, _ := BindFuncExprImplByPlanExpr(ctx, "!=", []*Expr{DeepCopyExpr(args[0]), expr})
+					tmpExpr, _ := bindFuncExprImplByPlanExpr(ctx, "!=", []*Expr{DeepCopyExpr(args[0]), expr})
 					if newExpr == nil {
 						newExpr = tmpExpr
 					} else {
-						newExpr, _ = BindFuncExprImplByPlanExpr(ctx, "and", []*Expr{newExpr, tmpExpr})
+						newExpr, _ = bindFuncExprImplByPlanExpr(ctx, "and", []*Expr{newExpr, tmpExpr})
 					}
 				}
 			}
@@ -1605,7 +1607,7 @@ func BindFuncExprImplByPlanExpr(ctx context.Context, name string, args []*Expr) 
 	if name == NameGroupConcat {
 		expressionList := args[:len(args)-1]
 		separator := args[len(args)-1]
-		compactCol, e := BindFuncExprImplByPlanExpr(ctx, "serial", expressionList)
+		compactCol, e := bindFuncExprImplByPlanExpr(ctx, "serial", expressionList)
 		if e != nil {
 			return nil, e
 		}

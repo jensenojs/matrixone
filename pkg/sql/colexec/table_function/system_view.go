@@ -735,11 +735,7 @@ var selectSuperTenant = func(selector clusterservice.Selector,
 	username string,
 	filter func(string) bool,
 	appendFn func(service *metadata.CNService)) {
-	clusterservice.GetMOCluster().GetCNService(
-		clusterservice.NewSelectAll(), func(s metadata.CNService) bool {
-			appendFn(&s)
-			return true
-		})
+	disttae.SelectForSuperTenant(selector, username, filter, appendFn)
 }
 
 var listTnService = func(appendFn func(service *metadata.TNService)) {

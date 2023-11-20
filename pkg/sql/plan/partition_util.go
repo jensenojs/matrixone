@@ -16,10 +16,9 @@ package plan
 
 import (
 	"context"
-	"strings"
-
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/rule"
+	"strings"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
@@ -987,7 +986,7 @@ func evalPartitionBoolExpr(ctx context.Context, lOriExpr *Expr, rOriExpr *Expr, 
 		return false, err
 	}
 
-	retExpr, err := BindFuncExprImplByPlanExpr(ctx, ">", []*Expr{lexpr, rexpr})
+	retExpr, err := bindFuncExprImplByPlanExpr(ctx, ">", []*Expr{lexpr, rexpr})
 	if err != nil {
 		return false, err
 	}

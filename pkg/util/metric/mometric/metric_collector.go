@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math"
 	"runtime"
 	"time"
 
@@ -53,12 +52,11 @@ type collectorOpts struct {
 }
 
 func defaultCollectorOpts() collectorOpts {
-	var defaultSqlWorkerNum = int(math.Ceil(float64(runtime.NumCPU()) * 0.1))
 	return collectorOpts{
 		metricThreshold: 1000,
 		sampleThreshold: 4096,
 		flushInterval:   15 * time.Second,
-		sqlWorkerNum:    defaultSqlWorkerNum,
+		sqlWorkerNum:    runtime.NumCPU(),
 	}
 }
 

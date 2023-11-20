@@ -16,7 +16,6 @@ package vector
 
 import (
 	"fmt"
-	"reflect"
 	"unsafe"
 
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -32,9 +31,9 @@ func MustFixedCol[T any](v *Vector) []T {
 		return nil
 	}
 	if v.class == CONSTANT {
-		return toTypedSlice[T](&v.col)[:1]
+		return v.col.([]T)[:1]
 	}
-	return toTypedSlice[T](&v.col)[:v.length]
+	return v.col.([]T)[:v.length]
 }
 
 func MustBytesCol(v *Vector) [][]byte {
@@ -92,7 +91,7 @@ func ExpandFixedCol[T any](v *Vector) []T {
 	if v.IsConst() {
 		vs := make([]T, v.Length())
 		if len(v.data) > 0 {
-			cols := toTypedSlice[T](&v.col)
+			cols := v.col.([]T)
 			for i := range vs {
 				vs[i] = cols[0]
 			}
@@ -106,7 +105,7 @@ func ExpandStrCol(v *Vector) []string {
 	if v.IsConst() {
 		vs := make([]string, v.Length())
 		if len(v.data) > 0 {
-			cols := toTypedSlice[types.Varlena](&v.col)
+			cols := v.col.([]types.Varlena)
 			ss := cols[0].GetString(v.area)
 			for i := range vs {
 				vs[i] = ss
@@ -121,7 +120,7 @@ func ExpandBytesCol(v *Vector) [][]byte {
 	if v.IsConst() {
 		vs := make([][]byte, v.Length())
 		if len(v.data) > 0 {
-			cols := toTypedSlice[types.Varlena](&v.col)
+			cols := v.col.([]types.Varlena)
 			ss := cols[0].GetByteSlice(v.area)
 			for i := range vs {
 				vs[i] = ss
@@ -158,83 +157,57 @@ func extend(v *Vector, rows int, m *mpool.MPool) error {
 	return nil
 }
 
-var (
-	varlenaType    = reflect.TypeOf((*types.Varlena)(nil)).Elem()
-	boolType       = reflect.TypeOf((*bool)(nil)).Elem()
-	int8Type       = reflect.TypeOf((*int8)(nil)).Elem()
-	int16Type      = reflect.TypeOf((*int16)(nil)).Elem()
-	int32Type      = reflect.TypeOf((*int32)(nil)).Elem()
-	int64Type      = reflect.TypeOf((*int64)(nil)).Elem()
-	uint8Type      = reflect.TypeOf((*uint8)(nil)).Elem()
-	uint16Type     = reflect.TypeOf((*uint16)(nil)).Elem()
-	uint32Type     = reflect.TypeOf((*uint32)(nil)).Elem()
-	uint64Type     = reflect.TypeOf((*uint64)(nil)).Elem()
-	float32Type    = reflect.TypeOf((*float32)(nil)).Elem()
-	float64Type    = reflect.TypeOf((*float64)(nil)).Elem()
-	decimal64Type  = reflect.TypeOf((*types.Decimal64)(nil)).Elem()
-	decimal128Type = reflect.TypeOf((*types.Decimal128)(nil)).Elem()
-	uuidType       = reflect.TypeOf((*types.Uuid)(nil)).Elem()
-	dateType       = reflect.TypeOf((*types.Date)(nil)).Elem()
-	timeType       = reflect.TypeOf((*types.Time)(nil)).Elem()
-	dateTimeType   = reflect.TypeOf((*types.Datetime)(nil)).Elem()
-	timestampType  = reflect.TypeOf((*types.Timestamp)(nil)).Elem()
-	tsType         = reflect.TypeOf((*types.TS)(nil)).Elem()
-	rowIDType      = reflect.TypeOf((*types.Rowid)(nil)).Elem()
-	blockIDType    = reflect.TypeOf((*types.Blockid)(nil)).Elem()
-	enumType       = reflect.TypeOf((*types.Enum)(nil)).Elem()
-)
-
 func (v *Vector) setupColFromData() {
 	if v.GetType().IsVarlen() {
-		v.col.setFromVector(v, varlenaType)
+		v.col = DecodeFixedCol[types.Varlena](v)
 	} else {
 		// The followng switch attach the correct type to v.col
 		// even though v.col is only an interface.
 		switch v.typ.Oid {
 		case types.T_bool:
-			v.col.setFromVector(v, boolType)
+			v.col = DecodeFixedCol[bool](v)
 		case types.T_int8:
-			v.col.setFromVector(v, int8Type)
+			v.col = DecodeFixedCol[int8](v)
 		case types.T_int16:
-			v.col.setFromVector(v, int16Type)
+			v.col = DecodeFixedCol[int16](v)
 		case types.T_int32:
-			v.col.setFromVector(v, int32Type)
+			v.col = DecodeFixedCol[int32](v)
 		case types.T_int64:
-			v.col.setFromVector(v, int64Type)
+			v.col = DecodeFixedCol[int64](v)
 		case types.T_uint8:
-			v.col.setFromVector(v, uint8Type)
+			v.col = DecodeFixedCol[uint8](v)
 		case types.T_uint16:
-			v.col.setFromVector(v, uint16Type)
+			v.col = DecodeFixedCol[uint16](v)
 		case types.T_uint32:
-			v.col.setFromVector(v, uint32Type)
+			v.col = DecodeFixedCol[uint32](v)
 		case types.T_uint64:
-			v.col.setFromVector(v, uint64Type)
+			v.col = DecodeFixedCol[uint64](v)
 		case types.T_float32:
-			v.col.setFromVector(v, float32Type)
+			v.col = DecodeFixedCol[float32](v)
 		case types.T_float64:
-			v.col.setFromVector(v, float64Type)
+			v.col = DecodeFixedCol[float64](v)
 		case types.T_decimal64:
-			v.col.setFromVector(v, decimal64Type)
+			v.col = DecodeFixedCol[types.Decimal64](v)
 		case types.T_decimal128:
-			v.col.setFromVector(v, decimal128Type)
+			v.col = DecodeFixedCol[types.Decimal128](v)
 		case types.T_uuid:
-			v.col.setFromVector(v, uuidType)
+			v.col = DecodeFixedCol[types.Uuid](v)
 		case types.T_date:
-			v.col.setFromVector(v, dateType)
+			v.col = DecodeFixedCol[types.Date](v)
 		case types.T_time:
-			v.col.setFromVector(v, timeType)
+			v.col = DecodeFixedCol[types.Time](v)
 		case types.T_datetime:
-			v.col.setFromVector(v, dateTimeType)
+			v.col = DecodeFixedCol[types.Datetime](v)
 		case types.T_timestamp:
-			v.col.setFromVector(v, timestampType)
+			v.col = DecodeFixedCol[types.Timestamp](v)
 		case types.T_TS:
-			v.col.setFromVector(v, tsType)
+			v.col = DecodeFixedCol[types.TS](v)
 		case types.T_Rowid:
-			v.col.setFromVector(v, rowIDType)
+			v.col = DecodeFixedCol[types.Rowid](v)
 		case types.T_Blockid:
-			v.col.setFromVector(v, blockIDType)
+			v.col = DecodeFixedCol[types.Blockid](v)
 		case types.T_enum:
-			v.col.setFromVector(v, enumType)
+			v.col = DecodeFixedCol[types.Enum](v)
 		default:
 			panic(fmt.Sprintf("unknown type %s", v.typ.Oid))
 		}

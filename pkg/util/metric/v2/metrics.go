@@ -43,7 +43,6 @@ func init() {
 	initTaskMetrics()
 	initRPCMetrics()
 	initMemMetrics()
-	initTraceMetrics()
 
 	registry.MustRegister(HeartbeatHistogram)
 	registry.MustRegister(HeartbeatFailureCounter)
@@ -143,8 +142,4 @@ func initRPCMetrics() {
 	registry.MustRegister(rpcWriteLatencyDurationHistogram)
 	registry.MustRegister(rpcBackendDoneDurationHistogram)
 
-}
-
-func initTraceMetrics() {
-	registry.MustRegister(traceCollectorDurationHistogram)
 }
