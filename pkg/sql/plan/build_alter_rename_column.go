@@ -27,10 +27,10 @@ func RenameColumn(ctx CompilerContext, alterPlan *plan.AlterTable, spec *tree.Al
 	tableDef := alterPlan.CopyTableDef
 
 	// get the original column name
-	originalColName := spec.OldColumnName.Parts[0]
+	originalColName := spec.OldColumnName.Parts[0].Get()
 
 	// get the new column name
-	newColName := spec.NewColumnName.Parts[0]
+	newColName := spec.NewColumnName.Parts[0].Get()
 
 	// Check whether original column has existed.
 	originalCol := FindColumn(tableDef.Cols, originalColName)
@@ -108,7 +108,7 @@ func AlterColumn(ctx CompilerContext, alterPlan *plan.AlterTable, spec *tree.Alt
 	tableDef := alterPlan.CopyTableDef
 
 	// get the original column name
-	originalColName := spec.ColumnName.Parts[0]
+	originalColName := spec.ColumnName.Parts[0].Get()
 
 	// Check whether original column has existed.
 	originalCol := FindColumn(tableDef.Cols, originalColName)
@@ -144,7 +144,7 @@ func OrderByColumn(ctx CompilerContext, alterPlan *plan.AlterTable, spec *tree.A
 	tableDef := alterPlan.CopyTableDef
 	for _, order := range spec.AlterOrderByList {
 		// get the original column name
-		originalColName := order.Column.Parts[0]
+		originalColName := order.Column.Parts[0].Get()
 		// Check whether original column has existed.
 		originalCol := FindColumn(tableDef.Cols, originalColName)
 		if originalCol == nil || originalCol.Hidden {

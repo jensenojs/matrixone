@@ -94,13 +94,13 @@ func (b *baseBinder) baseBindExpr(astExpr tree.Expr, depth int32, isRoot bool) (
 			tmpScope := b.GetContext().Value(defines.VarScopeKey{}).(*[]map[string]interface{})
 			for i := len(*tmpScope) - 1; i >= 0; i-- {
 				curScope := (*tmpScope)[i]
-				if _, ok := curScope[strings.ToLower(exprImpl.Parts[0])]; ok {
+				if _, ok := curScope[strings.ToLower(exprImpl.Parts[0].Get())]; ok {
 					typ := types.T_text.ToType()
 					expr = &Expr{
 						Typ: makePlan2Type(&typ),
 						Expr: &plan.Expr_V{
 							V: &plan.VarRef{
-								Name:   exprImpl.Parts[0],
+								Name:   exprImpl.Parts[0].Get(),
 								System: false,
 								Global: false,
 							},
@@ -271,11 +271,11 @@ func (b *baseBinder) baseBindVar(astExpr *tree.VarExpr, depth int32, isRoot bool
 
 func (b *baseBinder) baseBindColRef(astExpr *tree.UnresolvedName, depth int32, isRoot bool) (expr *plan.Expr, err error) {
 	if b.ctx == nil {
-		return nil, moerr.NewInvalidInput(b.GetContext(), "ambiguous column reference '%v'", astExpr.Parts[0])
+		return nil, moerr.NewInvalidInput(b.GetContext(), "ambiguous column reference '%v'", astExpr.Parts[0].Get())
 	}
 
-	col := astExpr.Parts[0]
-	table := astExpr.Parts[1]
+	col := astExpr.Parts[0].Get()
+	table := astExpr.Parts[1].Get()
 	name := tree.String(astExpr, dialect.MYSQL)
 
 	relPos := NotFound
@@ -916,7 +916,7 @@ func (b *baseBinder) bindFuncExpr(astExpr *tree.FuncExpr, depth int32, isRoot bo
 	if !ok {
 		return nil, moerr.NewNYI(b.GetContext(), "function expr '%v'", astExpr)
 	}
-	funcName := funcRef.Parts[0]
+	funcName := funcRef.Parts[0].Get()
 
 	if function.GetFunctionIsAggregateByName(funcName) && astExpr.WindowSpec == nil {
 		return b.impl.BindAggFunc(funcName, astExpr, depth, isRoot)
@@ -955,7 +955,7 @@ func (b *baseBinder) bindFuncExprImplByAstExpr(name string, astArgs []tree.Expr,
 		//case "extract":
 		//	// "extract(year from col_name)"  parser return year as UnresolvedName.
 		//	// we must rewrite it to string。 because binder bind UnresolvedName as column name
-		//	unit := astArgs[0].(*tree.UnresolvedName).Parts[0]
+		//	unit := astArgs[0].(*tree.UnresolvedName).Parts[0].Get()
 		//	astArgs[0] = tree.NewNumVal(constant.MakeString(unit), unit, false)
 
 	case "count":

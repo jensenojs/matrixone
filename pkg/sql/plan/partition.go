@@ -100,9 +100,9 @@ func (p *partitionExprChecker) extractColumns(ctx context.Context, _ *plan.Table
 		return nil
 	}
 
-	colInfo := findColumnByName(columnNameExpr.Parts[0], p.tableInfo)
+	colInfo := findColumnByName(columnNameExpr.Parts[0].Get(), p.tableInfo)
 	if colInfo == nil {
-		return moerr.NewBadFieldError(ctx, columnNameExpr.Parts[0], "partition function")
+		return moerr.NewBadFieldError(ctx, columnNameExpr.Parts[0].Get(), "partition function")
 	}
 
 	p.columns = append(p.columns, colInfo)

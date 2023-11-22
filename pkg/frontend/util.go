@@ -287,7 +287,7 @@ func getExprValue(e tree.Expr, mce *MysqlCmdExecutor, ses *Session) (interface{}
 	switch v := e.(type) {
 	case *tree.UnresolvedName:
 		// set @a = on, type of a is bool.
-		return v.Parts[0], nil
+		return v.Parts[0].Get(), nil
 	}
 
 	var err error
@@ -377,7 +377,7 @@ func GetSimpleExprValue(e tree.Expr, ses *Session) (interface{}, error) {
 	switch v := e.(type) {
 	case *tree.UnresolvedName:
 		// set @a = on, type of a is bool.
-		return v.Parts[0], nil
+		return v.Parts[0].Get(), nil
 	default:
 		builder := plan2.NewQueryBuilder(plan.Query_SELECT, ses.GetTxnCompileCtx(), false)
 		bindContext := plan2.NewBindContext(builder, nil)

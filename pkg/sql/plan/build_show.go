@@ -73,10 +73,10 @@ func formatStr(str string) string {
 
 func buildShowCreateTable(stmt *tree.ShowCreateTable, ctx CompilerContext) (*Plan, error) {
 	// b := ctx.GetBuffer()
-	tblName := stmt.Name.Parts[0]
+	tblName := stmt.Name.Parts[0].Get()
 	dbName := ctx.DefaultDatabase()
 	if stmt.Name.NumParts == 2 {
-		dbName = stmt.Name.Parts[1]
+		dbName = stmt.Name.Parts[1].Get()
 	}
 
 	_, tableDef := ctx.Resolve(dbName, tblName)
@@ -353,10 +353,10 @@ func buildShowCreateTable(stmt *tree.ShowCreateTable, ctx CompilerContext) (*Pla
 
 // buildShowCreateView
 func buildShowCreateView(stmt *tree.ShowCreateView, ctx CompilerContext) (*Plan, error) {
-	tblName := stmt.Name.Parts[0]
+	tblName := stmt.Name.Parts[0].Get()
 	dbName := ctx.DefaultDatabase()
 	if stmt.Name.NumParts == 2 {
-		dbName = stmt.Name.Parts[1]
+		dbName = stmt.Name.Parts[1].Get()
 	}
 
 	_, tableDef := ctx.Resolve(dbName, tblName)

@@ -69,7 +69,7 @@ type UnresolvedName struct {
 
 func (node *UnresolvedName) Format(ctx *FmtCtx) {
 	for i := node.NumParts - 1; i >= 0; i-- {
-		ctx.WriteString(node.Parts[i])
+		ctx.WriteString(node.Parts[i].Get())
 		if i > 0 {
 			ctx.WriteByte('.')
 		}
@@ -92,11 +92,11 @@ func (node *UnresolvedName) Accept(v Visitor) (Expr, bool) {
 
 // GetNames dbName, tableName, colName
 func (node *UnresolvedName) GetNames() (string, string, string) {
-	return node.Parts[2], node.Parts[1], node.Parts[0]
+	return node.Parts[2].Get(), node.Parts[1].Get(), node.Parts[0].Get()
 }
 
 // the path in an UnresolvedName.
-type NameParts = [4]string
+type NameParts = [4]*BufString
 
 func NewUnresolvedName(ctx context.Context, buf *buffer.Buffer, parts ...string) (*UnresolvedName, error) {
 	l := len(parts)
@@ -112,7 +112,11 @@ func NewUnresolvedName(ctx context.Context, buf *buffer.Buffer, parts ...string)
 	u.NumParts = len(parts)
 	u.Star = false
 	for i := 0; i < len(parts); i++ {
-		u.Parts[i] = parts[l-1-i]
+		ui := NewBufString(parts[l-1-i])
+		if buf != nil {
+			buf.Pin(ui)
+		}
+		u.Parts[i] = ui
 	}
 	return u, nil
 }
@@ -128,7 +132,11 @@ func SetUnresolvedName(buf *buffer.Buffer, parts ...string) *UnresolvedName {
 	u.NumParts = len(parts)
 	u.Star = false
 	for i := 0; i < len(parts); i++ {
-		u.Parts[i] = parts[l-1-i]
+		ui := NewBufString(parts[l-1-i])
+		if buf != nil {
+			buf.Pin(ui)
+		}
+		u.Parts[i] = ui
 	}
 	return u
 }
@@ -146,9 +154,13 @@ func NewUnresolvedNameWithStar(ctx context.Context, buf *buffer.Buffer, parts ..
 	}
 	u.NumParts = len(parts)
 	u.Star = true
-	u.Parts[0] = ""
+	u.Parts[0] = NewBufString("")
 	for i := 0; i < len(parts); i++ {
-		u.Parts[i] = parts[l-1-i]
+		ui := NewBufString(parts[l-1-i])
+		if buf != nil {
+			buf.Pin(ui)
+		}
+		u.Parts[i] = ui
 	}
 	return u, nil
 }
@@ -164,7 +176,11 @@ func SetUnresolvedNameWithStar(buf *buffer.Buffer, parts ...string) *UnresolvedN
 	u.NumParts = len(parts)
 	u.Star = true
 	for i := 0; i < len(parts); i++ {
-		u.Parts[i] = parts[l-1-i]
+		ui := NewBufString(parts[l-1-i])
+		if buf != nil {
+			buf.Pin(ui)
+		}
+		u.Parts[i] = ui
 	}
 	return u
 }

@@ -197,10 +197,10 @@ func getProjectNode(stmt *tree.Load, ctx CompilerContext, node *plan.Node, table
 		for i, col := range stmt.Param.Tail.ColumnList {
 			switch realCol := col.(type) {
 			case *tree.UnresolvedName:
-				if _, ok := tableDef.Name2ColIndex[realCol.Parts[0]]; !ok {
-					return isInsertWithoutAutoPkCol, moerr.NewInternalError(ctx.GetContext(), "column '%s' does not exist", realCol.Parts[0])
+				if _, ok := tableDef.Name2ColIndex[realCol.Parts[0].Get()]; !ok {
+					return isInsertWithoutAutoPkCol, moerr.NewInternalError(ctx.GetContext(), "column '%s' does not exist", realCol.Parts[0].Get())
 				}
-				colToIndex[int32(i)] = realCol.Parts[0]
+				colToIndex[int32(i)] = realCol.Parts[0].Get()
 			case *tree.VarExpr:
 				//NOTE:variable like '@abc' will be passed by.
 			default:
@@ -266,7 +266,7 @@ func InitNullMap(param *tree.ExternParam, ctx CompilerContext) error {
 		}
 
 		expr2, ok := expr.Func.FunctionReference.(*tree.UnresolvedName)
-		if !ok || expr2.Parts[0] != "nullif" {
+		if !ok || expr2.Parts[0].Get() != "nullif" {
 			param.Tail.Assignments[i].Expr = nil
 			return nil
 		}
@@ -281,8 +281,8 @@ func InitNullMap(param *tree.ExternParam, ctx CompilerContext) error {
 			return moerr.NewInvalidInput(ctx.GetContext(), "the nullif func second param is not NumVal form")
 		}
 		for j := 0; j < len(param.Tail.Assignments[i].Names); j++ {
-			col := param.Tail.Assignments[i].Names[j].Parts[0]
-			if col != expr3.Parts[0] {
+			col := param.Tail.Assignments[i].Names[j].Parts[0].Get()
+			if col != expr3.Parts[0].Get() {
 				return moerr.NewInvalidInput(ctx.GetContext(), "the nullif func first param must equal to colName")
 			}
 			param.NullMap[col] = append(param.NullMap[col], strings.ToLower(expr4.String()))

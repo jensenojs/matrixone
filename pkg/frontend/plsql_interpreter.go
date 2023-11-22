@@ -186,7 +186,7 @@ func (interpreter *Interpreter) MatchExpr(expr tree.Expr) (tree.Expr, error) {
 	case *tree.FuncExpr:
 	case *tree.UnresolvedName:
 		// change column name to var name
-		val, err := interpreter.GetSpVar(e.Parts[0])
+		val, err := interpreter.GetSpVar(e.Parts[0].Get())
 		if err != nil {
 			return nil, err
 		}
@@ -195,7 +195,7 @@ func (interpreter *Interpreter) MatchExpr(expr tree.Expr) (tree.Expr, error) {
 			Star:     e.Star,
 			Parts:    e.Parts,
 		}
-		retName.Parts[0] = fmt.Sprintf("%v", val)
+		retName.Parts[0] = retName.Parts[0].Set(fmt.Sprintf("%v", val))
 		return retName, nil
 	default:
 		return e, nil

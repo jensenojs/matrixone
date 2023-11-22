@@ -195,7 +195,7 @@ func buildStreamDefs(stmt *tree.CreateStream, ctx CompilerContext, createStream 
 	for _, item := range stmt.Defs {
 		switch def := item.(type) {
 		case *tree.ColumnTableDef:
-			colName := def.Name.Parts[0]
+			colName := def.Name.Parts[0].Get()
 			if _, ok := colMap[colName]; ok {
 				return moerr.NewInvalidInput(ctx.GetContext(), "duplicate column name: %s", colName)
 			}
@@ -897,16 +897,16 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 						return moerr.NewNotSupported(ctx.GetContext(), "text type in primary key")
 					}
 					if colType.GetId() == int32(types.T_json) {
-						return moerr.NewNotSupported(ctx.GetContext(), fmt.Sprintf("JSON column '%s' cannot be in primary key", def.Name.Parts[0]))
+						return moerr.NewNotSupported(ctx.GetContext(), fmt.Sprintf("JSON column '%s' cannot be in primary key", def.Name.Parts[0].Get()))
 					}
 					if colType.GetId() == int32(types.T_array_float32) || colType.GetId() == int32(types.T_array_float64) {
-						return moerr.NewNotSupported(ctx.GetContext(), fmt.Sprintf("VECTOR column '%s' cannot be in primary key", def.Name.Parts[0]))
+						return moerr.NewNotSupported(ctx.GetContext(), fmt.Sprintf("VECTOR column '%s' cannot be in primary key", def.Name.Parts[0].Get()))
 					}
-					pks = append(pks, def.Name.Parts[0])
+					pks = append(pks, def.Name.Parts[0].Get())
 				case *tree.AttributeComment:
 					comment = attribute.CMT.String()
 					if getNumOfCharacters(comment) > maxLengthOfColumnComment {
-						return moerr.NewInvalidInput(ctx.GetContext(), "comment for column '%s' is too long", def.Name.Parts[0])
+						return moerr.NewInvalidInput(ctx.GetContext(), "comment for column '%s' is too long", def.Name.Parts[0].Get())
 					}
 				case *tree.AttributeAutoIncrement:
 					auto_incr = true
@@ -920,9 +920,9 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 								ColName: def.Name,
 							},
 						},
-						Name: tree.NewBufString(def.Name.Parts[0]),
+						Name: tree.NewBufString(def.Name.Parts[0].Get()),
 					})
-					indexs = append(indexs, def.Name.Parts[0])
+					indexs = append(indexs, def.Name.Parts[0].Get())
 				}
 			}
 			if len(pks) > 0 {
@@ -937,7 +937,7 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 				return err
 			}
 			if auto_incr && defaultValue.Expr != nil {
-				return moerr.NewInvalidInput(ctx.GetContext(), "invalid default value for '%s'", def.Name.Parts[0])
+				return moerr.NewInvalidInput(ctx.GetContext(), "invalid default value for '%s'", def.Name.Parts[0].Get())
 			}
 
 			onUpdateExpr, err := buildOnUpdate(def, colType, ctx.GetProcess(), ctx.GetBuffer())
@@ -945,13 +945,13 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 				return err
 			}
 
-			if !checkTableColumnNameValid(def.Name.Parts[0]) {
-				return moerr.NewInvalidInput(ctx.GetContext(), "table column name '%s' is illegal and conflicts with internal keyword", def.Name.Parts[0])
+			if !checkTableColumnNameValid(def.Name.Parts[0].Get()) {
+				return moerr.NewInvalidInput(ctx.GetContext(), "table column name '%s' is illegal and conflicts with internal keyword", def.Name.Parts[0].Get())
 			}
 
 			colType.AutoIncr = auto_incr
 			col := &ColDef{
-				Name:     def.Name.Parts[0],
+				Name:     def.Name.Parts[0].Get(),
 				Alg:      plan.CompressType_Lz4,
 				Typ:      colType,
 				Default:  defaultValue,
@@ -966,7 +966,7 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 			}
 			pksMap := map[string]bool{}
 			for _, key := range def.KeyParts {
-				name := key.ColName.Parts[0] // name of primary key column
+				name := key.ColName.Parts[0].Get() // name of primary key column
 				if _, ok := pksMap[name]; ok {
 					return moerr.NewInvalidInput(ctx.GetContext(), "duplicate column name '%s' in primary key", name)
 				}
@@ -982,7 +982,7 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 
 			secondaryIndexInfos = append(secondaryIndexInfos, def)
 			for _, key := range def.KeyParts {
-				name := key.ColName.Parts[0]
+				name := key.ColName.Parts[0].Get()
 				indexs = append(indexs, name)
 			}
 
@@ -994,7 +994,7 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 
 			uniqueIndexInfos = append(uniqueIndexInfos, def)
 			for _, key := range def.KeyParts {
-				name := key.ColName.Parts[0]
+				name := key.ColName.Parts[0].Get()
 				indexs = append(indexs, name)
 			}
 		case *tree.ForeignKey:
@@ -1146,7 +1146,7 @@ func buildTableDefs(stmt *tree.CreateTable, ctx CompilerContext, createTable *pl
 		lenClusterBy := len(stmt.ClusterByOption.ColumnList)
 		var clusterByKeys []string
 		for i := 0; i < lenClusterBy; i++ {
-			colName := stmt.ClusterByOption.ColumnList[i].Parts[0]
+			colName := stmt.ClusterByOption.ColumnList[i].Parts[0].Get()
 			if _, ok := colMap[colName]; !ok {
 				return moerr.NewInvalidInput(ctx.GetContext(), "column '%s' doesn't exist in table", colName)
 			}
@@ -1249,7 +1249,7 @@ func buildUniqueIndexTable(createTable *plan.CreateTable, indexInfos []*tree.Uni
 		indexParts := make([]string, 0)
 
 		for _, keyPart := range indexInfo.KeyParts {
-			name := keyPart.ColName.Parts[0]
+			name := keyPart.ColName.Parts[0].Get()
 			if _, ok := colMap[name]; !ok {
 				return moerr.NewInvalidInput(ctx.GetContext(), "column '%s' is not exist", name)
 			}
@@ -1276,8 +1276,8 @@ func buildUniqueIndexTable(createTable *plan.CreateTable, indexInfos []*tree.Uni
 				Name: keyName,
 				Alg:  plan.CompressType_Lz4,
 				Typ: &Type{
-					Id:    colMap[indexInfo.KeyParts[0].ColName.Parts[0]].Typ.Id,
-					Width: colMap[indexInfo.KeyParts[0].ColName.Parts[0]].Typ.Width,
+					Id:    colMap[indexInfo.KeyParts[0].ColName.Parts[0].Get()].Typ.Id,
+					Width: colMap[indexInfo.KeyParts[0].ColName.Parts[0].Get()].Typ.Width,
 				},
 				Default: &plan.Default{
 					NullAbility:  false,
@@ -1351,7 +1351,7 @@ func buildSecondaryIndexDef(createTable *plan.CreateTable, indexInfos []*tree.In
 		indexParts := make([]string, 0)
 
 		for _, keyPart := range indexInfo.KeyParts {
-			name := keyPart.ColName.Parts[0]
+			name := keyPart.ColName.Parts[0].Get()
 			if _, ok := colMap[name]; !ok {
 				return moerr.NewInvalidInput(ctx.GetContext(), "column '%s' is not exist", name)
 			}
@@ -1368,7 +1368,7 @@ func buildSecondaryIndexDef(createTable *plan.CreateTable, indexInfos []*tree.In
 		}
 
 		if indexInfo.Name.Get() == "" {
-			firstPart := indexInfo.KeyParts[0].ColName.Parts[0]
+			firstPart := indexInfo.KeyParts[0].ColName.Parts[0].Get()
 			nameCount[firstPart]++
 			count := nameCount[firstPart]
 			indexName := firstPart
@@ -2151,16 +2151,16 @@ func buildAlterTableInplace(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, 
 						return nil, moerr.NewNotSupported(ctx.GetContext(), "text type in primary key")
 					}
 					if colType.GetId() == int32(types.T_json) {
-						return nil, moerr.NewNotSupported(ctx.GetContext(), fmt.Sprintf("JSON column '%s' cannot be in primary key", opt.Column.Name.Parts[0]))
+						return nil, moerr.NewNotSupported(ctx.GetContext(), fmt.Sprintf("JSON column '%s' cannot be in primary key", opt.Column.Name.Parts[0].Get()))
 					}
 					if colType.GetId() == int32(types.T_array_float32) || colType.GetId() == int32(types.T_array_float64) {
-						return nil, moerr.NewNotSupported(ctx.GetContext(), fmt.Sprintf("VECTOR column '%s' cannot be in primary key", opt.Column.Name.Parts[0]))
+						return nil, moerr.NewNotSupported(ctx.GetContext(), fmt.Sprintf("VECTOR column '%s' cannot be in primary key", opt.Column.Name.Parts[0].Get()))
 					}
-					pks = append(pks, opt.Column.Name.Parts[0])
+					pks = append(pks, opt.Column.Name.Parts[0].Get())
 				case *tree.AttributeComment:
 					comment = attribute.CMT.String()
 					if getNumOfCharacters(comment) > maxLengthOfColumnComment {
-						return nil, moerr.NewInvalidInput(ctx.GetContext(), "comment for column '%s' is too long", opt.Column.Name.Parts[0])
+						return nil, moerr.NewInvalidInput(ctx.GetContext(), "comment for column '%s' is too long", opt.Column.Name.Parts[0].Get())
 					}
 				case *tree.AttributeAutoIncrement:
 					auto_incr = true
@@ -2175,9 +2175,9 @@ func buildAlterTableInplace(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, 
 					//			ColName: opt.Column.Name,
 					//		},
 					//	},
-					//	Name: opt.Column.Name.Parts[0],
+					//	Name: opt.Column.Name.Parts[0].Get(),
 					//})
-					//indexs = append(indexs, opt.Column.Name.Parts[0])
+					//indexs = append(indexs, opt.Column.Name.Parts[0].Get())
 				}
 			}
 			if len(pks) > 0 {
@@ -2192,7 +2192,7 @@ func buildAlterTableInplace(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, 
 				return nil, err
 			}
 			if auto_incr && defaultValue.Expr != nil {
-				return nil, moerr.NewInvalidInput(ctx.GetContext(), "invalid default value for '%s'", opt.Column.Name.Parts[0])
+				return nil, moerr.NewInvalidInput(ctx.GetContext(), "invalid default value for '%s'", opt.Column.Name.Parts[0].Get())
 			}
 
 			onUpdateExpr, err := buildOnUpdate(opt.Column, colType, ctx.GetProcess(), ctx.GetBuffer())
@@ -2200,13 +2200,13 @@ func buildAlterTableInplace(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, 
 				return nil, err
 			}
 
-			if !checkTableColumnNameValid(opt.Column.Name.Parts[0]) {
-				return nil, moerr.NewInvalidInput(ctx.GetContext(), "table column name '%s' is illegal and conflicts with internal keyword", opt.Column.Name.Parts[0])
+			if !checkTableColumnNameValid(opt.Column.Name.Parts[0].Get()) {
+				return nil, moerr.NewInvalidInput(ctx.GetContext(), "table column name '%s' is illegal and conflicts with internal keyword", opt.Column.Name.Parts[0].Get())
 			}
 
 			colType.AutoIncr = auto_incr
 			col := &ColDef{
-				Name:     opt.Column.Name.Parts[0],
+				Name:     opt.Column.Name.Parts[0].Get(),
 				Alg:      plan.CompressType_Lz4,
 				Typ:      colType,
 				Default:  defaultValue,
@@ -2216,16 +2216,16 @@ func buildAlterTableInplace(stmt *tree.AlterTable, ctx CompilerContext) (*Plan, 
 			colMap[col.Name] = col
 			preName := ""
 			if opt.Position.RelativeColumn != nil {
-				preName = opt.Position.RelativeColumn.Parts[0]
+				preName = opt.Position.RelativeColumn.Parts[0].Get()
 			}
-			err = checkIsAddableColumn(tableDef, opt.Column.Name.Parts[0], colType, ctx)
+			err = checkIsAddableColumn(tableDef, opt.Column.Name.Parts[0].Get(), colType, ctx)
 			if err != nil {
 				return nil, err
 			}
 			alterTable.Actions[i] = &plan.AlterTable_Action{
 				Action: &plan.AlterTable_Action_AddCol{
 					AddCol: &plan.AlterAddCol{
-						Name:    opt.Column.Name.Parts[0],
+						Name:    opt.Column.Name.Parts[0].Get(),
 						PreName: preName,
 						Type:    colType,
 						Pos:     int32(opt.Position.Typ),
@@ -2380,7 +2380,7 @@ func getForeignKeyData(ctx CompilerContext, tableDef *TableDef, def *tree.Foreig
 	fkColName := make(map[int]string)
 	for i, keyPart := range def.KeyParts {
 		getCol := false
-		colName := keyPart.ColName.Parts[0]
+		colName := keyPart.ColName.Parts[0].Get()
 		for _, col := range tableDef.Cols {
 			if col.Name == colName {
 				fkData.Def.Cols[i] = col.ColId
@@ -2448,7 +2448,7 @@ func getForeignKeyData(ctx CompilerContext, tableDef *TableDef, def *tree.Foreig
 	matchCol := make([]uint64, 0, len(refer.KeyParts))
 	for _, uniqueColumn := range uniqueColumns {
 		for i, keyPart := range refer.KeyParts {
-			colName := keyPart.ColName.Parts[0]
+			colName := keyPart.ColName.Parts[0].Get()
 			if _, exists := columnNamePos[colName]; exists {
 				if colId, ok := uniqueColumn[colName]; ok {
 					// check column type

@@ -32,11 +32,11 @@ func ChangeColumn(ctx CompilerContext, alterPlan *plan.AlterTable, spec *tree.Al
 	tableDef := alterPlan.CopyTableDef
 
 	// get the original column name
-	originalColName := spec.OldColumnName.Parts[0]
+	originalColName := spec.OldColumnName.Parts[0].Get()
 
 	specNewColumn := spec.NewColumn
 	// get the new column name
-	newColName := specNewColumn.Name.Parts[0]
+	newColName := specNewColumn.Name.Parts[0].Get()
 
 	// Check whether original column has existed.
 	col := FindColumn(tableDef.Cols, originalColName)
@@ -101,7 +101,7 @@ func ChangeColumn(ctx CompilerContext, alterPlan *plan.AlterTable, spec *tree.Al
 // buildChangeColumnAndConstraint Build the changed new column definition, and check its column level integrity constraints,
 // and check other table level constraints, such as primary keys, indexes, etc
 func buildChangeColumnAndConstraint(ctx CompilerContext, alterPlan *plan.AlterTable, originalCol *ColDef, specNewColumn *tree.ColumnTableDef, colType *plan.Type) (*ColDef, error) {
-	newColName := specNewColumn.Name.Parts[0]
+	newColName := specNewColumn.Name.Parts[0].Get()
 	// Check if the new column name is valid and conflicts with internal hidden columns
 	err := CheckColumnNameValid(ctx.GetContext(), newColName)
 	if err != nil {
@@ -142,7 +142,7 @@ func buildChangeColumnAndConstraint(ctx CompilerContext, alterPlan *plan.AlterTa
 		case *tree.AttributeComment:
 			comment := attribute.CMT.String()
 			if getNumOfCharacters(comment) > maxLengthOfColumnComment {
-				return nil, moerr.NewInvalidInput(ctx.GetContext(), "comment for column '%s' is too long", specNewColumn.Name.Parts[0])
+				return nil, moerr.NewInvalidInput(ctx.GetContext(), "comment for column '%s' is too long", specNewColumn.Name.Parts[0].Get())
 			}
 			newCol.Comment = comment
 		case *tree.AttributeAutoIncrement:

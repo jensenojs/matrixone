@@ -1918,7 +1918,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 				Expr: &tree.UnresolvedName{
 					NumParts: 1,
 					Star:     false,
-					Parts:    [4]string{colName, "", "", ""},
+					Parts:    [4]*tree.BufString{tree.NewBufString(colName), tree.NewBufString(""), tree.NewBufString(""), tree.NewBufString("")},
 				},
 				As: as,
 			})
@@ -1988,7 +1988,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 
 			case *tree.UnresolvedName:
 				if expr.Star {
-					cols, names, err := ctx.unfoldStar(builder.GetContext(), buf, expr.Parts[0], builder.compCtx.GetAccountId() == catalog.System_Account)
+					cols, names, err := ctx.unfoldStar(builder.GetContext(), buf, expr.Parts[0].Get(), builder.compCtx.GetAccountId() == catalog.System_Account)
 					if err != nil {
 						return 0, err
 					}
@@ -2001,7 +2001,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 					if selectExpr.As != nil && !selectExpr.As.Empty() {
 						ctx.headings = append(ctx.headings, string(selectExpr.As.Origin()))
 					} else {
-						ctx.headings = append(ctx.headings, expr.Parts[0])
+						ctx.headings = append(ctx.headings, expr.Parts[0].Get())
 					}
 
 					newExpr, err := ctx.qualifyColumnNames(expr, NoAlias)
@@ -3041,7 +3041,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 					ctx.binder = NewWhereBinder(builder, ctx, buf)
 					left := &tree.UnresolvedName{
 						NumParts: 1,
-						Parts:    tree.NameParts{util.GetClusterTableAttributeName()},
+						Parts:    tree.NameParts{tree.NewBufString(util.GetClusterTableAttributeName())},
 					}
 					currentAccountID := builder.compCtx.GetAccountId()
 					right := tree.NewNumVal(constant.MakeUint64(uint64(currentAccountID)), strconv.Itoa(int(currentAccountID)), false, nil)

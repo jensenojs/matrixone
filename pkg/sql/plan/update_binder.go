@@ -49,7 +49,7 @@ func (b *UpdateBinder) BindColRef(astExpr *tree.UnresolvedName, depth int32, isR
 }
 
 func (b *UpdateBinder) bindColRef(astExpr *tree.UnresolvedName, _ int32, _ bool) (expr *plan.Expr, err error) {
-	col := strings.ToLower(astExpr.Parts[0])
+	col := strings.ToLower(astExpr.Parts[0].Get())
 	idx := -1
 	var typ *Type
 	for i, c := range b.cols {

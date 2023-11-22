@@ -58,14 +58,14 @@ type UnresolvedObjectName struct {
 
 	//At most three components, in reverse order.
 	//object name, db/schema, catalog.
-	Parts [3]string
+	Parts [3]*BufString
 }
 
 func (node *UnresolvedObjectName) Format(ctx *FmtCtx) {
 	prefix := ""
 	for i := node.NumParts - 1; i >= 0; i-- {
 		ctx.WriteString(prefix)
-		ctx.WriteString(node.Parts[i])
+		ctx.WriteString(node.Parts[i].Get())
 		prefix = "."
 	}
 }
@@ -74,12 +74,12 @@ func (node *UnresolvedObjectName) ToTableName() TableName {
 	return TableName{
 		objName: objName{
 			ObjectNamePrefix: ObjectNamePrefix{
-				SchemaName:      NewBufIdentifier(node.Parts[1]),
-				CatalogName:     NewBufIdentifier(node.Parts[2]),
+				SchemaName:      NewBufIdentifier(node.Parts[1].Get()),
+				CatalogName:     NewBufIdentifier(node.Parts[2].Get()),
 				ExplicitSchema:  node.NumParts >= 2,
 				ExplicitCatalog: node.NumParts >= 3,
 			},
-			ObjectName: NewBufIdentifier(node.Parts[0]),
+			ObjectName: NewBufIdentifier(node.Parts[0].Get()),
 		},
 	}
 }
@@ -95,7 +95,14 @@ func NewUnresolvedObjectName(ctx context.Context, num int, parts [3]string, buf 
 		u = buffer.Alloc[UnresolvedObjectName](buf)
 	}
 	u.NumParts = num
-	u.Parts = parts
+
+	for i := 0; i < u.NumParts; i++ {
+		bp := NewBufString(parts[i])
+		if buf != nil {
+			buf.Pin(bp)
+		}
+		u.Parts[i] = bp
+	}
 	return u, nil
 }
 
@@ -107,10 +114,18 @@ func SetUnresolvedObjectName(num int, parts [3]string, buf *buffer.Buffer) *Unre
 		u = new(UnresolvedObjectName)
 	}
 	u.NumParts = num
-	u.Parts = parts
+
+	for i := 0; i < u.NumParts; i++ {
+		bp := NewBufString(parts[i])
+		if buf != nil {
+			buf.Pin(bp)
+		}
+		u.Parts[i] = bp
+	}
+
 	return u
 }
 
 func (node *UnresolvedObjectName) GetDBName() string {
-	return node.Parts[1]
+	return node.Parts[1].Get()
 }

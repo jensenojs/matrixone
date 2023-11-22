@@ -209,11 +209,11 @@ func buildDefaultExpr(col *tree.ColumnTableDef, typ *plan.Type, proc *process.Pr
 
 	if typ.Id == int32(types.T_json) {
 		if expr != nil && !isNullAstExpr(expr) {
-			return nil, moerr.NewNotSupported(proc.Ctx, fmt.Sprintf("JSON column '%s' cannot have default value", col.Name.Parts[0]))
+			return nil, moerr.NewNotSupported(proc.Ctx, fmt.Sprintf("JSON column '%s' cannot have default value", col.Name.Parts[0].Get()))
 		}
 	}
 	if !nullAbility && isNullAstExpr(expr) {
-		return nil, moerr.NewInvalidInput(proc.Ctx, "invalid default value for column '%s'", col.Name.Parts[0])
+		return nil, moerr.NewInvalidInput(proc.Ctx, "invalid default value for column '%s'", col.Name.Parts[0].Get())
 	}
 
 	if expr == nil {
@@ -232,7 +232,7 @@ func buildDefaultExpr(col *tree.ColumnTableDef, typ *plan.Type, proc *process.Pr
 
 	if defaultFunc := planExpr.GetF(); defaultFunc != nil {
 		if int(typ.Id) != int(types.T_uuid) && defaultFunc.Func.ObjName == "uuid" {
-			return nil, moerr.NewInvalidInput(proc.Ctx, "invalid default value for column '%s'", col.Name.Parts[0])
+			return nil, moerr.NewInvalidInput(proc.Ctx, "invalid default value for column '%s'", col.Name.Parts[0].Get())
 		}
 	}
 

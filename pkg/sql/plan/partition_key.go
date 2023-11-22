@@ -152,7 +152,7 @@ func chooseAvailableUniqueKey(ctx context.Context, tableDef *TableDef, uniqueInd
 		for i, keyPart := range uniqueIndex.KeyParts {
 			// if the unique key column were not defined as NOT NULL, then the previous statement would fail.
 			// See: https://dev.mysql.com/doc/refman/8.0/en/partitioning-key.html
-			if ok := checkTableColumnsNotNull(tableDef, keyPart.ColName.Parts[0]); !ok {
+			if ok := checkTableColumnsNotNull(tableDef, keyPart.ColName.Parts[0].Get()); !ok {
 				isNotNullCheckErr = true
 				isOK = false
 			}

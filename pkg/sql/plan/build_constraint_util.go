@@ -123,8 +123,8 @@ func getUpdateTableInfo(ctx CompilerContext, stmt *tree.Update) (*dmlTableInfo, 
 		parts := updateExpr.Names[0]
 		expr := updateExpr.Expr
 		if parts.NumParts > 1 {
-			colName := parts.Parts[0]
-			tblName := parts.Parts[1]
+			colName := parts.Parts[0].Get()
+			tblName := parts.Parts[1].Get()
 			if _, tblExists := tblInfo.alias[tblName]; tblExists {
 				if _, colExists := allColumns[tblName][colName]; colExists {
 					appendToTbl(tblName, colName, expr)
@@ -135,7 +135,7 @@ func getUpdateTableInfo(ctx CompilerContext, stmt *tree.Update) (*dmlTableInfo, 
 				return nil, moerr.NewNoSuchTable(ctx.GetContext(), "", tblName)
 			}
 		} else {
-			colName := parts.Parts[0]
+			colName := parts.Parts[0].Get()
 			tblName := ""
 			found := false
 			for alias, colulmns := range allColumns {
@@ -596,7 +596,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 			//get update cols
 			updateCols := make(map[string]tree.Expr)
 			for _, updateExpr := range stmt.OnDuplicateUpdate {
-				col := updateExpr.Names[0].Parts[0]
+				col := updateExpr.Names[0].Parts[0].Get()
 				updateCols[col] = updateExpr.Expr
 			}
 

@@ -366,7 +366,7 @@ func (bc *BindContext) qualifyColumnNames(astExpr tree.Expr, expandAlias ExpandA
 
 	case *tree.UnresolvedName:
 		if !exprImpl.Star && exprImpl.NumParts == 1 {
-			col := exprImpl.Parts[0]
+			col := exprImpl.Parts[0].Get()
 			if expandAlias == AliasBeforeColumn {
 				if selectItem, ok := bc.aliasMap[col]; ok {
 					return selectItem.astExpr, nil
@@ -376,7 +376,10 @@ func (bc *BindContext) qualifyColumnNames(astExpr tree.Expr, expandAlias ExpandA
 			if binding, ok := bc.bindingByCol[col]; ok {
 				if binding != nil {
 					exprImpl.NumParts = 2
-					exprImpl.Parts[1] = binding.table
+					ep := exprImpl.Parts[1].Set(binding.table)
+					buf := bc.binder.GetBuffer()
+					buf.Pin(ep)
+					exprImpl.Parts[1] = ep
 					return astExpr, nil
 				} else {
 					return nil, moerr.NewInvalidInput(bc.binder.GetContext(), "ambiguouse column reference to '%s'", col)

@@ -1267,7 +1267,8 @@ func (ses *Session) SetSessionVar(name string, value interface{}) error {
 			return moerr.NewInternalError(ses.GetRequestContext(), errorSystemVariableIsReadOnly())
 		}
 
-		cv, err := def.GetType().Convert(value)
+		sv := def.GetType()
+		cv, err := sv.Convert(value)
 		if err != nil {
 			errutil.ReportError(ses.GetRequestContext(), err)
 			return err

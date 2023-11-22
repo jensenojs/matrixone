@@ -52,7 +52,7 @@ func (s *SetBinder) BindExpr(expr tree.Expr, i int32, b bool) (*plan.Expr, error
 		if !ok {
 			return nil, moerr.NewNYI(s.GetContext(), "invalid function expr '%v'", exprImpl)
 		}
-		funcName := strings.ToLower(funcRef.Parts[0])
+		funcName := strings.ToLower(funcRef.Parts[0].Get())
 		if _, ok := funcNeedsTxn[funcName]; ok {
 			return nil, moerr.NewInvalidInput(s.GetContext(), "function %s is not allowed in the set expression", funcName)
 		}

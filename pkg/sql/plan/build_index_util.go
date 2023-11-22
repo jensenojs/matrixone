@@ -67,7 +67,7 @@ func checkDuplicateConstraint(namesMap map[string]bool, name string, foreign boo
 // setEmptyUniqueIndexName Set name for unqiue index constraint with an empty name
 func setEmptyUniqueIndexName(namesMap map[string]bool, indexConstr *tree.UniqueIndex) {
 	if indexConstr.Name.Get() == "" && len(indexConstr.KeyParts) > 0 {
-		colName := indexConstr.KeyParts[0].ColName.Parts[0]
+		colName := indexConstr.KeyParts[0].ColName.Parts[0].Get()
 		constrName := colName
 		i := 2
 		if strings.EqualFold(constrName, "PRIMARY") {
@@ -89,7 +89,7 @@ func setEmptyIndexName(namesMap map[string]bool, indexConstr *tree.Index) {
 	if indexConstr.Name.Get() == "" && len(indexConstr.KeyParts) > 0 {
 		var colName string
 		if colName == "" {
-			colName = indexConstr.KeyParts[0].ColName.Parts[0]
+			colName = indexConstr.KeyParts[0].ColName.Parts[0].Get()
 		}
 		constrName := colName
 		i := 2
