@@ -105,6 +105,8 @@ func MakeSlice[T any](b *Buffer, len_and_cap ...int) []T {
 	return unsafe.Slice((*T)(unsafe.Pointer(unsafe.SliceData(data))), c)[:l]
 }
 
+// https://github.com/golang/go/issues/45380
+
 func AppendSlice[T any](b *Buffer, slice []T, vs ...T) []T {
 	if b == (*Buffer)(nil) {
 		panic("append slice with nil buffer")
@@ -127,7 +129,15 @@ func AppendSlice[T any](b *Buffer, slice []T, vs ...T) []T {
 	}
 
 	newSlice := MakeSlice[T](b, len(slice), newCap)
-	copy(newSlice, slice)
+
+	// don't know why copy will occur some "fatal error: bulkBarrierPreWrite: unaligned arguments"
+	// currently AppendSlice can't check if slice and vs both alloced by buffer,
+	
+	// copy(newSlice, slice)
+	for i := 0; i < len(slice); i++ {
+		newSlice[i] = slice[i]
+	}
+	
 	defer FreeSlice[T](b, slice)
 
 	for _, v := range vs {
