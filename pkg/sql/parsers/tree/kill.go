@@ -43,11 +43,11 @@ type KillOption struct {
 	Typ   KillType
 }
 
-func NewKillOption(e bool, t KillType, buf *buffer.Buffer) KillOption {
+func NewKillOption(e bool, t KillType, buf *buffer.Buffer) *KillOption {
 	ko := buffer.Alloc[KillOption](buf)
 	ko.Exist = e
 	ko.Typ = t
-	return *ko
+	return ko
 }
 
 func (ko KillOption) Format(ctx *FmtCtx) {
@@ -61,13 +61,13 @@ type StatementOption struct {
 	StatementId *BufString
 }
 
-func NewStatementOption(e bool, i string, buf *buffer.Buffer) StatementOption {
+func NewStatementOption(e bool, i string, buf *buffer.Buffer) *StatementOption {
 	s := buffer.Alloc[StatementOption](buf)
 	s.Exist = e
 	bStatementId := NewBufString(i)
 	buf.Pin(bStatementId)
 	s.StatementId = bStatementId
-	return *s
+	return s
 }
 
 func (so StatementOption) Format(ctx *FmtCtx) {
@@ -78,12 +78,12 @@ func (so StatementOption) Format(ctx *FmtCtx) {
 
 type Kill struct {
 	statementImpl
-	Option       KillOption
+	Option       *KillOption
 	ConnectionId uint64
-	StmtOption   StatementOption
+	StmtOption   *StatementOption
 }
 
-func NewKill(opt KillOption, con uint64, stmtopt StatementOption, buf *buffer.Buffer) *Kill {
+func NewKill(opt *KillOption, con uint64, stmtopt *StatementOption, buf *buffer.Buffer) *Kill {
 	k := buffer.Alloc[Kill](buf)
 	k.Option = opt
 	k.ConnectionId = con

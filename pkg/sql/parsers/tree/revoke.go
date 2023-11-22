@@ -31,8 +31,8 @@ const (
 type Revoke struct {
 	statementImpl
 	Typ             RevokeType
-	RevokePrivilege RevokePrivilege
-	RevokeRole      RevokeRole
+	RevokePrivilege *RevokePrivilege
+	RevokeRole      *RevokeRole
 }
 
 func (node *Revoke) Format(ctx *FmtCtx) {
@@ -106,12 +106,8 @@ func (node *RevokePrivilege) GetQueryType() string     { return QueryTypeDCL }
 func NewRevoke(typ RevokeType, revokePrivilege *RevokePrivilege, revokeRole *RevokeRole, buf *buffer.Buffer) *Revoke {
 	r := buffer.Alloc[Revoke](buf)
 	r.Typ = typ
-	if revokePrivilege != nil {
-		r.RevokePrivilege = *revokePrivilege
-	}
-	if revokeRole != nil {
-		r.RevokeRole = *revokeRole
-	}
+	r.RevokePrivilege = revokePrivilege
+	r.RevokeRole = revokeRole
 	return r
 }
 

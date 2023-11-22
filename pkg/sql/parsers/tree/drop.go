@@ -103,7 +103,7 @@ func NewDropView(ifExists bool, names TableNames, buf *buffer.Buffer) *DropView 
 type DropIndex struct {
 	statementImpl
 	Name       *BufIdentifier
-	TableName  TableName
+	TableName  *TableName
 	IfExists   bool
 	MiscOption []MiscOption
 }
@@ -123,7 +123,7 @@ func (node *DropIndex) Format(ctx *FmtCtx) {
 func (node *DropIndex) GetStatementType() string { return "Drop Index" }
 func (node *DropIndex) GetQueryType() string     { return QueryTypeDDL }
 
-func NewDropIndex(name Identifier, tableName TableName, ifExists bool, buf *buffer.Buffer) *DropIndex {
+func NewDropIndex(name Identifier, tableName *TableName, ifExists bool, buf *buffer.Buffer) *DropIndex {
 	d := buffer.Alloc[DropIndex](buf)
 	n := NewBufIdentifier(name)
 	buf.Pin(n)

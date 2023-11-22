@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -1691,6 +1692,8 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal, typ *Type) (*Expr, error) 
 }
 
 func (b *baseBinder) GetContext() context.Context { return b.sysCtx }
+
+func (b *baseBinder) GetBuffer() *buffer.Buffer { return b.buf }
 
 // --- util functions ----
 

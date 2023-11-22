@@ -37,7 +37,7 @@ import (
     statement tree.Statement
     statements []tree.Statement
 
-    alterTable tree.AlterTable
+    alterTable *tree.AlterTable
     alterTableOptions tree.AlterTableOptions
     alterTableOption tree.AlterTableOption
     alterColPosition *tree.ColumnPosition
@@ -90,13 +90,13 @@ import (
 
     columnType *tree.T
     unresolvedName *tree.UnresolvedName
-    lengthScaleOpt tree.LengthScaleOpt
+    lengthScaleOpt *tree.LengthScaleOpt
     tuple *tree.Tuple
     funcType tree.FuncType
 
     columnAttribute tree.ColumnAttribute
     columnAttributes []tree.ColumnAttribute
-    attributeNull tree.AttributeNull
+    attributeNull *tree.AttributeNull
     expr tree.Expr
     exprs tree.Exprs
     rowsExprs []tree.Exprs
@@ -107,7 +107,7 @@ import (
     select *tree.Select
     selectStatement tree.SelectStatement
     selectExprs tree.SelectExprs
-    selectExpr tree.SelectExpr
+    selectExpr *tree.SelectExpr
 
     insert *tree.Insert
     replace *tree.Replace
@@ -186,28 +186,28 @@ import (
     loadColumns []tree.LoadColumn
     assignments []*tree.Assignment
     assignment *tree.Assignment
-    properties []tree.Property
-    property tree.Property
+    properties []*tree.Property
+    property *tree.Property
     exportParm *tree.ExportParam
 
-    epxlainOptions []tree.OptionElem
-    epxlainOption tree.OptionElem
+    epxlainOptions []*tree.OptionElem
+    epxlainOption *tree.OptionElem
     whenClause *tree.When
     whenClauseList []*tree.When
     withClause *tree.With
     cte *tree.CTE
     cteList []*tree.CTE
 
-    accountAuthOption tree.AccountAuthOption
-    alterAccountAuthOption tree.AlterAccountAuthOption
-    accountIdentified tree.AccountIdentified
-    accountStatus tree.AccountStatus
-    accountComment tree.AccountComment
-    stageComment tree.StageComment
-    stageStatus tree.StageStatus
-    stageUrl tree.StageUrl
-    stageCredentials tree.StageCredentials
-    accountCommentOrAttribute tree.AccountCommentOrAttribute
+    accountAuthOption *tree.AccountAuthOption
+    alterAccountAuthOption *tree.AlterAccountAuthOption
+    accountIdentified *tree.AccountIdentified
+    accountStatus *tree.AccountStatus
+    accountComment *tree.AccountComment
+    stageComment *tree.StageComment
+    stageStatus *tree.StageStatus
+    stageUrl *tree.StageUrl
+    stageCredentials *tree.StageCredentials
+    accountCommentOrAttribute *tree.AccountCommentOrAttribute
     userIdentified *tree.AccountIdentified
     accountRole *tree.Role
     showType tree.ShowType
@@ -219,11 +219,11 @@ import (
     indexHintList []*tree.IndexHint
     indexVisibility tree.VisibleType
 
-    killOption tree.KillOption
-    statementOption tree.StatementOption
+    killOption *tree.KillOption
+    statementOption *tree.StatementOption
 
-    tableLock tree.TableLock
-    tableLocks []tree.TableLock
+    tableLock *tree.TableLock
+    tableLocks []*tree.TableLock
     tableLockType tree.TableLockType
     cstr *tree.CStr
     incrementByOption *tree.IncrementByOption
@@ -794,7 +794,7 @@ stmt_list_return:
     }
 |   stmt_list_return ';' block_type_stmt
     {
-        $$ = buffer.MakeSlice[tree.Statement](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.Statement](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.Statement](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -1088,7 +1088,7 @@ elseif_clause_list:
     }
 |   elseif_clause_list elseif_clause
     {
-        $$ = buffer.MakeSlice[*tree.ElseIfStmt](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.ElseIfStmt](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.ElseIfStmt](yylex.(*Lexer).buf, $1, $2)
     }
 
@@ -1123,7 +1123,7 @@ when_clause_list2:
     }
 |   when_clause_list2 when_clause2
     {
-        $$ = buffer.MakeSlice[*tree.WhenStmt](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.WhenStmt](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.WhenStmt](yylex.(*Lexer).buf, $1, $2)
     }
 
@@ -1213,7 +1213,7 @@ load_set_list:
     }
 |   load_set_list ',' load_set_item
     {
-        $$ = buffer.MakeSlice[*tree.UpdateExpr](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.UpdateExpr](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.UpdateExpr](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -1303,10 +1303,10 @@ columns_or_variable_list:
         $$ = buffer.MakeSlice[tree.LoadColumn](yylex.(*Lexer).buf)
         switch $3.(type) {
         case *tree.UnresolvedName:
-            $$ = buffer.MakeSlice[tree.LoadColumn](yylex.(*Lexer).buf)
+            /* $$ = buffer.MakeSlice[tree.LoadColumn](yylex.(*Lexer).buf) */
             $$ = buffer.AppendSlice[tree.LoadColumn](yylex.(*Lexer).buf, $1, $3.(*tree.UnresolvedName))
         case *tree.VarExpr:
-            $$ = buffer.MakeSlice[tree.LoadColumn](yylex.(*Lexer).buf)
+            /* $$ = buffer.MakeSlice[tree.LoadColumn](yylex.(*Lexer).buf) */
             $$ = buffer.AppendSlice[tree.LoadColumn](yylex.(*Lexer).buf, $1, $3.(*tree.VarExpr))
         }
     }
@@ -1329,7 +1329,7 @@ variable_list:
     }
 |   variable_list ',' variable
     {
-        $$ = buffer.MakeSlice[*tree.VarExpr](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.VarExpr](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.VarExpr](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -1490,7 +1490,7 @@ field_item_list:
     }
 |   field_item_list field_item
     {
-        $$ = buffer.MakeSlice[*tree.Fields](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.Fields](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.Fields](yylex.(*Lexer).buf, $1, $2)
     }
 
@@ -1792,7 +1792,7 @@ priv_list:
     }
 |   priv_list ',' priv_elem
     {
-        $$ = buffer.MakeSlice[*tree.Privilege](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.Privilege](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.Privilege](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -1824,7 +1824,7 @@ column_name_list:
     }
 |   column_name_list ',' column_name
     {
-        $$ = buffer.MakeSlice[*tree.UnresolvedName](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.UnresolvedName](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.UnresolvedName](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -2075,7 +2075,7 @@ transaction_characteristic_list:
     }
 |   transaction_characteristic_list ',' transaction_characteristic
     {
-        $$ = buffer.MakeSlice[*tree.TransactionCharacteristic](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.TransactionCharacteristic](yylex.(*Lexer).buf) */
 	    $$ = buffer.AppendSlice[*tree.TransactionCharacteristic](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -2267,7 +2267,7 @@ var_assignment_list:
     }
 |   var_assignment_list ',' var_assignment
     {
-        $$ = buffer.MakeSlice[*tree.VarAssignmentExpr](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.VarAssignmentExpr](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.VarAssignmentExpr](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -2682,7 +2682,7 @@ update_list:
     }
 |   update_list ',' update_value
     {
-        $$ = buffer.MakeSlice[*tree.UpdateExpr](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.UpdateExpr](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.UpdateExpr](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -2708,19 +2708,19 @@ lock_table_stmt:
 table_lock_list:
     table_lock_elem
     {
-        $$ = buffer.MakeSlice[tree.TableLock](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.TableLock](yylex.(*Lexer).buf, $$, $1)
+        $$ = buffer.MakeSlice[*tree.TableLock](yylex.(*Lexer).buf)
+        $$ = buffer.AppendSlice[*tree.TableLock](yylex.(*Lexer).buf, $$, $1)
     }
 |   table_lock_list ',' table_lock_elem
     {
-        $$ = buffer.MakeSlice[tree.TableLock](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.TableLock](yylex.(*Lexer).buf, $1, $3)
+        /* $$ = buffer.MakeSlice[*tree.TableLock](yylex.(*Lexer).buf) */
+        $$ = buffer.AppendSlice[*tree.TableLock](yylex.(*Lexer).buf, $1, $3)
     }
 
 table_lock_elem:
     table_name table_lock_type
     {
-        $$ = *tree.NewTableLock(*$1, $2, yylex.(*Lexer).buf)
+        $$ = tree.NewTableLock($1, $2, yylex.(*Lexer).buf)
     }
 
 table_lock_type:
@@ -2874,7 +2874,7 @@ explain_stmt:
         optionElem1 := tree.MakeOptionElem("analyze", "NULL", yylex.(*Lexer).buf)
         optionElem2 := tree.MakeOptionElem("verbose", "NULL", yylex.(*Lexer).buf)
         options := tree.MakeOptions(optionElem1, yylex.(*Lexer).buf)
-        options = buffer.AppendSlice[tree.OptionElem](yylex.(*Lexer).buf, options, optionElem2)
+        options = buffer.AppendSlice[*tree.OptionElem](yylex.(*Lexer).buf, options, optionElem2)
         explainStmt.Options = options
         $$ = explainStmt
     }
@@ -2925,8 +2925,8 @@ utility_option_list:
     }
 |     utility_option_list ',' utility_option_elem
     {
-        $$ = buffer.MakeSlice[tree.OptionElem](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.OptionElem](yylex.(*Lexer).buf, $1, $3);
+        /* $$ = buffer.MakeSlice[*tree.OptionElem](yylex.(*Lexer).buf) */
+        $$ = buffer.AppendSlice[*tree.OptionElem](yylex.(*Lexer).buf, $1, $3);
     }
 
 utility_option_elem:
@@ -3276,7 +3276,7 @@ alter_column_order_list:
     }
 |   alter_column_order_list ',' alter_column_order
     {
-        $$ = buffer.MakeSlice[*tree.AlterColumnOrder](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.AlterColumnOrder](yylex.(*Lexer).buf) */
 	    $$ = buffer.AppendSlice[*tree.AlterColumnOrder](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -3456,7 +3456,7 @@ alter_database_config_stmt:
 alter_account_auth_option:
 {
     // Exist Equal AdminName IdentifiedType
-    $$ = *tree.NewAlterAccountAuthOption(
+    $$ = tree.NewAlterAccountAuthOption(
         false,
         "",
         "",
@@ -3466,7 +3466,7 @@ alter_account_auth_option:
 | ADMIN_NAME equal_opt account_admin_name account_identified
 {
     // Exist Equal AdminName IdentifiedType
-    $$ = *tree.NewAlterAccountAuthOption(
+    $$ = tree.NewAlterAccountAuthOption(
         true,
         $2,
         $3,
@@ -4289,7 +4289,7 @@ drop_user_spec_list:
     }
 |   drop_user_spec_list ',' drop_user_spec
     {
-        $$ = buffer.MakeSlice[*tree.User](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.User](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.User](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -4322,7 +4322,7 @@ drop_index_stmt:
         // Name TableName IfExists
         $$ = tree.NewDropIndex(
             tree.Identifier($4.Compare()),
-            *$6,
+            $6,
             $3,
             yylex.(*Lexer).buf,
         )
@@ -4507,7 +4507,7 @@ table_name_wild_list:
     }
 |    table_name_wild_list ',' table_name_opt_wild
     {
-        $$ = buffer.MakeSlice[tree.TableExpr](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.TableExpr](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.TableExpr](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -4625,7 +4625,7 @@ accounts_list:
     }
 |   accounts_list ',' account_name
     {
-        $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $1, tree.Identifier($3))
     }
 
@@ -4700,7 +4700,7 @@ set_value_list:
     }
 |    set_value_list ',' set_value
     {
-        $$ = buffer.MakeSlice[*tree.Assignment](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.Assignment](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.Assignment](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -4722,7 +4722,7 @@ insert_column_list:
     }
 |   insert_column_list ',' insert_column
     {
-        $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $1, tree.Identifier($3))
     }
 
@@ -4744,7 +4744,7 @@ values_list:
     }
 |   values_list ',' row_value
     {
-        $$ = buffer.MakeSlice[tree.Exprs](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.Exprs](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.Exprs](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -4772,7 +4772,7 @@ data_values:
     }
 |   data_values ',' expr_or_default
     {
-        $$ = buffer.MakeSlice[tree.Expr](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.Expr](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.Expr](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -4800,7 +4800,7 @@ partition_id_list:
     }
 |   partition_id_list ',' ident
     {
-        $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $1, tree.Identifier($3.Compare()))
     }
 
@@ -4964,7 +4964,7 @@ force_quote_list:
     }
 |   force_quote_list ',' ident
     {
-        $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, yylex.(*Lexer).buf.CopyString($3.Compare()))
     }
 
@@ -5042,7 +5042,7 @@ cte_list:
     }
 |    cte_list ',' common_table_expr
     {
-        $$ = buffer.MakeSlice[*tree.CTE](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.CTE](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.CTE](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -5127,7 +5127,7 @@ order_list:
     }
 |   order_list ',' order
     {
-        $$ = buffer.MakeSlice[*tree.Order](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.Order](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.Order](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -5473,41 +5473,37 @@ where_expression_opt:
 select_expression_list:
     select_expression
     {
-        $$ = buffer.MakeSlice[tree.SelectExpr](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.SelectExpr](yylex.(*Lexer).buf, $$, $1)
+        $$ = buffer.MakeSlice[*tree.SelectExpr](yylex.(*Lexer).buf)
+        $$ = buffer.AppendSlice[*tree.SelectExpr](yylex.(*Lexer).buf, $$, $1)
     }
 |   select_expression_list ',' select_expression
     {
-        $$ = buffer.MakeSlice[tree.SelectExpr](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.SelectExpr](yylex.(*Lexer).buf, $1, $3)
+        /* $$ = buffer.MakeSlice[*tree.SelectExpr](yylex.(*Lexer).buf) */
+        $$ = buffer.AppendSlice[*tree.SelectExpr](yylex.(*Lexer).buf, $1, $3)
     }
 
 select_expression:
     '*' %prec '*'
     {
-        s := buffer.Alloc[tree.SelectExpr](yylex.(*Lexer).buf)
-        s.Expr = tree.StarExpr()
-        $$ = *s
+        $$ = buffer.Alloc[tree.SelectExpr](yylex.(*Lexer).buf)
+        $$.Expr = tree.StarExpr()
     }
 |   expression as_name_opt
     {
     	$2.SetConfig(0)
-        s := buffer.Alloc[tree.SelectExpr](yylex.(*Lexer).buf)
-        s.Expr = $1
-        s.As = $2
-        $$ = *s
+        $$ = buffer.Alloc[tree.SelectExpr](yylex.(*Lexer).buf)
+        $$.Expr = $1
+        $$.As = $2
     }
 |   ident '.' '*' %prec '*'
     {
-        s := buffer.Alloc[tree.SelectExpr](yylex.(*Lexer).buf)
-        s.Expr = tree.SetUnresolvedNameWithStar(yylex.(*Lexer).buf, $1.Compare())
-        $$ = *s
+        $$ = buffer.Alloc[tree.SelectExpr](yylex.(*Lexer).buf)
+        $$.Expr = tree.SetUnresolvedNameWithStar(yylex.(*Lexer).buf, $1.Compare())
     }
 |   ident '.' ident '.' '*' %prec '*'
     {
-        s := buffer.Alloc[tree.SelectExpr](yylex.(*Lexer).buf)
-        s.Expr = tree.SetUnresolvedNameWithStar(yylex.(*Lexer).buf, $3.Compare(), $1.Compare())
-        $$ = *s
+        $$ = buffer.Alloc[tree.SelectExpr](yylex.(*Lexer).buf)
+        $$.Expr = tree.SetUnresolvedNameWithStar(yylex.(*Lexer).buf, $3.Compare(), $1.Compare())
     }
 
 from_opt:
@@ -5676,7 +5672,7 @@ row_constructor_list:
     }
 |   row_constructor_list ',' row_constructor
     {
-        $$ = buffer.MakeSlice[tree.Exprs](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.Exprs](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.Exprs](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -5744,7 +5740,7 @@ column_list:
     }
 |   column_list ',' ident
     {
-        $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $1, tree.Identifier($3.Compare()))
     }
 
@@ -5839,7 +5835,7 @@ index_hint_list:
 	}
 |	index_hint_list index_hint
 	{
-        $$ = buffer.MakeSlice[*tree.IndexHint](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.IndexHint](yylex.(*Lexer).buf) */
 		$$ = buffer.AppendSlice[*tree.IndexHint](yylex.(*Lexer).buf, $1, $2)
 	}
 
@@ -6059,7 +6055,7 @@ proc_args_list:
     }
 |   proc_args_list ',' proc_arg
     {
-        $$ = buffer.MakeSlice[tree.ProcedureArg](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.ProcedureArg](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.ProcedureArg](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -6140,7 +6136,7 @@ func_args_list:
     }
 |   func_args_list ',' func_arg
     {
-        $$ = buffer.MakeSlice[tree.FunctionArg](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.FunctionArg](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.FunctionArg](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -6277,7 +6273,7 @@ account_auth_option:
     ADMIN_NAME equal_opt account_admin_name account_identified
     {
         // Equal AdminName IdentifiedType
-        $$ = *tree.NewAccountAuthOption(
+        $$ = tree.NewAccountAuthOption(
             $2,
             $3,
             $4,
@@ -6299,7 +6295,7 @@ account_identified:
     IDENTIFIED BY STRING
     {
         // Typ Str
-        $$ = *tree.NewAccountIdentified(
+        $$ = tree.NewAccountIdentified(
             tree.AccountIdentifiedByPassword,
             $3,
             yylex.(*Lexer).buf,
@@ -6308,7 +6304,7 @@ account_identified:
 |   IDENTIFIED BY RANDOM PASSWORD
     {
         // Typ Str
-        $$ = *tree.NewAccountIdentified(
+        $$ = tree.NewAccountIdentified(
             tree.AccountIdentifiedByRandomPassword,
             "",
             yylex.(*Lexer).buf,
@@ -6317,7 +6313,7 @@ account_identified:
 |   IDENTIFIED WITH STRING
     {
         // Typ Str
-        $$ = *tree.NewAccountIdentified(
+        $$ = tree.NewAccountIdentified(
             tree.AccountIdentifiedWithSSL,
             $3,
             yylex.(*Lexer).buf,
@@ -6327,7 +6323,7 @@ account_identified:
 account_status_option:
     {
         // Exist Option
-        $$ = *tree.NewAccountStatus(
+        $$ = tree.NewAccountStatus(
             false,
             0,
             yylex.(*Lexer).buf,
@@ -6336,7 +6332,7 @@ account_status_option:
 |   OPEN
     {
         // Exist Option
-        $$ = *tree.NewAccountStatus(
+        $$ = tree.NewAccountStatus(
             true,
             tree.AccountStatusOpen,
             yylex.(*Lexer).buf,
@@ -6345,7 +6341,7 @@ account_status_option:
 |   SUSPEND
     {
         // Exist Option
-        $$ = *tree.NewAccountStatus(
+        $$ = tree.NewAccountStatus(
             true,
             tree.AccountStatusSuspend,
             yylex.(*Lexer).buf,
@@ -6354,7 +6350,7 @@ account_status_option:
 |   RESTRICTED
     {
         // Exist Option
-        $$ = *tree.NewAccountStatus(
+        $$ = tree.NewAccountStatus(
             true,
             tree.AccountStatusRestricted,
             yylex.(*Lexer).buf,
@@ -6364,7 +6360,7 @@ account_status_option:
 account_comment_opt:
     {
         // Exist Comment
-        $$ = *tree.NewAccountComment(
+        $$ = tree.NewAccountComment(
             false,
             "",
             yylex.(*Lexer).buf,
@@ -6373,7 +6369,7 @@ account_comment_opt:
 |   COMMENT_KEYWORD STRING
     {
         // Exist Comment
-        $$ = *tree.NewAccountComment(
+        $$ = tree.NewAccountComment(
             true,
             $2,
             yylex.(*Lexer).buf,
@@ -6426,7 +6422,7 @@ create_stage_stmt:
 stage_status_opt:
     {
         // Exist Option
-        $$ = *tree.NewStageStatus(
+        $$ = tree.NewStageStatus(
             false,
             0,
             yylex.(*Lexer).buf,
@@ -6435,7 +6431,7 @@ stage_status_opt:
 |   ENABLE '=' TRUE
     {
         // Exist Option
-        $$ = *tree.NewStageStatus(
+        $$ = tree.NewStageStatus(
             true,
             tree.StageStatusEnabled,
             yylex.(*Lexer).buf,
@@ -6444,7 +6440,7 @@ stage_status_opt:
 |   ENABLE '=' FALSE
     {
         // Exist Option
-        $$ = *tree.NewStageStatus(
+        $$ = tree.NewStageStatus(
             true,
             tree.StageStatusDisabled,
             yylex.(*Lexer).buf,
@@ -6454,7 +6450,7 @@ stage_status_opt:
 stage_comment_opt:
     {
         // Exist Comment
-        $$ = *tree.NewStageComment(
+        $$ = tree.NewStageComment(
             false,
             "",
             yylex.(*Lexer).buf,
@@ -6463,7 +6459,7 @@ stage_comment_opt:
 |   COMMENT_KEYWORD STRING
     {
         // Exist Comment
-        $$ = *tree.NewStageComment(
+        $$ = tree.NewStageComment(
             true,
             $2,
             yylex.(*Lexer).buf,
@@ -6473,7 +6469,7 @@ stage_comment_opt:
 stage_url_opt:
     {
         // Exist URL
-        $$ = *tree.NewStageUrl(
+        $$ = tree.NewStageUrl(
             false,
             "",
             yylex.(*Lexer).buf,
@@ -6482,7 +6478,7 @@ stage_url_opt:
 |   URL '=' STRING
     {
         // Exist URL
-        $$ = *tree.NewStageUrl(
+        $$ = tree.NewStageUrl(
             true,
             $3,
             yylex.(*Lexer).buf,
@@ -6492,7 +6488,7 @@ stage_url_opt:
 stage_credentials_opt:
     {
         // Exist Credentials
-        $$ = *tree.NewStageCredentials(
+        $$ = tree.NewStageCredentials(
             false,
             nil,
             yylex.(*Lexer).buf,
@@ -6501,7 +6497,7 @@ stage_credentials_opt:
 |   CREDENTIALS '=' '{' credentialsparams '}'
     {
         // Exist Credentials
-        $$ = *tree.NewStageCredentials(
+        $$ = tree.NewStageCredentials(
             true,
             $4,
             yylex.(*Lexer).buf,
@@ -6786,7 +6782,7 @@ user_spec_list_of_create_user:
     }
 |   user_spec_list_of_create_user ',' user_spec_with_identified
     {
-        $$ = buffer.MakeSlice[*tree.User](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.User](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.User](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -6810,7 +6806,7 @@ user_spec_list:
     }
 |   user_spec_list ',' user_spec
     {
-        $$ = buffer.MakeSlice[*tree.User](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.User](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.User](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -6919,7 +6915,7 @@ role_spec_list:
     }
 |   role_spec_list ',' role_spec
     {
-        $$ = buffer.MakeSlice[*tree.Role](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.Role](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.Role](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -6984,7 +6980,7 @@ create_index_stmt:
         // Name Table IndexCat KeyParts IndexOption MiscOption
         $$ = tree.NewCreateIndex(
             tree.Identifier($4.Compare()),
-            *$7,
+            $7,
             $2,
             $9,
             io,
@@ -7083,7 +7079,7 @@ index_column_list:
     }
 |   index_column_list ',' index_column
     {
-        $$ = buffer.MakeSlice[*tree.KeyPart](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.KeyPart](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.KeyPart](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -7192,7 +7188,7 @@ create_option_list:
     }
 |   create_option_list create_option
     {
-        $$ = buffer.MakeSlice[tree.CreateOption](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.CreateOption](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.CreateOption](yylex.(*Lexer).buf, $1, $2)
     }
 
@@ -7374,7 +7370,7 @@ create_table_stmt:
             $2,
             false,
             $4,
-            *$5,
+            $5,
             $7,
             $9,
             $10,
@@ -7390,7 +7386,7 @@ create_table_stmt:
             false,
             false,
             $4,
-            *$5,
+            $5,
             $7,
             nil,
             nil,
@@ -7406,7 +7402,7 @@ create_table_stmt:
             false,
             true, // isClusterTable
             $4,  //  ifNotExists
-            *$5, // Table
+            $5, // Table
             $7,  // Defs
             $9,  // Options
             $10, // PartitionOption
@@ -7499,7 +7495,7 @@ infile_or_s3_params:
     }
 |   infile_or_s3_params ',' infile_or_s3_param
     {
-        $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[string](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[string](yylex.(*Lexer).buf, $1, $3...)
     }
 
@@ -7749,7 +7745,7 @@ partition_by_opt:
         $3.Num = uint64($4)
         // PartBy SubPartBy Partitions
         $$ = tree.NewPartitionOption(
-            *$3,
+            $3,
             $5,
             $6,
             yylex.(*Lexer).buf,
@@ -7806,7 +7802,7 @@ partition_list:
     }
 |   partition_list ',' partition
     {
-        $$ = buffer.MakeSlice[*tree.Partition](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.Partition](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.Partition](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -7851,7 +7847,7 @@ sub_partition_list:
     }
 |   sub_partition_list ',' sub_partition
     {
-        $$ = buffer.MakeSlice[*tree.SubPartition](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.SubPartition](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.SubPartition](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -7883,7 +7879,7 @@ partition_option_list:
     }
 |   partition_option_list table_option
     {
-        $$ = buffer.MakeSlice[tree.TableOption](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.TableOption](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.TableOption](yylex.(*Lexer).buf, $1, $2)
     }
 
@@ -8027,7 +8023,7 @@ connector_option_list:
 	}
 |	connector_option_list ',' connector_option
 	{
-        $$ = buffer.MakeSlice[*tree.ConnectorOption](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.ConnectorOption](yylex.(*Lexer).buf) */
 		$$ = buffer.AppendSlice[*tree.ConnectorOption](yylex.(*Lexer).buf, $1, $3)
 	}
 
@@ -8068,7 +8064,7 @@ stream_option_list:
 	}
 |	stream_option_list ',' stream_option
 	{
-        $$ = buffer.MakeSlice[tree.TableOption](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.TableOption](yylex.(*Lexer).buf) */
 		$$ = buffer.AppendSlice[tree.TableOption](yylex.(*Lexer).buf, $1, $3)
 	}
 
@@ -8109,12 +8105,12 @@ table_option_list:
     }
 |   table_option_list ',' table_option
     {
-        $$ = buffer.MakeSlice[tree.TableOption](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.TableOption](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.TableOption](yylex.(*Lexer).buf, $1, $3)
     }
 |   table_option_list table_option
     {
-        $$ = buffer.MakeSlice[tree.TableOption](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.TableOption](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.TableOption](yylex.(*Lexer).buf, $1, $2)
     }
 
@@ -8304,20 +8300,20 @@ table_option:
 properties_list:
     property_elem
     {
-        $$ = buffer.MakeSlice[tree.Property](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.Property](yylex.(*Lexer).buf, $$, $1)
+        $$ = buffer.MakeSlice[*tree.Property](yylex.(*Lexer).buf)
+        $$ = buffer.AppendSlice[*tree.Property](yylex.(*Lexer).buf, $$, $1)
     }
 |    properties_list ',' property_elem
     {
-        $$ = buffer.MakeSlice[tree.Property](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.Property](yylex.(*Lexer).buf, $1, $3)
+        /* $$ = buffer.MakeSlice[*tree.Property](yylex.(*Lexer).buf) */
+        $$ = buffer.AppendSlice[*tree.Property](yylex.(*Lexer).buf, $1, $3)
     }
 
 property_elem:
     STRING '=' STRING
     {
         // key value
-        $$ = *tree.NewProperty($1, $3, yylex.(*Lexer).buf)
+        $$ = tree.NewProperty($1, $3, yylex.(*Lexer).buf)
     }
 
 storage_opt:
@@ -8372,7 +8368,7 @@ table_name_list:
     }
 |   table_name_list ',' table_name
     {
-        $$ = buffer.MakeSlice[*tree.TableName](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.TableName](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.TableName](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -8410,7 +8406,7 @@ table_elem_list:
     }
 |   table_elem_list ',' table_elem
     {
-        $$ = buffer.MakeSlice[tree.TableDef](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.TableDef](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.TableDef](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -8733,7 +8729,7 @@ column_attribute_list:
     }
 |   column_attribute_list column_attribute_elem
     {
-        $$ = buffer.MakeSlice[tree.ColumnAttribute](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.ColumnAttribute](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.ColumnAttribute](yylex.(*Lexer).buf, $1, $2)
     }
 
@@ -9221,7 +9217,7 @@ when_clause_list:
     }
 |    when_clause_list when_clause
     {
-        $$ = buffer.MakeSlice[*tree.When](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[*tree.When](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[*tree.When](yylex.(*Lexer).buf, $1, $2)
     }
 
@@ -10370,7 +10366,7 @@ expression_list:
     }
 |   expression_list ',' expression
     {
-        $$ = buffer.MakeSlice[tree.Expr](yylex.(*Lexer).buf)
+        /* $$ = buffer.MakeSlice[tree.Expr](yylex.(*Lexer).buf) */
         $$ = buffer.AppendSlice[tree.Expr](yylex.(*Lexer).buf, $1, $3)
     }
 
@@ -11091,7 +11087,7 @@ float_length_opt:
     /* EMPTY */
     {
         // DisplayWith Scale
-        $$ = *tree.NewLengthScaleOpt(
+        $$ = tree.NewLengthScaleOpt(
             tree.NotDefineDisplayWidth,
             tree.NotDefineDec,
             yylex.(*Lexer).buf,
@@ -11100,7 +11096,7 @@ float_length_opt:
 |   '(' INTEGRAL ')'
     {
         // DisplayWith Scale
-        $$ = *tree.NewLengthScaleOpt(
+        $$ = tree.NewLengthScaleOpt(
             tree.GetDisplayWith(int32($2.(int64))),
             tree.NotDefineDec,
             yylex.(*Lexer).buf,
@@ -11109,7 +11105,7 @@ float_length_opt:
 |   '(' INTEGRAL ',' INTEGRAL ')'
     {
         // DisplayWith Scale
-        $$ = *tree.NewLengthScaleOpt(
+        $$ = tree.NewLengthScaleOpt(
             tree.GetDisplayWith(int32($2.(int64))),
             int32($4.(int64)),
             yylex.(*Lexer).buf,
@@ -11120,7 +11116,7 @@ decimal_length_opt:
     /* EMPTY */
     {
         // DisplayWith Scale
-        $$ = *tree.NewLengthScaleOpt(
+        $$ = tree.NewLengthScaleOpt(
             38,           // this is the default precision for decimal
             0,
             yylex.(*Lexer).buf,
@@ -11129,7 +11125,7 @@ decimal_length_opt:
 |   '(' INTEGRAL ')'
     {
         // DisplayWith Scale
-        $$ = *tree.NewLengthScaleOpt(
+        $$ = tree.NewLengthScaleOpt(
             tree.GetDisplayWith(int32($2.(int64))),
             0,
             yylex.(*Lexer).buf,
@@ -11138,7 +11134,7 @@ decimal_length_opt:
 |   '(' INTEGRAL ',' INTEGRAL ')'
     {
         // DisplayWith Scale
-        $$ = *tree.NewLengthScaleOpt(
+        $$ = tree.NewLengthScaleOpt(
             tree.GetDisplayWith(int32($2.(int64))),
             int32($4.(int64)),
             yylex.(*Lexer).buf,

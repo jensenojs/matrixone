@@ -299,7 +299,7 @@ func getExprValue(e tree.Expr, mce *MysqlCmdExecutor, ses *Session) (interface{}
 	compositedSelect := &tree.Select{
 		Select: &tree.SelectClause{
 			Exprs: tree.SelectExprs{
-				tree.SelectExpr{
+				&tree.SelectExpr{
 					Expr: e,
 				},
 			},

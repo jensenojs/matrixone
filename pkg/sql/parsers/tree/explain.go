@@ -29,7 +29,7 @@ type explainImpl struct {
 	Explain
 	Statement Statement
 	Format    *BufString
-	Options   []OptionElem
+	Options   []*OptionElem
 }
 
 // EXPLAIN stmt statement
@@ -158,20 +158,20 @@ type OptionElem struct {
 	Value *BufString
 }
 
-func MakeOptionElem(name string, value string, buf *buffer.Buffer) OptionElem {
+func MakeOptionElem(name string, value string, buf *buffer.Buffer) *OptionElem {
 	o := buffer.Alloc[OptionElem](buf)
 	o.Name = NewBufString(name)
 	o.Value = NewBufString(value)
-	return *o
+	return o
 }
 
-func MakeOptions(elem OptionElem, buf *buffer.Buffer) []OptionElem {
-	os := buffer.MakeSlice[OptionElem](buf, 0, 1)
-	os = buffer.AppendSlice[OptionElem](buf, os, elem)
+func MakeOptions(elem *OptionElem, buf *buffer.Buffer) []*OptionElem {
+	os := buffer.MakeSlice[*OptionElem](buf, 0, 1)
+	os = buffer.AppendSlice[*OptionElem](buf, os, elem)
 	return os
 }
 
-func IsContainAnalyze(options []OptionElem) bool {
+func IsContainAnalyze(options []*OptionElem) bool {
 	if len(options) > 0 {
 		for _, option := range options {
 			if strings.EqualFold(option.Name.Get(), "analyze") && strings.EqualFold(option.Value.Get(), "true") {

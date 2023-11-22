@@ -91,14 +91,14 @@ func (builder *QueryBuilder) buildResultScan(tbl *tree.TableFunction, ctx *BindC
 	}
 	// build external param
 	p := &tree.ExternParam{
-		ExParamConst: tree.ExParamConst{
+		ExParamConst: &tree.ExParamConst{
 			// ScanType: tree.S3,
 			Filepath: tree.NewBufString(path),
 			// FileService: builder.compCtx.GetProcess().FileService,
 			// S3Param:     &tree.S3Parameter{},
 			Tail: &tree.TailParameter{},
 		},
-		ExParam: tree.ExParam{
+		ExParam: &tree.ExParam{
 			QueryResult: true,
 		},
 	}

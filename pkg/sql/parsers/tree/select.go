@@ -301,7 +301,7 @@ func NewWhere(t string, e Expr, buf *buffer.Buffer) *Where {
 }
 
 // SELECT expressions.
-type SelectExprs []SelectExpr
+type SelectExprs []*SelectExpr
 
 func (node *SelectExprs) Format(ctx *FmtCtx) {
 	for i, n := range *node {
@@ -515,13 +515,13 @@ func (node *AliasClause) Format(ctx *FmtCtx) {
 type AliasedTableExpr struct {
 	TableExpr
 	Expr       TableExpr
-	As         AliasClause
+	As         *AliasClause
 	IndexHints []*IndexHint
 }
 
 func (node *AliasedTableExpr) Format(ctx *FmtCtx) {
 	node.Expr.Format(ctx)
-	if node.As.Alias.Get() != "" {
+	if node.As != nil && node.As.Alias.Get() != "" {
 		ctx.WriteString(" as ")
 		node.As.Format(ctx)
 	}
@@ -538,9 +538,7 @@ func (node *AliasedTableExpr) Format(ctx *FmtCtx) {
 func NewAliasedTableExpr(e TableExpr, a *AliasClause, idxs []*IndexHint, buf *buffer.Buffer) *AliasedTableExpr {
 	ate := buffer.Alloc[AliasedTableExpr](buf)
 	ate.Expr = e
-	if a != nil {
-		ate.As = *a
-	}
+	ate.As = a
 	ate.IndexHints = idxs
 	return ate
 }

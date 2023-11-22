@@ -579,7 +579,7 @@ func mockPartitionBinder(tableDef *plan.TableDef) (*PartitionBinder, error) {
 		BindingTags: []int32{builder.genNewTag()},
 	}, bindContext)
 
-	err := builder.addBinding(nodeID, tree.AliasClause{}, bindContext)
+	err := builder.addBinding(nodeID, &tree.AliasClause{}, bindContext)
 	if err != nil {
 		return nil, err
 	}

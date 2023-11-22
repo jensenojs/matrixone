@@ -993,7 +993,9 @@ func Test_statement_type(t *testing.T) {
 			stmt tree.Statement
 		}
 		kases := []kase{
-			{&tree.CreateTable{}},
+			{&tree.CreateTable{
+				Table: &tree.TableName{},
+			}},
 			{&tree.Insert{}},
 			{&tree.BeginTransaction{}},
 			{&tree.ShowTables{}},
@@ -1005,7 +1007,9 @@ func Test_statement_type(t *testing.T) {
 			convey.So(ret, convey.ShouldBeTrue)
 		}
 
-		convey.So(IsDDL(&tree.CreateTable{}), convey.ShouldBeTrue)
+		convey.So(IsDDL(&tree.CreateTable{
+			Table: &tree.TableName{},
+		}), convey.ShouldBeTrue)
 		convey.So(IsDropStatement(&tree.DropTable{}), convey.ShouldBeTrue)
 		convey.So(IsAdministrativeStatement(&tree.CreateAccount{}), convey.ShouldBeTrue)
 		convey.So(IsParameterModificationStatement(&tree.SetVar{}), convey.ShouldBeTrue)
@@ -1115,7 +1119,7 @@ func Test_getSqlType(t *testing.T) {
 func TestProcessLoadLocal(t *testing.T) {
 	convey.Convey("call processLoadLocal func", t, func() {
 		param := &tree.ExternParam{
-			ExParamConst: tree.ExParamConst{
+			ExParamConst: &tree.ExParamConst{
 				Filepath: tree.NewBufString("test.csv"),
 			},
 		}

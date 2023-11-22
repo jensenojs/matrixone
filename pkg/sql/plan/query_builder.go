@@ -1324,7 +1324,7 @@ func (builder *QueryBuilder) buildUnion(stmt *tree.UnionClause, astOrderBy tree.
 					Select: &tree.SelectClause{
 						Distinct: true,
 
-						Exprs: []tree.SelectExpr{
+						Exprs: []*tree.SelectExpr{
 							{Expr: tree.StarExpr()},
 						},
 						From: &tree.From{
@@ -1333,7 +1333,7 @@ func (builder *QueryBuilder) buildUnion(stmt *tree.UnionClause, astOrderBy tree.
 									Expr: &tree.ParenTableExpr{
 										Expr: sltStmt,
 									},
-									As: tree.AliasClause{
+									As: &tree.AliasClause{
 										Alias: tree.NewBufIdentifier("a"),
 									},
 								},
@@ -1776,7 +1776,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 					subCtx.isTryBindingCTE = true
 					subCtx.cteByName = make(map[string]*CTERef)
 					subCtx.cteByName[table] = cteRef
-					err = builder.addBinding(initLastNodeID, *cteRef.ast.Name, subCtx)
+					err = builder.addBinding(initLastNodeID, cteRef.ast.Name, subCtx)
 					if err != nil {
 						return 0, err
 					}
@@ -1914,7 +1914,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 
 			colName := fmt.Sprintf("column_%d", i) // like MySQL
 			as := tree.NewCStr(colName, 0, nil)
-			selectList = append(selectList, tree.SelectExpr{
+			selectList = append(selectList, &tree.SelectExpr{
 				Expr: &tree.UnresolvedName{
 					NumParts: 1,
 					Star:     false,
@@ -1945,7 +1945,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 			proc.SetValueScanBatch(nodeUUID, bat)
 		}
 
-		err = builder.addBinding(nodeID, tree.AliasClause{
+		err = builder.addBinding(nodeID, &tree.AliasClause{
 			Alias: tree.NewBufIdentifier("_ValueScan"),
 		}, ctx)
 		if err != nil {
@@ -1981,7 +1981,8 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 					if ctx.finalSelect && name == moRecursiveLevelCol {
 						continue
 					}
-					selectList = append(selectList, cols[i])
+					c := cols[i]
+					selectList = append(selectList, &c)
 					ctx.headings = append(ctx.headings, name)
 				}
 
@@ -1991,7 +1992,10 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 					if err != nil {
 						return 0, err
 					}
-					selectList = append(selectList, cols...)
+					for _, c := range cols {
+						c := c // NOTE: necessary!
+						selectList = append(selectList, &c)
+					}
 					ctx.headings = append(ctx.headings, names...)
 				} else {
 					if selectExpr.As != nil && !selectExpr.As.Empty() {
@@ -2005,7 +2009,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 						return 0, err
 					}
 
-					selectList = append(selectList, tree.SelectExpr{
+					selectList = append(selectList, &tree.SelectExpr{
 						Expr: newExpr,
 						As:   selectExpr.As,
 					})
@@ -2021,7 +2025,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 					ctx.headings = append(ctx.headings, tree.String(expr, dialect.MYSQL))
 				}
 
-				selectList = append(selectList, tree.SelectExpr{
+				selectList = append(selectList, &tree.SelectExpr{
 					Expr: expr,
 					As:   selectExpr.As,
 				})
@@ -2044,7 +2048,7 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 					return 0, err
 				}
 
-				selectList = append(selectList, tree.SelectExpr{
+				selectList = append(selectList, &tree.SelectExpr{
 					Expr: newExpr,
 					As:   selectExpr.As,
 				})
@@ -2728,7 +2732,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 						subCtx.sinkTag = initCtx.sinkTag
 						subCtx.cteByName = make(map[string]*CTERef)
 						subCtx.cteByName[table] = cteRef
-						err = builder.addBinding(initLastNodeID, *cteRef.ast.Name, subCtx)
+						err = builder.addBinding(initLastNodeID, cteRef.ast.Name, subCtx)
 						if err != nil {
 							return
 						}
@@ -2822,7 +2826,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 					// final statement
 					ctx.finalSelect = true
 					ctx.sinkTag = initCtx.sinkTag
-					err = builder.addBinding(initLastNodeID, *cteRef.ast.Name, ctx)
+					err = builder.addBinding(initLastNodeID, cteRef.ast.Name, ctx)
 					if err != nil {
 						return
 					}
@@ -3073,7 +3077,7 @@ func (builder *QueryBuilder) genNewTag() int32 {
 	return builder.nextTag
 }
 
-func (builder *QueryBuilder) addBinding(nodeID int32, alias tree.AliasClause, ctx *BindContext) error {
+func (builder *QueryBuilder) addBinding(nodeID int32, alias *tree.AliasClause, ctx *BindContext) error {
 	node := builder.qry.Nodes[nodeID]
 
 	var cols []string

@@ -3475,7 +3475,7 @@ func checkStageExistOrNot(ctx context.Context, bh BackgroundExec, stageName stri
 	return false, nil
 }
 
-func formatCredentials(credentials tree.StageCredentials) string {
+func formatCredentials(credentials *tree.StageCredentials) string {
 	var rstr string
 	if credentials.Exist {
 		for i := 0; i < len(credentials.Credentials)-1; i += 2 {
@@ -7299,7 +7299,7 @@ func authenticateUserCanExecuteStatementWithObjectTypeNone(ctx context.Context, 
 		switch gp := stmt.(type) {
 		case *tree.Grant:
 			if gp.Typ == tree.GrantTypePrivilege {
-				yes, err := checkGrantPrivilege(&gp.GrantPrivilege)
+				yes, err := checkGrantPrivilege(gp.GrantPrivilege)
 				if err != nil {
 					return yes, err
 				}

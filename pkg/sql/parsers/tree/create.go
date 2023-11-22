@@ -174,7 +174,7 @@ type CreateTable struct {
 	Temporary       bool
 	IsClusterTable  bool
 	IfNotExists     bool
-	Table           TableName
+	Table           *TableName
 	Defs            TableDefs
 	Options         []TableOption
 	PartitionOption *PartitionOption
@@ -182,7 +182,7 @@ type CreateTable struct {
 	Param           *ExternParam
 }
 
-func NewCreateTable(temporary, isClusterTable, ifNotExists bool, table TableName, defs TableDefs, options []TableOption, partitionOption *PartitionOption, clusterByOption *ClusterByOption, param *ExternParam, buf *buffer.Buffer) *CreateTable {
+func NewCreateTable(temporary, isClusterTable, ifNotExists bool, table *TableName, defs TableDefs, options []TableOption, partitionOption *PartitionOption, clusterByOption *ClusterByOption, param *ExternParam, buf *buffer.Buffer) *CreateTable {
 	c := buffer.Alloc[CreateTable](buf)
 	c.Temporary = temporary
 	c.IsClusterTable = isClusterTable
@@ -1165,7 +1165,7 @@ type tableOptionImpl struct {
 
 type TableOptionProperties struct {
 	tableOptionImpl
-	Preperties []Property
+	Preperties []*Property
 }
 
 func (node *TableOptionProperties) Format(ctx *FmtCtx) {
@@ -1181,7 +1181,7 @@ func (node *TableOptionProperties) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewTableOptionProperties(preperties []Property, buf *buffer.Buffer) *TableOptionProperties {
+func NewTableOptionProperties(preperties []*Property, buf *buffer.Buffer) *TableOptionProperties {
 	t := buffer.Alloc[TableOptionProperties](buf)
 	t.Preperties = preperties
 	return t
@@ -2096,7 +2096,7 @@ func NewClusterByOption(columnList []*UnresolvedName, buf *buffer.Buffer) *Clust
 }
 
 type PartitionOption struct {
-	PartBy     PartitionBy
+	PartBy     *PartitionBy
 	SubPartBy  *PartitionBy
 	Partitions []*Partition
 }
@@ -2119,7 +2119,7 @@ func (node *PartitionOption) Format(ctx *FmtCtx) {
 	}
 }
 
-func NewPartitionOption(partBy PartitionBy, subPartBy *PartitionBy, partitions []*Partition, buf *buffer.Buffer) *PartitionOption {
+func NewPartitionOption(partBy *PartitionBy, subPartBy *PartitionBy, partitions []*Partition, buf *buffer.Buffer) *PartitionOption {
 	p := buffer.Alloc[PartitionOption](buf)
 	p.PartBy = partBy
 	p.SubPartBy = subPartBy
@@ -2152,7 +2152,7 @@ const (
 type CreateIndex struct {
 	statementImpl
 	Name        *BufIdentifier
-	Table       TableName
+	Table       *TableName
 	IndexCat    IndexCategory
 	IfNotExists bool
 	KeyParts    []*KeyPart
@@ -2199,7 +2199,7 @@ func (node *CreateIndex) Format(ctx *FmtCtx) {
 func (node *CreateIndex) GetStatementType() string { return "Create Index" }
 func (node *CreateIndex) GetQueryType() string     { return QueryTypeDDL }
 
-func NewCreateIndex(name Identifier, table TableName, indexCat IndexCategory, keyParts []*KeyPart, indexOption *IndexOption, miscOption []MiscOption, buf *buffer.Buffer) *CreateIndex {
+func NewCreateIndex(name Identifier, table *TableName, indexCat IndexCategory, keyParts []*KeyPart, indexOption *IndexOption, miscOption []MiscOption, buf *buffer.Buffer) *CreateIndex {
 	t := buffer.Alloc[CreateIndex](buf)
 	n := NewBufIdentifier(name)
 	buf.Pin(n)
@@ -2700,7 +2700,7 @@ type CreateUser struct {
 	Role        *Role
 	MiscOpt     UserMiscOption
 	// comment or attribute
-	CommentOrAttribute AccountCommentOrAttribute
+	CommentOrAttribute *AccountCommentOrAttribute
 }
 
 func (node *CreateUser) Format(ctx *FmtCtx) {
@@ -2734,7 +2734,7 @@ func (node *CreateUser) Format(ctx *FmtCtx) {
 func (node *CreateUser) GetStatementType() string { return "Create User" }
 func (node *CreateUser) GetQueryType() string     { return QueryTypeDCL }
 
-func NewCreateUser(ife bool, u []*User, r *Role, misc UserMiscOption, co AccountCommentOrAttribute, buf *buffer.Buffer) *CreateUser {
+func NewCreateUser(ife bool, u []*User, r *Role, misc UserMiscOption, co *AccountCommentOrAttribute, buf *buffer.Buffer) *CreateUser {
 	c := buffer.Alloc[CreateUser](buf)
 	c.IfNotExists = ife
 	c.Users = u
@@ -2748,11 +2748,11 @@ type CreateAccount struct {
 	statementImpl
 	IfNotExists bool
 	Name        *BufString
-	AuthOption  AccountAuthOption
+	AuthOption  *AccountAuthOption
 	//status_option or not
-	StatusOption AccountStatus
+	StatusOption *AccountStatus
 	//comment or not
-	Comment AccountComment
+	Comment *AccountComment
 }
 
 func (ca *CreateAccount) Format(ctx *FmtCtx) {
@@ -2769,7 +2769,7 @@ func (ca *CreateAccount) Format(ctx *FmtCtx) {
 func (ca *CreateAccount) GetStatementType() string { return "Create Account" }
 func (ca *CreateAccount) GetQueryType() string     { return QueryTypeDCL }
 
-func NewCreateAccount(ifNotExists bool, name string, authOption AccountAuthOption, statusOption AccountStatus, comment AccountComment, buf *buffer.Buffer) *CreateAccount {
+func NewCreateAccount(ifNotExists bool, name string, authOption *AccountAuthOption, statusOption *AccountStatus, comment *AccountComment, buf *buffer.Buffer) *CreateAccount {
 	c := buffer.Alloc[CreateAccount](buf)
 	c.IfNotExists = ifNotExists
 	bName := NewBufString(name)
@@ -2784,10 +2784,10 @@ func NewCreateAccount(ifNotExists bool, name string, authOption AccountAuthOptio
 type AccountAuthOption struct {
 	Equal          *BufString
 	AdminName      *BufString
-	IdentifiedType AccountIdentified
+	IdentifiedType *AccountIdentified
 }
 
-func NewAccountAuthOption(equal string, adminName string, identifiedType AccountIdentified, buf *buffer.Buffer) *AccountAuthOption {
+func NewAccountAuthOption(equal string, adminName string, identifiedType *AccountIdentified, buf *buffer.Buffer) *AccountAuthOption {
 	a := buffer.Alloc[AccountAuthOption](buf)
 	bEqual := NewBufString(equal)
 	bAdminName := NewBufString(adminName)
@@ -2916,14 +2916,14 @@ type AccountCommentOrAttribute struct {
 	Str       *BufString
 }
 
-func NewAccountCommentOrAttribute(e, i bool, s string, buf *buffer.Buffer) AccountCommentOrAttribute {
+func NewAccountCommentOrAttribute(e, i bool, s string, buf *buffer.Buffer) *AccountCommentOrAttribute {
 	a := buffer.Alloc[AccountCommentOrAttribute](buf)
 	a.Exist = e
 	a.IsComment = i
 	bStr := NewBufString(s)
 	buf.Pin(bStr)
 	a.Str = bStr
-	return *a
+	return a
 }
 
 func (node *AccountCommentOrAttribute) Format(ctx *FmtCtx) {

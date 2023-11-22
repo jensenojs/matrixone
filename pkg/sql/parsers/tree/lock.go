@@ -52,11 +52,11 @@ func (t TableLockType) String() string {
 }
 
 type TableLock struct {
-	Table    TableName
+	Table    *TableName
 	LockType TableLockType
 }
 
-func NewTableLock(t TableName ,l TableLockType, buf *buffer.Buffer) *TableLock {
+func NewTableLock(t *TableName ,l TableLockType, buf *buffer.Buffer) *TableLock {
 	ta := buffer.Alloc[TableLock](buf)	
 	ta.Table = t
 	ta.LockType = l
@@ -65,10 +65,10 @@ func NewTableLock(t TableName ,l TableLockType, buf *buffer.Buffer) *TableLock {
 
 type LockTableStmt struct {
 	statementImpl
-	TableLocks []TableLock
+	TableLocks []*TableLock
 }
 
-func NewLockTableStmt(tblocks []TableLock, buf *buffer.Buffer) *LockTableStmt {
+func NewLockTableStmt(tblocks []*TableLock, buf *buffer.Buffer) *LockTableStmt {
 	lo := buffer.Alloc[LockTableStmt](buf)	
 	lo.TableLocks = tblocks
 	return lo

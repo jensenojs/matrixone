@@ -25,12 +25,12 @@ type CreateStage struct {
 	IfNotExists bool
 	Name        *BufIdentifier
 	Url         *BufString
-	Credentials StageCredentials
-	Status      StageStatus
-	Comment     StageComment
+	Credentials *StageCredentials
+	Status      *StageStatus
+	Comment     *StageComment
 }
 
-func NewCreateStage(ifs bool, name Identifier, url string, cs StageCredentials, st StageStatus, co StageComment, buf *buffer.Buffer) *CreateStage {
+func NewCreateStage(ifs bool, name Identifier, url string, cs *StageCredentials, st *StageStatus, co *StageComment, buf *buffer.Buffer) *CreateStage {
 	cr := buffer.Alloc[CreateStage](buf)
 	n := NewBufIdentifier(name)
 	burl := NewBufString(url)
@@ -92,13 +92,13 @@ type AlterStage struct {
 	statementImpl
 	IfNotExists       bool
 	Name              *BufIdentifier
-	UrlOption         StageUrl
-	CredentialsOption StageCredentials
-	StatusOption      StageStatus
-	Comment           StageComment
+	UrlOption         *StageUrl
+	CredentialsOption *StageCredentials
+	StatusOption      *StageStatus
+	Comment           *StageComment
 }
 
-func NewAlterStage(ifn bool, name Identifier, url StageUrl, cop StageCredentials, sop StageStatus, co StageComment, buf *buffer.Buffer) *AlterStage {
+func NewAlterStage(ifn bool, name Identifier, url *StageUrl, cop *StageCredentials, sop *StageStatus, co *StageComment, buf *buffer.Buffer) *AlterStage {
 	al := buffer.Alloc[AlterStage](buf)
 	n := NewBufIdentifier(name)
 	buf.Pin(n)

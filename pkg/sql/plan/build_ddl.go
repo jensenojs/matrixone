@@ -761,7 +761,7 @@ func buildCreateTable(stmt *tree.CreateTable, ctx CompilerContext) (*Plan, error
 			BindingTags: []int32{builder.genNewTag()},
 		}, bindContext)
 
-		err = builder.addBinding(nodeID, tree.AliasClause{}, bindContext)
+		err = builder.addBinding(nodeID, &tree.AliasClause{}, bindContext)
 		if err != nil {
 			return nil, err
 		}

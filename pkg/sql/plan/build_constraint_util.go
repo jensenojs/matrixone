@@ -473,7 +473,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 		return false, nil, false, moerr.NewInvalidInput(builder.GetContext(), "insert has unknown select statement")
 	}
 
-	err = builder.addBinding(info.rootId, tree.AliasClause{
+	err = builder.addBinding(info.rootId, &tree.AliasClause{
 		Alias: tree.NewBufIdentifier(derivedTableName),
 	}, bindCtx)
 	if err != nil {
@@ -771,10 +771,16 @@ func deleteToSelect(builder *QueryBuilder, bindCtx *BindContext, node *tree.Dele
 		fromTables.Tables = node.Tables
 	}
 
+	exprs := make([]*tree.SelectExpr, 0)
+	for _, s := range selectList {
+		s := s // NOTE: necessary!
+		exprs = append(exprs, &s)
+	}
+
 	astSelect := &tree.Select{
 		Select: &tree.SelectClause{
 			Distinct: false,
-			Exprs:    selectList,
+			Exprs:    exprs,
 			From:     fromTables,
 			Where:    node.Where,
 		},
@@ -1051,7 +1057,7 @@ func buildValueScan(
 		proc.SetValueScanBatch(nodeId, bat)
 	}
 	info.rootId = builder.appendNode(scanNode, bindCtx)
-	err = builder.addBinding(info.rootId, tree.AliasClause{
+	err = builder.addBinding(info.rootId, &tree.AliasClause{
 		Alias: tree.NewBufIdentifier("_ValueScan"),
 	}, bindCtx)
 	if err != nil {

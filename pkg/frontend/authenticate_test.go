@@ -272,9 +272,9 @@ func Test_checkTenantExistsOrNot(t *testing.T) {
 		err = InitGeneralTenant(ctx, ses, &tree.CreateAccount{
 			Name:        tree.NewBufString("test"),
 			IfNotExists: true,
-			AuthOption: tree.AccountAuthOption{
+			AuthOption: &tree.AccountAuthOption{
 				AdminName: tree.NewBufString("root"),
-				IdentifiedType: tree.AccountIdentified{
+				IdentifiedType: &tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByPassword,
 					Str: tree.NewBufString("123456"),
 				},
@@ -318,10 +318,11 @@ func Test_createTablesInMoCatalogOfGeneralTenant(t *testing.T) {
 		ca := &tree.CreateAccount{
 			Name:        tree.NewBufString("test"),
 			IfNotExists: true,
-			AuthOption: tree.AccountAuthOption{
+			AuthOption: &tree.AccountAuthOption{
 				AdminName:      tree.NewBufString("test_root"),
-				IdentifiedType: tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123")}},
-			Comment: tree.AccountComment{Exist: true, Comment: tree.NewBufString("test acccount")},
+				IdentifiedType: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123")}},
+			StatusOption: &tree.AccountStatus{},
+			Comment:      &tree.AccountComment{Exist: true, Comment: tree.NewBufString("test acccount")},
 		}
 
 		newTi, _, err := createTablesInMoCatalogOfGeneralTenant(ctx, bh, ca)
@@ -513,10 +514,16 @@ func Test_determinePrivilege(t *testing.T) {
 	args := []arg{
 		{stmt: &tree.CreateAccount{}},
 		{stmt: &tree.DropAccount{}},
-		{stmt: &tree.AlterAccount{}},
+		{stmt: &tree.AlterAccount{
+			AuthOption:   &tree.AlterAccountAuthOption{},
+			StatusOption: &tree.AccountStatus{},
+			Comment:      &tree.AccountComment{},
+		}},
 		{stmt: &tree.CreateUser{}},
 		{stmt: &tree.DropUser{}},
-		{stmt: &tree.AlterUser{}},
+		{stmt: &tree.AlterUser{
+			CommentOrAttribute: &tree.AccountCommentOrAttribute{},
+		}},
 		{stmt: &tree.CreateRole{}},
 		{stmt: &tree.DropRole{}},
 		{stmt: &tree.GrantRole{}},
@@ -532,7 +539,9 @@ func Test_determinePrivilege(t *testing.T) {
 		{stmt: &tree.ShowCreateTable{}},
 		{stmt: &tree.ShowColumns{}},
 		{stmt: &tree.ShowCreateView{}},
-		{stmt: &tree.CreateTable{}},
+		{stmt: &tree.CreateTable{
+			Table: &tree.TableName{},
+		}},
 		{stmt: &tree.CreateView{}},
 		{stmt: &tree.DropTable{}},
 		{stmt: &tree.DropView{}},
@@ -1276,9 +1285,10 @@ func Test_determineGrantRole(t *testing.T) {
 		}
 
 		g := &tree.Grant{
-			Typ: tree.GrantTypeRole,
+			Typ:       tree.GrantTypeRole,
+			GrantRole: &tree.GrantRole{},
 		}
-		gr := &g.GrantRole
+		gr := g.GrantRole
 		for _, name := range roleNames {
 			gr.Roles = append(gr.Roles, &tree.Role{UserName: tree.NewBufString(name)})
 		}
@@ -1378,9 +1388,10 @@ func Test_determineGrantRole(t *testing.T) {
 		}
 
 		g := &tree.Grant{
-			Typ: tree.GrantTypeRole,
+			Typ:       tree.GrantTypeRole,
+			GrantRole: &tree.GrantRole{},
 		}
-		gr := &g.GrantRole
+		gr := g.GrantRole
 		for _, name := range roleNames {
 			gr.Roles = append(gr.Roles, &tree.Role{UserName: tree.NewBufString(name)})
 		}
@@ -1480,9 +1491,10 @@ func Test_determineGrantRole(t *testing.T) {
 		}
 
 		g := &tree.Grant{
-			Typ: tree.GrantTypeRole,
+			Typ:       tree.GrantTypeRole,
+			GrantRole: &tree.GrantRole{},
 		}
-		gr := &g.GrantRole
+		gr := g.GrantRole
 		for _, name := range roleNames {
 			gr.Roles = append(gr.Roles, &tree.Role{UserName: tree.NewBufString(name)})
 		}
@@ -1579,9 +1591,10 @@ func Test_determineGrantRole(t *testing.T) {
 		}
 
 		g := &tree.Grant{
-			Typ: tree.GrantTypeRole,
+			Typ:       tree.GrantTypeRole,
+			GrantRole: &tree.GrantRole{},
 		}
-		gr := &g.GrantRole
+		gr := g.GrantRole
 		for _, name := range roleNames {
 			gr.Roles = append(gr.Roles, &tree.Role{UserName: tree.NewBufString(name)})
 		}
@@ -2970,7 +2983,9 @@ func Test_determineCreateTable(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		stmt := &tree.CreateTable{}
+		stmt := &tree.CreateTable{
+			Table: &tree.TableName{},
+		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
 
@@ -3029,7 +3044,9 @@ func Test_determineCreateTable(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		stmt := &tree.CreateTable{}
+		stmt := &tree.CreateTable{
+			Table: &tree.TableName{},
+		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
 
@@ -3103,7 +3120,9 @@ func Test_determineCreateTable(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		stmt := &tree.CreateTable{}
+		stmt := &tree.CreateTable{
+			Table: &tree.TableName{},
+		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
 
@@ -6179,7 +6198,9 @@ func TestDoGrantPrivilegeImplicitly(t *testing.T) {
 		bhStub := gostub.StubFunc(&NewBackgroundHandler, bh)
 		defer bhStub.Reset()
 
-		stmt := &tree.CreateTable{}
+		stmt := &tree.CreateTable{
+			Table: &tree.TableName{},
+		}
 
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6418,6 +6439,7 @@ func Test_doAlterUser(t *testing.T) {
 			Users: []*tree.User{
 				{Username: tree.NewBufString("u1"), Hostname: tree.NewBufString("%"), AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123456")}},
 			},
+			CommentOrAttribute: &tree.AccountCommentOrAttribute{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6473,6 +6495,7 @@ func Test_doAlterUser(t *testing.T) {
 				{Username: tree.NewBufString("u2"), Hostname: tree.NewBufString("%"), AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123456")}},
 				{Username: tree.NewBufString("u3"), Hostname: tree.NewBufString("%"), AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123456")}},
 			},
+			CommentOrAttribute: &tree.AccountCommentOrAttribute{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6524,6 +6547,7 @@ func Test_doAlterUser(t *testing.T) {
 			Users: []*tree.User{
 				{Username: tree.NewBufString("u1"), Hostname: tree.NewBufString("%"), AuthOption: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123456")}},
 			},
+			CommentOrAttribute: &tree.AccountCommentOrAttribute{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6575,14 +6599,16 @@ func Test_doAlterAccount(t *testing.T) {
 
 		stmt := &tree.AlterAccount{
 			Name: tree.NewBufString("aaa"),
-			AuthOption: tree.AlterAccountAuthOption{
+			AuthOption: &tree.AlterAccountAuthOption{
 				Exist:     true,
 				AdminName: tree.NewBufString("rootx"),
-				IdentifiedType: tree.AccountIdentified{
+				IdentifiedType: &tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByPassword,
 					Str: tree.NewBufString("111"),
 				},
 			},
+			StatusOption: &tree.AccountStatus{},
+			Comment:      &tree.AccountComment{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6629,14 +6655,16 @@ func Test_doAlterAccount(t *testing.T) {
 
 		stmt := &tree.AlterAccount{
 			Name: tree.NewBufString("aaa"),
-			AuthOption: tree.AlterAccountAuthOption{
+			AuthOption: &tree.AlterAccountAuthOption{
 				Exist:     true,
 				AdminName: tree.NewBufString("rootx"),
-				IdentifiedType: tree.AccountIdentified{
+				IdentifiedType: &tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByRandomPassword,
 					Str: tree.NewBufString("111"),
 				},
 			},
+			StatusOption: &tree.AccountStatus{},
+			Comment:      &tree.AccountComment{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6683,14 +6711,16 @@ func Test_doAlterAccount(t *testing.T) {
 
 		stmt := &tree.AlterAccount{
 			Name: tree.NewBufString("aaa"),
-			AuthOption: tree.AlterAccountAuthOption{
+			AuthOption: &tree.AlterAccountAuthOption{
 				Exist:     true,
 				AdminName: tree.NewBufString("rootx"),
-				IdentifiedType: tree.AccountIdentified{
+				IdentifiedType: &tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByRandomPassword,
 					Str: tree.NewBufString("111"),
 				},
 			},
+			StatusOption: &tree.AccountStatus{},
+			Comment:      &tree.AccountComment{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6733,14 +6763,16 @@ func Test_doAlterAccount(t *testing.T) {
 		stmt := &tree.AlterAccount{
 			IfExists: true,
 			Name:     tree.NewBufString("aaa"),
-			AuthOption: tree.AlterAccountAuthOption{
+			AuthOption: &tree.AlterAccountAuthOption{
 				Exist:     true,
 				AdminName: tree.NewBufString("rootx"),
-				IdentifiedType: tree.AccountIdentified{
+				IdentifiedType: &tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByPassword,
 					Str: tree.NewBufString("111"),
 				},
 			},
+			StatusOption: &tree.AccountStatus{},
+			Comment:      &tree.AccountComment{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6784,14 +6816,16 @@ func Test_doAlterAccount(t *testing.T) {
 		stmt := &tree.AlterAccount{
 			IfExists: true,
 			Name:     tree.NewBufString("aaa"),
-			AuthOption: tree.AlterAccountAuthOption{
+			AuthOption: &tree.AlterAccountAuthOption{
 				Exist:     true,
 				AdminName: tree.NewBufString("rootx"),
-				IdentifiedType: tree.AccountIdentified{
+				IdentifiedType: &tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByPassword,
 					Str: tree.NewBufString("111"),
 				},
 			},
+			StatusOption: &tree.AccountStatus{},
+			Comment:      &tree.AccountComment{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6839,6 +6873,11 @@ func Test_doAlterAccount(t *testing.T) {
 		stmt := &tree.AlterAccount{
 			IfExists: true,
 			Name:     tree.NewBufString("aaa"),
+			AuthOption:   &tree.AlterAccountAuthOption{
+				IdentifiedType: &tree.AccountIdentified{},
+			},
+			StatusOption: &tree.AccountStatus{},
+			Comment:      &tree.AccountComment{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6881,18 +6920,19 @@ func Test_doAlterAccount(t *testing.T) {
 		stmt := &tree.AlterAccount{
 			IfExists: true,
 			Name:     tree.NewBufString("aaa"),
-			AuthOption: tree.AlterAccountAuthOption{
+			AuthOption: &tree.AlterAccountAuthOption{
 				Exist:     true,
 				AdminName: tree.NewBufString("rootx"),
-				IdentifiedType: tree.AccountIdentified{
+				IdentifiedType: &tree.AccountIdentified{
 					Typ: tree.AccountIdentifiedByPassword,
 					Str: tree.NewBufString("111"),
 				},
 			},
-			StatusOption: tree.AccountStatus{
+			StatusOption: &tree.AccountStatus{
 				Exist:  true,
 				Option: tree.AccountStatusOpen,
 			},
+			Comment: &tree.AccountComment{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6932,11 +6972,13 @@ func Test_doAlterAccount(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.AlterAccount{
-			Name: tree.NewBufString("aaa"),
-			Comment: tree.AccountComment{
+			Name:       tree.NewBufString("aaa"),
+			AuthOption: &tree.AlterAccountAuthOption{},
+			Comment: &tree.AccountComment{
 				Exist:   true,
 				Comment: tree.NewBufString("new account"),
 			},
+			StatusOption: &tree.AccountStatus{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -6980,11 +7022,13 @@ func Test_doAlterAccount(t *testing.T) {
 		defer bhStub.Reset()
 
 		stmt := &tree.AlterAccount{
-			Name: tree.NewBufString("aaa"),
-			StatusOption: tree.AccountStatus{
+			Name:       tree.NewBufString("aaa"),
+			AuthOption: &tree.AlterAccountAuthOption{},
+			StatusOption: &tree.AccountStatus{
 				Exist:  true,
 				Option: tree.AccountStatusSuspend,
 			},
+			Comment: &tree.AccountComment{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -7029,10 +7073,12 @@ func Test_doAlterAccount(t *testing.T) {
 
 		stmt := &tree.AlterAccount{
 			Name: tree.NewBufString("sys"),
-			StatusOption: tree.AccountStatus{
+			StatusOption: &tree.AccountStatus{
 				Exist:  true,
 				Option: tree.AccountStatusSuspend,
 			},
+			AuthOption: &tree.AlterAccountAuthOption{},
+			Comment:    &tree.AccountComment{},
 		}
 		priv := determinePrivilegeSetOfStatement(stmt)
 		ses := newSes(priv, ctrl)
@@ -9322,7 +9368,7 @@ func TestCheckStageExistOrNot(t *testing.T) {
 
 func TestFormatCredentials(t *testing.T) {
 	convey.Convey("formatCredentials success", t, func() {
-		ta := tree.StageCredentials{
+		ta := &tree.StageCredentials{
 			Exist: false,
 		}
 		rstr := formatCredentials(ta)
@@ -9331,7 +9377,7 @@ func TestFormatCredentials(t *testing.T) {
 	})
 
 	convey.Convey("formatCredentials success", t, func() {
-		ta := tree.StageCredentials{
+		ta := &tree.StageCredentials{
 			Exist:       true,
 			Credentials: []string{"AWS_KEY_ID", "1a2b3c"},
 		}
@@ -9341,7 +9387,7 @@ func TestFormatCredentials(t *testing.T) {
 	})
 
 	convey.Convey("formatCredentials success", t, func() {
-		ta := tree.StageCredentials{
+		ta := &tree.StageCredentials{
 			Exist:       true,
 			Credentials: []string{"AWS_KEY_ID", "1a2b3c", "AWS_SECRET_KEY", "4x5y6z"},
 		}
@@ -9548,13 +9594,13 @@ func TestDoCreateStage(t *testing.T) {
 			IfNotExists: false,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
 			Url:         tree.NewBufString("'s3://load/files/'"),
-			Credentials: tree.StageCredentials{
+			Credentials: &tree.StageCredentials{
 				Exist: false,
 			},
-			Status: tree.StageStatus{
+			Status: &tree.StageStatus{
 				Exist: false,
 			},
-			Comment: tree.StageComment{
+			Comment: &tree.StageComment{
 				Exist: false,
 			},
 		}
@@ -9606,13 +9652,13 @@ func TestDoCreateStage(t *testing.T) {
 			IfNotExists: false,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
 			Url:         tree.NewBufString("'s3://load/files/'"),
-			Credentials: tree.StageCredentials{
+			Credentials: &tree.StageCredentials{
 				Exist: false,
 			},
-			Status: tree.StageStatus{
+			Status: &tree.StageStatus{
 				Exist: false,
 			},
-			Comment: tree.StageComment{
+			Comment: &tree.StageComment{
 				Exist: false,
 			},
 		}
@@ -9666,13 +9712,13 @@ func TestDoCreateStage(t *testing.T) {
 			IfNotExists: true,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
 			Url:         tree.NewBufString("'s3://load/files/'"),
-			Credentials: tree.StageCredentials{
+			Credentials: &tree.StageCredentials{
 				Exist: false,
 			},
-			Status: tree.StageStatus{
+			Status: &tree.StageStatus{
 				Exist: false,
 			},
-			Comment: tree.StageComment{
+			Comment: &tree.StageComment{
 				Exist: false,
 			},
 		}
@@ -9724,15 +9770,15 @@ func TestDoCreateStage(t *testing.T) {
 			IfNotExists: false,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
 			Url:         tree.NewBufString("'s3://load/files/'"),
-			Credentials: tree.StageCredentials{
+			Credentials: &tree.StageCredentials{
 				Exist:       true,
 				Credentials: []string{"'AWS_KEY_ID'", "'1a2b3c'", "'AWS_SECRET_KEY'", "'4x5y6z'"},
 			},
-			Status: tree.StageStatus{
+			Status: &tree.StageStatus{
 				Exist:  true,
 				Option: tree.StageStatusEnabled,
 			},
-			Comment: tree.StageComment{
+			Comment: &tree.StageComment{
 				Exist: false,
 			},
 		}
@@ -9785,17 +9831,17 @@ func TestDoAlterStage(t *testing.T) {
 		as := &tree.AlterStage{
 			IfNotExists: false,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
-			UrlOption: tree.StageUrl{
+			UrlOption: &tree.StageUrl{
 				Exist: true,
 				Url:   tree.NewBufString("'s3://load/files/'"),
 			},
-			CredentialsOption: tree.StageCredentials{
+			CredentialsOption: &tree.StageCredentials{
 				Exist: false,
 			},
-			StatusOption: tree.StageStatus{
+			StatusOption: &tree.StageStatus{
 				Exist: false,
 			},
-			Comment: tree.StageComment{
+			Comment: &tree.StageComment{
 				Exist: false,
 			},
 		}
@@ -9848,17 +9894,17 @@ func TestDoAlterStage(t *testing.T) {
 		as := &tree.AlterStage{
 			IfNotExists: false,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
-			UrlOption: tree.StageUrl{
+			UrlOption: &tree.StageUrl{
 				Exist: false,
 			},
-			CredentialsOption: tree.StageCredentials{
+			CredentialsOption: &tree.StageCredentials{
 				Exist:       true,
 				Credentials: []string{"'AWS_KEY_ID'", "'1a2b3c'", "'AWS_SECRET_KEY'", "'4x5y6z'"},
 			},
-			StatusOption: tree.StageStatus{
+			StatusOption: &tree.StageStatus{
 				Exist: false,
 			},
-			Comment: tree.StageComment{
+			Comment: &tree.StageComment{
 				Exist: false,
 			},
 		}
@@ -9911,17 +9957,17 @@ func TestDoAlterStage(t *testing.T) {
 		as := &tree.AlterStage{
 			IfNotExists: true,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
-			UrlOption: tree.StageUrl{
+			UrlOption: &tree.StageUrl{
 				Exist: true,
 				Url:   tree.NewBufString("'s3://load/files/'"),
 			},
-			CredentialsOption: tree.StageCredentials{
+			CredentialsOption: &tree.StageCredentials{
 				Exist: false,
 			},
-			StatusOption: tree.StageStatus{
+			StatusOption: &tree.StageStatus{
 				Exist: false,
 			},
-			Comment: tree.StageComment{
+			Comment: &tree.StageComment{
 				Exist: false,
 			},
 		}
@@ -9972,17 +10018,17 @@ func TestDoAlterStage(t *testing.T) {
 		as := &tree.AlterStage{
 			IfNotExists: false,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
-			UrlOption: tree.StageUrl{
+			UrlOption: &tree.StageUrl{
 				Exist: true,
 				Url:   tree.NewBufString("'s3://load/files/'"),
 			},
-			CredentialsOption: tree.StageCredentials{
+			CredentialsOption: &tree.StageCredentials{
 				Exist: false,
 			},
-			StatusOption: tree.StageStatus{
+			StatusOption: &tree.StageStatus{
 				Exist: false,
 			},
-			Comment: tree.StageComment{
+			Comment: &tree.StageComment{
 				Exist: false,
 			},
 		}
@@ -10033,18 +10079,18 @@ func TestDoAlterStage(t *testing.T) {
 		as := &tree.AlterStage{
 			IfNotExists: true,
 			Name:        tree.NewBufIdentifier("my_stage_test"),
-			UrlOption: tree.StageUrl{
+			UrlOption: &tree.StageUrl{
 				Exist: true,
 				Url:   tree.NewBufString("'s3://load/files/'"),
 			},
-			CredentialsOption: tree.StageCredentials{
+			CredentialsOption: &tree.StageCredentials{
 				Exist:       true,
 				Credentials: []string{"'AWS_KEY_ID'", "'1a2b3c'", "'AWS_SECRET_KEY'", "'4x5y6z'"},
 			},
-			StatusOption: tree.StageStatus{
+			StatusOption: &tree.StageStatus{
 				Exist: false,
 			},
-			Comment: tree.StageComment{
+			Comment: &tree.StageComment{
 				Exist: false,
 			},
 		}

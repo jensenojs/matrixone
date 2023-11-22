@@ -27,9 +27,9 @@ const (
 type Grant struct {
 	statementImpl
 	Typ            GrantType
-	GrantPrivilege GrantPrivilege
-	GrantRole      GrantRole
-	GrantProxy     GrantProxy
+	GrantPrivilege *GrantPrivilege
+	GrantRole      *GrantRole
+	GrantProxy     *GrantProxy
 }
 
 func (node *Grant) Format(ctx *FmtCtx) {
@@ -49,15 +49,9 @@ func (node *Grant) GetQueryType() string     { return QueryTypeDCL }
 func NewGrant(typ GrantType, grantPrivilege *GrantPrivilege, grantRole *GrantRole, grantProxy *GrantProxy, buf *buffer.Buffer) *Grant {
 	g := buffer.Alloc[Grant](buf)
 	g.Typ = typ
-	if grantPrivilege != nil {
-		g.GrantPrivilege = *grantPrivilege
-	}
-	if grantRole != nil {
-		g.GrantRole = *grantRole
-	}
-	if grantProxy != nil {
-		g.GrantProxy = *grantProxy
-	}
+	g.GrantPrivilege = grantPrivilege
+	g.GrantRole = grantRole
+	g.GrantProxy = grantProxy
 	return g
 }
 
@@ -127,7 +121,7 @@ type GrantRole struct {
 }
 
 func NewGrantRole(roles []*Role, users []*User, grantoption bool, buf *buffer.Buffer) *GrantRole {
-	g := buffer.Alloc[GrantRole](buf)	
+	g := buffer.Alloc[GrantRole](buf)
 	g.Roles = roles
 	g.Users = users
 	g.GrantOption = grantoption
@@ -168,8 +162,8 @@ type GrantProxy struct {
 	GrantOption bool
 }
 
-func NewGrantProxy(r *User, users []*User, grantoption bool, buf *buffer.Buffer) *GrantProxy{
-	g := buffer.Alloc[GrantProxy](buf)	
+func NewGrantProxy(r *User, users []*User, grantoption bool, buf *buffer.Buffer) *GrantProxy {
+	g := buffer.Alloc[GrantProxy](buf)
 	g.ProxyUser = r
 	g.Users = users
 	g.GrantOption = grantoption

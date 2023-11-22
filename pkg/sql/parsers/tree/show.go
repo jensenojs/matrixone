@@ -593,7 +593,7 @@ func NewShowStatus(g bool, l *ComparisonExpr, w *Where, buf *buffer.Buffer) *Sho
 // show index statement
 type ShowIndex struct {
 	showImpl
-	TableName TableName
+	TableName *TableName
 	Where     *Where
 }
 
@@ -610,9 +610,7 @@ func (node *ShowIndex) GetQueryType() string     { return QueryTypeOth }
 
 func NewShowIndex(t *TableName, w *Where, buf *buffer.Buffer) *ShowIndex {
 	si := buffer.Alloc[ShowIndex](buf)
-	if t != nil {
-		si.TableName = *t
-	}
+	si.TableName = t
 	si.Where = w
 	return si
 }

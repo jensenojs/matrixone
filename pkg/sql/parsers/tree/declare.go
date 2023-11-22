@@ -35,7 +35,6 @@ func NewDeclare(vs []string, ct *T, dv Expr, buf *buffer.Buffer) *Declare {
 			d.Variables = buffer.AppendSlice[string](buf, d.Variables, buf.CopyString(v))
 		}
 	}
-
 	return d
 }
 

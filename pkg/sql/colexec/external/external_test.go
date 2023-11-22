@@ -98,7 +98,7 @@ func Test_Prepare(t *testing.T) {
 		for _, tcs := range cases {
 			param := tcs.arg.Es
 			extern := &tree.ExternParam{
-				ExParamConst: tree.ExParamConst{
+				ExParamConst: &tree.ExParamConst{
 					Filepath: tree.NewBufString(""),
 					Tail: &tree.TailParameter{
 						IgnoredLines: 0,
@@ -106,7 +106,7 @@ func Test_Prepare(t *testing.T) {
 					Format: tree.NewBufString(tcs.format),
 					Option: defaultOption,
 				},
-				ExParam: tree.ExParam{
+				ExParam: &tree.ExParam{
 					FileService: tcs.proc.FileService,
 					JsonData:    tree.NewBufString(tcs.jsondata),
 					Ctx:         context.Background(),
@@ -132,7 +132,7 @@ func Test_Prepare(t *testing.T) {
 
 			if tcs.format == tree.JSONLINE {
 				extern = &tree.ExternParam{
-					ExParamConst: tree.ExParamConst{
+					ExParamConst: &tree.ExParamConst{
 						Filepath: tree.NewBufString(""),
 						Tail: &tree.TailParameter{
 							IgnoredLines: 0,
@@ -140,6 +140,7 @@ func Test_Prepare(t *testing.T) {
 						Format: tree.NewBufString(tcs.format),
 						Option: defaultOption,
 					},
+					ExParam: &tree.ExParam{},
 				}
 				extern.JsonData = tree.NewBufString(tcs.jsondata)
 				json_byte, err = json.Marshal(extern)
@@ -167,14 +168,14 @@ func Test_Call(t *testing.T) {
 		for _, tcs := range cases {
 			param := tcs.arg.Es
 			extern := &tree.ExternParam{
-				ExParamConst: tree.ExParamConst{
+				ExParamConst: &tree.ExParamConst{
 					Filepath: tree.NewBufString(""),
 					Tail: &tree.TailParameter{
 						IgnoredLines: 0,
 					},
 					Format: tree.NewBufString(tcs.format),
 				},
-				ExParam: tree.ExParam{
+				ExParam: &tree.ExParam{
 					FileService: tcs.proc.FileService,
 					JsonData:    tree.NewBufString(tcs.jsondata),
 					Ctx:         context.Background(),
@@ -209,10 +210,10 @@ func Test_Call(t *testing.T) {
 func Test_getCompressType(t *testing.T) {
 	convey.Convey("getCompressType succ", t, func() {
 		param := &tree.ExternParam{
-			ExParamConst: tree.ExParamConst{
+			ExParamConst: &tree.ExParamConst{
 				CompressType: tree.NewBufString(tree.GZIP),
 			},
-			ExParam: tree.ExParam{
+			ExParam: &tree.ExParam{
 				Ctx: context.Background(),
 			},
 		}
@@ -245,10 +246,10 @@ func Test_getCompressType(t *testing.T) {
 func Test_getUnCompressReader(t *testing.T) {
 	convey.Convey("getUnCompressReader succ", t, func() {
 		param := &tree.ExternParam{
-			ExParamConst: tree.ExParamConst{
+			ExParamConst: &tree.ExParamConst{
 				CompressType: tree.NewBufString(tree.NOCOMPRESS),
 			},
-			ExParam: tree.ExParam{
+			ExParam: &tree.ExParam{
 				Ctx: context.Background(),
 			},
 		}
@@ -465,13 +466,13 @@ func Test_GetBatchData(t *testing.T) {
 				Attrs: atrrs,
 				Cols:  cols,
 				Extern: &tree.ExternParam{
-					ExParamConst: tree.ExParamConst{
+					ExParamConst: &tree.ExParamConst{
 						Tail: &tree.TailParameter{
 							Fields: &tree.Fields{},
 						},
 						Format: tree.CSV,
 					},
-					ExParam: tree.ExParam{
+					ExParam: &tree.ExParam{
 						Ctx: context.Background(),
 					},
 				},
@@ -616,10 +617,10 @@ func TestReadDirSymlink(t *testing.T) {
 	// read a/b/d/foo
 	fooPathInB := filepath.Join(root, "a", "b", "d", "foo")
 	files, _, err := plan2.ReadDir(&tree.ExternParam{
-		ExParamConst: tree.ExParamConst{
+		ExParamConst: &tree.ExParamConst{
 			Filepath: tree.NewBufString(fooPathInB),
 		},
-		ExParam: tree.ExParam{
+		ExParam: &tree.ExParam{
 			Ctx: ctx,
 		},
 	})
@@ -629,10 +630,10 @@ func TestReadDirSymlink(t *testing.T) {
 
 	path1 := root + "/a//b/./../b/c/foo"
 	files1, _, err := plan2.ReadDir(&tree.ExternParam{
-		ExParamConst: tree.ExParamConst{
+		ExParamConst: &tree.ExParamConst{
 			Filepath: tree.NewBufString(path1),
 		},
-		ExParam: tree.ExParam{
+		ExParam: &tree.ExParam{
 			Ctx: ctx,
 		},
 	})

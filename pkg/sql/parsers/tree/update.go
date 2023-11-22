@@ -147,16 +147,15 @@ const (
 
 type ExternParam struct {
 	// params which come from parser
-	ExParamConst
+	*ExParamConst
 	// params which come from internal construct
-	ExParam
+	*ExParam
 }
 
 func NewExternParam(ec *ExParamConst, buf *buffer.Buffer) *ExternParam {
 	extermParam := buffer.Alloc[ExternParam](buf)
-	if ec != nil {
-		extermParam.ExParamConst = *ec
-	}
+	extermParam.ExParam = buffer.Alloc[ExParam](buf)
+	extermParam.ExParamConst = ec
 	return extermParam
 }
 

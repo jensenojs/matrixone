@@ -1557,7 +1557,7 @@ func GetExplainColumns(ctx context.Context, explainColName string) ([]interface{
 	return columns, err
 }
 
-func getExplainOption(requestCtx context.Context, options []tree.OptionElem) (*explain.ExplainOptions, error) {
+func getExplainOption(requestCtx context.Context, options []*tree.OptionElem) (*explain.ExplainOptions, error) {
 	es := explain.NewExplainDefaultOptions()
 	if options == nil {
 		return es, nil
@@ -3124,11 +3124,11 @@ func (mce *MysqlCmdExecutor) executeStmt(requestCtx context.Context,
 		ses.InvalidatePrivilegeCache()
 		switch st.Typ {
 		case tree.GrantTypeRole:
-			if err = mce.handleGrantRole(requestCtx, &st.GrantRole); err != nil {
+			if err = mce.handleGrantRole(requestCtx, st.GrantRole); err != nil {
 				return err
 			}
 		case tree.GrantTypePrivilege:
-			if err = mce.handleGrantPrivilege(requestCtx, &st.GrantPrivilege); err != nil {
+			if err = mce.handleGrantPrivilege(requestCtx, st.GrantPrivilege); err != nil {
 				return err
 			}
 		}
@@ -3137,11 +3137,11 @@ func (mce *MysqlCmdExecutor) executeStmt(requestCtx context.Context,
 		ses.InvalidatePrivilegeCache()
 		switch st.Typ {
 		case tree.RevokeTypeRole:
-			if err = mce.handleRevokeRole(requestCtx, &st.RevokeRole); err != nil {
+			if err = mce.handleRevokeRole(requestCtx, st.RevokeRole); err != nil {
 				return err
 			}
 		case tree.RevokeTypePrivilege:
-			if err = mce.handleRevokePrivilege(requestCtx, &st.RevokePrivilege); err != nil {
+			if err = mce.handleRevokePrivilege(requestCtx, st.RevokePrivilege); err != nil {
 				return err
 			}
 		}

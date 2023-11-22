@@ -30,18 +30,18 @@ const (
 	moEnumCastIndexValueToIndexFun = "cast_index_value_to_index"
 )
 
-func makeZeroRecursiveLevel(buf *buffer.Buffer) tree.SelectExpr {
-	return tree.SelectExpr{
+func makeZeroRecursiveLevel(buf *buffer.Buffer) *tree.SelectExpr {
+	return &tree.SelectExpr{
 		Expr: tree.NewNumValWithType(constant.MakeInt64(0), "0", false, tree.P_int64, buf),
 		As:   tree.NewCStr(moRecursiveLevelCol, 1, buf),
 	}
 
 }
 
-func makePlusRecursiveLevel(name string, buf *buffer.Buffer) tree.SelectExpr {
+func makePlusRecursiveLevel(name string, buf *buffer.Buffer) *tree.SelectExpr {
 	a := tree.SetUnresolvedName(buf, name, moRecursiveLevelCol)
 	b := tree.NewNumValWithType(constant.MakeInt64(1), "1", false, tree.P_int64, buf)
-	return tree.SelectExpr{
+	return &tree.SelectExpr{
 		Expr: tree.NewBinaryExpr(tree.PLUS, a, b, buf),
 		As:   tree.NewCStr("", 1, buf),
 	}

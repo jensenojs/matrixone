@@ -266,6 +266,7 @@ type Binder interface {
 	BindWinFunc(string, *tree.FuncExpr, int32, bool) (*plan.Expr, error)
 	BindSubquery(*tree.Subquery, bool) (*plan.Expr, error)
 	GetContext() context.Context
+	GetBuffer() *buffer.Buffer
 }
 
 type baseBinder struct {

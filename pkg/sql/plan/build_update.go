@@ -249,10 +249,16 @@ func selectUpdateTables(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.
 		updatePlanCtxs[i] = upPlanCtx
 	}
 
+	exprs := make([]*tree.SelectExpr, 0)
+	for _, s := range selectList {
+		s := s // NOTE: necessary!
+		exprs = append(exprs, &s)
+	}
+
 	selectAst := &tree.Select{
 		Select: &tree.SelectClause{
 			Distinct: false,
-			Exprs:    selectList,
+			Exprs:    exprs,
 			From:     fromTables,
 			Where:    stmt.Where,
 		},

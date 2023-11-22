@@ -27,7 +27,7 @@ type AlterUser struct {
 	Role     *Role
 	MiscOpt  UserMiscOption
 	// comment or attribute
-	CommentOrAttribute AccountCommentOrAttribute
+	CommentOrAttribute *AccountCommentOrAttribute
 }
 
 func (node *AlterUser) Format(ctx *FmtCtx) {
@@ -58,7 +58,7 @@ func (node *AlterUser) Format(ctx *FmtCtx) {
 func (node *AlterUser) GetStatementType() string { return "Alter User" }
 func (node *AlterUser) GetQueryType() string     { return QueryTypeDCL }
 
-func NewAlterUser(e bool, u []*User, r *Role, m UserMiscOption, c AccountCommentOrAttribute, buf *buffer.Buffer) *AlterUser {
+func NewAlterUser(e bool, u []*User, r *Role, m UserMiscOption, c *AccountCommentOrAttribute, buf *buffer.Buffer) *AlterUser {
 	a := buffer.Alloc[AlterUser](buf)
 	a.IfExists = e
 	a.Role = r
@@ -72,7 +72,7 @@ type AlterAccountAuthOption struct {
 	Exist          bool
 	Equal          *BufString
 	AdminName      *BufString
-	IdentifiedType AccountIdentified
+	IdentifiedType *AccountIdentified
 }
 
 func NewAlterAccountAuthOption(exist bool, equal, name string, buf *buffer.Buffer) *AlterAccountAuthOption {
@@ -103,14 +103,14 @@ type AlterAccount struct {
 	statementImpl
 	IfExists   bool
 	Name       *BufString
-	AuthOption AlterAccountAuthOption
+	AuthOption *AlterAccountAuthOption
 	//status_option or not
-	StatusOption AccountStatus
+	StatusOption *AccountStatus
 	//comment or not
-	Comment AccountComment
+	Comment *AccountComment
 }
 
-func NewAlterAccount(exist bool, name string, aopt AlterAccountAuthOption, sopt AccountStatus, c AccountComment, buf *buffer.Buffer) *AlterAccount {
+func NewAlterAccount(exist bool, name string, aopt *AlterAccountAuthOption, sopt *AccountStatus, c *AccountComment, buf *buffer.Buffer) *AlterAccount {
 	a := buffer.Alloc[AlterAccount](buf)
 	a.IfExists = exist
 	bName := NewBufString(name)
