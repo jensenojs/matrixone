@@ -993,9 +993,7 @@ func Test_statement_type(t *testing.T) {
 			stmt tree.Statement
 		}
 		kases := []kase{
-			{&tree.CreateTable{
-				Table: &tree.TableName{},
-			}},
+			{&tree.CreateTable{}},
 			{&tree.Insert{}},
 			{&tree.BeginTransaction{}},
 			{&tree.ShowTables{}},
@@ -1007,9 +1005,7 @@ func Test_statement_type(t *testing.T) {
 			convey.So(ret, convey.ShouldBeTrue)
 		}
 
-		convey.So(IsDDL(&tree.CreateTable{
-			Table: &tree.TableName{},
-		}), convey.ShouldBeTrue)
+		convey.So(IsDDL(&tree.CreateTable{}), convey.ShouldBeTrue)
 		convey.So(IsDropStatement(&tree.DropTable{}), convey.ShouldBeTrue)
 		convey.So(IsAdministrativeStatement(&tree.CreateAccount{}), convey.ShouldBeTrue)
 		convey.So(IsParameterModificationStatement(&tree.SetVar{}), convey.ShouldBeTrue)

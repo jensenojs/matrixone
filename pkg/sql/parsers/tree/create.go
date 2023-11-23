@@ -2970,10 +2970,10 @@ func (node *CreatePublication) Format(ctx *FmtCtx) {
 	node.Name.Format(ctx)
 	ctx.WriteString(" database ")
 	node.Database.Format(ctx)
-	if node.AccountsSet != nil && len(node.AccountsSet.SetAccounts) > 0 {
+	if node.AccountsSet != nil && len(node.AccountsSet.SetAccounts.Get()) > 0 {
 		ctx.WriteString(" account ")
 		prefix := ""
-		for _, a := range node.AccountsSet.SetAccounts {
+		for _, a := range node.AccountsSet.SetAccounts.Get() {
 			ctx.WriteString(prefix)
 			a.Format(ctx)
 			prefix = ", "

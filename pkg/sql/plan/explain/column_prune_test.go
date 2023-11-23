@@ -177,10 +177,13 @@ func TestSingleTableQueryPrune(t *testing.T) {
 		},
 	}
 
+	buf := buffer.New()
+	defer buf.Free()
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			mock := plan2.NewMockOptimizer(false)
-			logicPlan, err := buildOneStmt(mock, t, c.sql)
+			logicPlan, err := buildOneStmt(mock, t, c.sql, buf)
 			if err != nil {
 				t.Fatalf("%+v", err)
 			}
@@ -381,10 +384,13 @@ func TestJoinQueryPrune(t *testing.T) {
 		},
 	}
 
+	buf := buffer.New()
+	defer buf.Free()
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			mock := plan2.NewMockOptimizer(false)
-			logicPlan, err := buildOneStmt(mock, t, c.sql)
+			logicPlan, err := buildOneStmt(mock, t, c.sql, buf)
 			if err != nil {
 				t.Fatalf("%+v", err)
 			}
@@ -452,10 +458,13 @@ func TestNestedQueryPrune(t *testing.T) {
 		},
 	}
 
+	buf := buffer.New()
+	defer buf.Free()
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			mock := plan2.NewMockOptimizer(false)
-			logicPlan, err := buildOneStmt(mock, t, c.sql)
+			logicPlan, err := buildOneStmt(mock, t, c.sql, buf)
 			if err != nil {
 				t.Fatalf("%+v", err)
 			}
@@ -539,10 +548,13 @@ func TestDerivedTableQueryPrune(t *testing.T) {
 		},
 	}
 
+	buf := buffer.New()
+	defer buf.Free()
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			mock := plan2.NewMockOptimizer(false)
-			logicPlan, err := buildOneStmt(mock, t, c.sql)
+			logicPlan, err := buildOneStmt(mock, t, c.sql, buf)
 			if err != nil {
 				t.Fatalf("%+v", err)
 			}
@@ -556,9 +568,7 @@ func TestDerivedTableQueryPrune(t *testing.T) {
 
 }
 
-func buildOneStmt(opt plan2.Optimizer, t *testing.T, sql string) (*plan.Plan, error) {
-	buf := buffer.New()
-	defer buf.Free()
+func buildOneStmt(opt plan2.Optimizer, t *testing.T, sql string, buf *buffer.Buffer) (*plan.Plan, error) {
 	stmts, err := mysql.Parse(opt.CurrentContext().GetContext(), sql, 1, buf)
 	if err != nil {
 		t.Fatalf("%+v", err)

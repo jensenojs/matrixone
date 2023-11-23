@@ -23,7 +23,7 @@ type CreateStream struct {
 	IfNotExists bool
 	StreamName  *TableName
 	Defs        TableDefs
-	ColNames    IdentifierList
+	ColNames    *BufIdentifierList
 	AsSource    *Select
 	Options     []TableOption
 }
@@ -35,7 +35,9 @@ func NewCreateStream(replace, source, ifNotExists bool, streamName *TableName, d
 	c.IfNotExists = ifNotExists
 	c.StreamName = streamName
 	c.Defs = defs
-	c.ColNames = colNames
+	bc := NewBufIdentifierList(colNames)
+	buf.Pin(bc)
+	c.ColNames = bc
 	c.AsSource = asSource
 	c.Options = options
 	return c

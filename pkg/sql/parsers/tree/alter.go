@@ -140,7 +140,7 @@ type AlterView struct {
 	statementImpl
 	IfExists bool
 	Name     *TableName
-	ColNames IdentifierList
+	ColNames *BufIdentifierList
 	AsSource *Select
 }
 
@@ -148,7 +148,9 @@ func NewAlterView(exist bool, name *TableName, colNames IdentifierList, asSource
 	a := buffer.Alloc[AlterView](buf)
 	a.IfExists = exist
 	a.Name = name
-	a.ColNames = colNames
+	bc := NewBufIdentifierList(colNames)
+	buf.Pin(bc)
+	a.ColNames = bc
 	a.AsSource = asSource
 	return a
 }
@@ -163,7 +165,7 @@ func (node *AlterView) Format(ctx *FmtCtx) {
 	}
 
 	node.Name.Format(ctx)
-	if len(node.ColNames) > 0 {
+	if len(node.ColNames.Get()) > 0 {
 		ctx.WriteString(" (")
 		node.ColNames.Format(ctx)
 		ctx.WriteByte(')')
@@ -415,17 +417,22 @@ func (node *AlterAddCol) Format(ctx *FmtCtx) {
 
 type AccountsSetOption struct {
 	All          bool
-	SetAccounts  IdentifierList
-	AddAccounts  IdentifierList
-	DropAccounts IdentifierList
+	SetAccounts  *BufIdentifierList
+	AddAccounts  *BufIdentifierList
+	DropAccounts *BufIdentifierList
 }
 
 func NewAccountsSetOption(al bool, se, ad, dr IdentifierList, buf *buffer.Buffer) *AccountsSetOption {
 	a := buffer.Alloc[AccountsSetOption](buf)
 	a.All = al
-	a.SetAccounts = se
-	a.AddAccounts = ad
-	a.DropAccounts = dr
+
+	bse := NewBufIdentifierList(se)
+	bad := NewBufIdentifierList(ad)
+	bdr := NewBufIdentifierList(dr)
+	buf.Pin(bse, bad, bdr)
+	a.SetAccounts = bse
+	a.AddAccounts = bad
+	a.DropAccounts = bdr
 	return a
 }
 
@@ -445,8 +452,8 @@ func NewAlterPublication(exist bool, name Identifier, accountsSet *AccountsSetOp
 	a.IfExists = exist
 	a.Name = n
 	a.AccountsSet = accountsSet
-bComment := NewBufString(comment)
-buf.Pin(bComment)
+	bComment := NewBufString(comment)
+	buf.Pin(bComment)
 	a.Comment = bComment
 	return a
 }
@@ -462,14 +469,14 @@ func (node *AlterPublication) Format(ctx *FmtCtx) {
 		if node.AccountsSet.All {
 			ctx.WriteString("all")
 		} else {
-			if len(node.AccountsSet.SetAccounts) > 0 {
+			if len(node.AccountsSet.SetAccounts.Get()) > 0 {
 				node.AccountsSet.SetAccounts.Format(ctx)
 			}
-			if len(node.AccountsSet.AddAccounts) > 0 {
+			if len(node.AccountsSet.AddAccounts.Get()) > 0 {
 				ctx.WriteString("add ")
 				node.AccountsSet.AddAccounts.Format(ctx)
 			}
-			if len(node.AccountsSet.DropAccounts) > 0 {
+			if len(node.AccountsSet.DropAccounts.Get()) > 0 {
 				ctx.WriteString("drop ")
 				node.AccountsSet.DropAccounts.Format(ctx)
 			}

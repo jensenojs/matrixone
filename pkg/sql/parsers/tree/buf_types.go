@@ -87,3 +87,31 @@ func (b *BufIdentifier) Format(ctx *FmtCtx) {
 		ctx.WriteString(string(*b.i))
 	}
 }
+
+type BufIdentifierList struct {
+	l *IdentifierList
+}
+
+func NewBufIdentifierList(l IdentifierList) *BufIdentifierList {
+	return &BufIdentifierList{&l}
+}
+
+func (b *BufIdentifierList) Get() IdentifierList {
+	if b != nil && b.l != nil {
+		return *b.l
+	}
+	return nil
+}
+
+func (b *BufIdentifierList) Format(ctx *FmtCtx) {
+	if b != nil && b.l != nil {
+		b.l.Format(ctx)
+	}
+}
+
+func (b *BufIdentifierList) Append(s string) *BufIdentifierList {
+	bl := b.Get()
+	bl = append(bl, Identifier(s))
+	b.l = &bl
+	return b
+}

@@ -21,7 +21,7 @@ type Delete struct {
 	statementImpl
 	Tables         TableExprs
 	TableRefs      TableExprs
-	PartitionNames IdentifierList
+	PartitionNames *BufIdentifierList
 	Where          *Where
 	OrderBy        OrderBy
 	Limit          *Limit

@@ -39,11 +39,11 @@ func buildReplace(stmt *tree.Replace, ctx CompilerContext, isPrepareStmt bool) (
 
 	if keys != nil {
 		// table has keys
-		if len(stmt.Columns) != 0 {
+		if len(stmt.Columns.Get()) != 0 {
 			// replace into table set col1 = val1, col2 = val2, ...
 			row := stmt.Rows.Select.(*tree.ValuesClause).Rows[0]
-			keyToRow := getKeyToRowMatch(stmt.Columns)
-			keepKeys := filterKeys(keys, stmt.Columns)
+			keyToRow := getKeyToRowMatch(stmt.Columns.Get())
+			keepKeys := filterKeys(keys, stmt.Columns.Get())
 			disjunction := make([]string, 0, len(keepKeys))
 			for _, key := range keepKeys {
 				disjunction = append(disjunction, buildConjunction(key, row, keyToRow))

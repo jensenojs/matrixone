@@ -20,7 +20,7 @@ type CreateView struct {
 	statementImpl
 	Replace     bool
 	Name        *TableName
-	ColNames    IdentifierList
+	ColNames    *BufIdentifierList
 	AsSource    *Select
 	IfNotExists bool
 }
@@ -29,7 +29,9 @@ func NewCreateView(replace bool, name *TableName, colnames IdentifierList, asSou
 	c := buffer.Alloc[CreateView](buf)
 	c.Replace = replace
 	c.Name = name
-	c.ColNames = colnames
+	bc := NewBufIdentifierList(colnames)
+	buf.Pin(bc)
+	c.ColNames = bc
 	c.AsSource = asSource
 	c.IfNotExists = ifn
 	return c
@@ -49,7 +51,7 @@ func (node *CreateView) Format(ctx *FmtCtx) {
 	}
 
 	node.Name.Format(ctx)
-	if len(node.ColNames) > 0 {
+	if len(node.ColNames.Get()) > 0 {
 		ctx.WriteString(" (")
 		node.ColNames.Format(ctx)
 		ctx.WriteByte(')')

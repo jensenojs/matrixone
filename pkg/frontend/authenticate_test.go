@@ -318,10 +318,10 @@ func Test_createTablesInMoCatalogOfGeneralTenant(t *testing.T) {
 		ca := &tree.CreateAccount{
 			Name:        tree.NewBufString("test"),
 			IfNotExists: true,
+			StatusOption: &tree.AccountStatus{},
 			AuthOption: &tree.AccountAuthOption{
 				AdminName:      tree.NewBufString("test_root"),
 				IdentifiedType: &tree.AccountIdentified{Typ: tree.AccountIdentifiedByPassword, Str: tree.NewBufString("123")}},
-			StatusOption: &tree.AccountStatus{},
 			Comment:      &tree.AccountComment{Exist: true, Comment: tree.NewBufString("test acccount")},
 		}
 
@@ -8191,7 +8191,7 @@ func TestDoCreatePublication(t *testing.T) {
 		Database: tree.NewBufIdentifier("db1"),
 		Comment:  tree.NewBufString("124"),
 		AccountsSet: &tree.AccountsSetOption{
-			SetAccounts: tree.IdentifierList{"a1", "a2"},
+			SetAccounts: tree.NewBufIdentifierList(tree.IdentifierList{"a1", "a2"}),
 		},
 	}
 	sql1, err := getSqlForGetDbIdAndType(ctx, string(sa.Database.Get()), true, 0)
@@ -8323,9 +8323,9 @@ func TestDoAlterPublication(t *testing.T) {
 			pubName: "pub1",
 			comment: "124",
 			accountsSet: &tree.AccountsSetOption{
-				AddAccounts: tree.IdentifierList{
+				AddAccounts:  tree.NewBufIdentifierList(tree.IdentifierList{
 					tree.Identifier("a1"),
-				},
+				}),
 			},
 			accountList: "a0",
 			data:        [][]any{{"a0", "121"}},
@@ -8335,9 +8335,9 @@ func TestDoAlterPublication(t *testing.T) {
 			pubName: "pub1",
 			comment: "124",
 			accountsSet: &tree.AccountsSetOption{
-				SetAccounts: tree.IdentifierList{
+				SetAccounts:  tree.NewBufIdentifierList(tree.IdentifierList{
 					tree.Identifier("a1"),
-				},
+				}),
 			},
 			accountList: "a0",
 			data:        [][]any{{"a0", "121"}},
@@ -8347,9 +8347,9 @@ func TestDoAlterPublication(t *testing.T) {
 			pubName: "pub1",
 			comment: "124",
 			accountsSet: &tree.AccountsSetOption{
-				DropAccounts: tree.IdentifierList{
+				DropAccounts:  tree.NewBufIdentifierList(tree.IdentifierList{
 					tree.Identifier("a1"),
-				},
+				}),
 			},
 			accountList: "all",
 			data:        [][]any{{"all", "121"}},

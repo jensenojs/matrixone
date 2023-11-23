@@ -1043,7 +1043,7 @@ func (mce *MysqlCmdExecutor) handleAnalyzeStmt(requestCtx context.Context, ses *
 	// `handleAnalyzeStmt` can be easily managed by cron jobs in the future
 	ctx := tree.NewFmtCtx(dialect.MYSQL)
 	ctx.WriteString("select ")
-	for i, ident := range stmt.Cols {
+	for i, ident := range stmt.Cols.Get() {
 		if i > 0 {
 			ctx.WriteByte(',')
 		}

@@ -246,7 +246,7 @@ type Load struct {
 	Local             bool
 	DuplicateHandling DuplicateKey
 	Table             *TableName
-	Accounts          IdentifierList
+	Accounts          *BufIdentifierList
 	//Partition
 	Param *ExternParam
 }

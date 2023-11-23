@@ -20,7 +20,7 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 type AnalyzeStmt struct {
 	statementImpl
 	Table *TableName
-	Cols  IdentifierList
+	Cols  *BufIdentifierList
 }
 
 func (node *AnalyzeStmt) Format(ctx *FmtCtx) {
@@ -37,6 +37,8 @@ func (node *AnalyzeStmt) GetQueryType() string     { return QueryTypeOth }
 func NewAnalyzeStmt(table *TableName, cols IdentifierList, buf *buffer.Buffer) *AnalyzeStmt {
 	a := buffer.Alloc[AnalyzeStmt](buf)
 	a.Table = table
-	a.Cols = cols
+	bc := NewBufIdentifierList(cols)
+	buf.Pin(bc)
+	a.Cols = bc
 	return a
 }

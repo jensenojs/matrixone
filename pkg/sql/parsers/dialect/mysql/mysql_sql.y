@@ -4556,7 +4556,9 @@ replace_stmt:
     {
     	rep := $4
     	rep.Table = $2
-    	rep.PartitionNames = $3
+        bi := tree.NewBufIdentifierList($3)
+        yylex.(*Lexer).buf.Pin(bi)
+    	rep.PartitionNames = bi
     	$$ = rep
     }
 
@@ -4593,10 +4595,12 @@ replace_data:
 			yylex.Error("the set list of replace can not be empty")
 			return 1
 		}
-        identList := buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
+        /* identList := buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf) */
+        var identList tree.IdentifierList
         valueList := buffer.MakeSlice[tree.Expr](yylex.(*Lexer).buf)
 		for _, a := range $2 {
-            identList = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, identList, a.Column.Get())
+            /* identList = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, identList, a.Column.Get()) */
+            identList = append(identList, a.Column.Get())
             valueList = buffer.AppendSlice[tree.Expr](yylex.(*Lexer).buf, valueList, a.Expr)
 		}
         
@@ -4612,7 +4616,9 @@ insert_stmt:
     {
         ins := $4
         ins.Table = $2
-        ins.PartitionNames = $3
+        bi := tree.NewBufIdentifierList($3)
+        yylex.(*Lexer).buf.Pin(bi)
+        ins.PartitionNames = bi
         ins.OnDuplicateUpdate = $5
         $$ = ins
     }
@@ -4620,13 +4626,11 @@ insert_stmt:
 accounts_list:
     account_name
     {
-        $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $$, tree.Identifier($1))
+        $$ = tree.IdentifierList{tree.Identifier($1)}
     }
 |   accounts_list ',' account_name
     {
-        /* $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf) */
-        $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $1, tree.Identifier($3))
+        $$ = append($1, tree.Identifier($3))
     }
 
 insert_data:
@@ -4663,11 +4667,13 @@ insert_data:
             return 1
         }
 
-        identList := buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
+        /* identList := buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf) */
+        var identList tree.IdentifierList
         valueList := buffer.MakeSlice[tree.Expr](yylex.(*Lexer).buf)
         
 		for _, a := range $2 {
-            identList = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, identList, a.Column.Get())
+            /* identList = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, identList, a.Column.Get()) */
+            identList = append(identList, a.Column.Get())
             valueList = buffer.AppendSlice[tree.Expr](yylex.(*Lexer).buf, valueList, a.Expr)
 		}
         
@@ -4717,13 +4723,11 @@ set_value:
 insert_column_list:
     insert_column
     {
-        $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $$, tree.Identifier($1))
+        $$ = tree.IdentifierList{tree.Identifier($1)}
     }
 |   insert_column_list ',' insert_column
     {
-        /* $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf) */
-        $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $1, tree.Identifier($3))
+        $$ = append($1, tree.Identifier($3))
     }
 
 insert_column:
@@ -4795,13 +4799,15 @@ partition_clause_opt:
 partition_id_list:
     ident
     {
-        $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $$, tree.Identifier($1.Compare()))
+        /* $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
+        $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $$, tree.Identifier($1.Compare())) */
+        $$ = tree.IdentifierList{tree.Identifier($1.Compare())}
     }
 |   partition_id_list ',' ident
     {
         /* $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf) */
-        $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $1, tree.Identifier($3.Compare()))
+        /* $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $1, tree.Identifier($3.Compare())) */
+        $$ = append($1 , tree.Identifier($3.Compare()))
     }
 
 into_table_name:
@@ -5735,13 +5741,15 @@ join_condition:
 column_list:
     ident
     {
-        $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
-        $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $$, tree.Identifier($1.Compare()))
+        /* $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf)
+        $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $$, tree.Identifier($1.Compare())) */
+        $$ = tree.IdentifierList{tree.Identifier($1.Compare())}
     }
 |   column_list ',' ident
     {
         /* $$ = buffer.MakeSlice[tree.Identifier](yylex.(*Lexer).buf) */
-        $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $1, tree.Identifier($3.Compare()))
+        /* $$ = buffer.AppendSlice[tree.Identifier](yylex.(*Lexer).buf, $1, tree.Identifier($3.Compare())) */
+        $$ = append($1, tree.Identifier($3.Compare()))
     }
 
 table_factor:

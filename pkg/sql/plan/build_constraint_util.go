@@ -371,7 +371,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 	isInsertWithoutAutoPkCol := false
 	pkPosInValues := make(map[int]int)
 
-	if stmt.Columns == nil {
+	if stmt.Columns.Get() == nil {
 		for _, col := range tableDef.Cols {
 			// Hide pk can not added, because this column is auto increment
 			// column. This must be fill by auto increment
@@ -381,7 +381,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 		}
 	} else {
 		syntaxHasColumnNames = true
-		for _, column := range stmt.Columns {
+		for _, column := range stmt.Columns.Get() {
 			colName := string(column)
 			if _, ok := colToIdx[colName]; !ok {
 				return false, nil, false, moerr.NewBadFieldError(builder.GetContext(), colName, tableDef.Name)

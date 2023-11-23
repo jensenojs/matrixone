@@ -33,6 +33,7 @@ func NewCStr(str string, lower int64, buf *buffer.Buffer) *CStr {
 	o := NewBufString(str)
 	if buf != nil {
 		cs = buffer.Alloc[CStr](buf)
+		buf.Pin(buf) // TODO: this should aleady done
 		cs.buf = buf
 		buf.Pin(o)
 	} else {

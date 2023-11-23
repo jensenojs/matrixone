@@ -1751,8 +1751,8 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 				if err != nil {
 					return 0, err
 				}
-				if len(cteRef.ast.Name.Cols) > 0 && len(cteRef.ast.Name.Cols) != len(builder.qry.Nodes[nodeID].ProjectList) {
-					return 0, moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", table, len(builder.qry.Nodes[nodeID].ProjectList), len(cteRef.ast.Name.Cols))
+				if len(cteRef.ast.Name.Cols.Get()) > 0 && len(cteRef.ast.Name.Cols.Get()) != len(builder.qry.Nodes[nodeID].ProjectList) {
+					return 0, moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", table, len(builder.qry.Nodes[nodeID].ProjectList), len(cteRef.ast.Name.Cols.Get()))
 				}
 			} else {
 
@@ -1764,8 +1764,8 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 				if err != nil {
 					return 0, err
 				}
-				if len(cteRef.ast.Name.Cols) > 0 && len(cteRef.ast.Name.Cols) != len(builder.qry.Nodes[initLastNodeID].ProjectList) {
-					return 0, moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", table, len(builder.qry.Nodes[initLastNodeID].ProjectList), len(cteRef.ast.Name.Cols))
+				if len(cteRef.ast.Name.Cols.Get()) > 0 && len(cteRef.ast.Name.Cols.Get()) != len(builder.qry.Nodes[initLastNodeID].ProjectList) {
+					return 0, moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", table, len(builder.qry.Nodes[initLastNodeID].ProjectList), len(cteRef.ast.Name.Cols.Get()))
 				}
 				recursiveNodeId := initLastNodeID
 				for _, r := range stmts {
@@ -2689,7 +2689,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 						ctx.hasSingleRow = true
 					}
 
-					cols := cteRef.ast.Name.Cols
+					cols := cteRef.ast.Name.Cols.Get()
 
 					if len(cols) > len(subCtx.headings) {
 						return 0, moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", table, len(subCtx.headings), len(cols))
@@ -2717,8 +2717,8 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 					initSourceStep := int32(len(builder.qry.Steps))
 					recursiveSteps := make([]int32, len(stmts))
 					recursiveNodeIDs := make([]int32, len(stmts))
-					if len(cteRef.ast.Name.Cols) > 0 {
-						cteRef.ast.Name.Cols = append(cteRef.ast.Name.Cols, moRecursiveLevelCol)
+					if len(cteRef.ast.Name.Cols.Get()) > 0 {
+						cteRef.ast.Name.Cols.Append(moRecursiveLevelCol)
 					}
 
 					for i, r := range stmts {
@@ -2759,7 +2759,7 @@ func (builder *QueryBuilder) buildTable(stmt tree.TableExpr, ctx *BindContext, p
 							ctx.hasSingleRow = true
 						}
 
-						cols := cteRef.ast.Name.Cols
+						cols := cteRef.ast.Name.Cols.Get()
 
 						if len(cols) > len(subCtx.headings) {
 							return 0, moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", table, len(subCtx.headings), len(cols))
@@ -3089,8 +3089,8 @@ func (builder *QueryBuilder) addBinding(nodeID int32, alias *tree.AliasClause, c
 		if (node.NodeType == plan.Node_VALUE_SCAN || node.NodeType == plan.Node_SINK_SCAN || node.NodeType == plan.Node_RECURSIVE_SCAN) && node.TableDef == nil {
 			return nil
 		}
-		if len(alias.Cols) > len(node.TableDef.Cols) {
-			return moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", alias.Alias.Get(), len(node.TableDef.Cols), len(alias.Cols))
+		if len(alias.Cols.Get()) > len(node.TableDef.Cols) {
+			return moerr.NewSyntaxError(builder.GetContext(), "table %q has %d columns available but %d columns specified", alias.Alias.Get(), len(node.TableDef.Cols), len(alias.Cols.Get()))
 		}
 
 		if alias.Alias.Get() != "" {
@@ -3118,8 +3118,8 @@ func (builder *QueryBuilder) addBinding(nodeID int32, alias *tree.AliasClause, c
 		tag := node.BindingTags[0]
 
 		for i, col := range node.TableDef.Cols {
-			if i < len(alias.Cols) {
-				cols[i] = string(alias.Cols[i])
+			if i < len(alias.Cols.Get()) {
+				cols[i] = string(alias.Cols.Get()[i])
 			} else {
 				cols[i] = col.Name
 			}
@@ -3137,8 +3137,8 @@ func (builder *QueryBuilder) addBinding(nodeID int32, alias *tree.AliasClause, c
 		headings := subCtx.headings
 		projects := subCtx.projects
 
-		if len(alias.Cols) > len(headings) {
-			return moerr.NewSyntaxError(builder.GetContext(), "11111 table %q has %d columns available but %d columns specified", alias.Alias.Get(), len(headings), len(alias.Cols))
+		if len(alias.Cols.Get()) > len(headings) {
+			return moerr.NewSyntaxError(builder.GetContext(), "11111 table %q has %d columns available but %d columns specified", alias.Alias.Get(), len(headings), len(alias.Cols.Get()))
 		}
 
 		table = subCtx.cteName
@@ -3158,8 +3158,8 @@ func (builder *QueryBuilder) addBinding(nodeID int32, alias *tree.AliasClause, c
 		types = make([]*plan.Type, colLength)
 
 		for i, col := range headings {
-			if i < len(alias.Cols) {
-				cols[i] = string(alias.Cols[i])
+			if i < len(alias.Cols.Get()) {
+				cols[i] = string(alias.Cols.Get()[i])
 			} else {
 				cols[i] = strings.ToLower(col)
 			}
@@ -3253,7 +3253,7 @@ func (builder *QueryBuilder) buildJoinTable(tbl *tree.JoinTableExpr, ctx *BindCo
 		node.OnList = joinConds
 
 	case *tree.UsingJoinCond:
-		for _, col := range cond.Cols {
+		for _, col := range cond.Cols.Get() {
 			expr, err := ctx.addUsingCol(string(col), joinType, leftCtx, rightCtx)
 			if err != nil {
 				return 0, err

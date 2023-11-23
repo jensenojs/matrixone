@@ -20,9 +20,9 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 type Insert struct {
 	statementImpl
 	Table             TableExpr
-	Accounts          IdentifierList
-	PartitionNames    IdentifierList
-	Columns           IdentifierList
+	Accounts          *BufIdentifierList
+	PartitionNames    *BufIdentifierList
+	Columns           *BufIdentifierList
 	Rows              *Select
 	OnDuplicateUpdate UpdateExprs
 }
@@ -62,7 +62,9 @@ func (node *Insert) GetQueryType() string     { return QueryTypeDML }
 
 func NewInsert(columns IdentifierList, rows *Select, buf *buffer.Buffer) *Insert {
 	i := buffer.Alloc[Insert](buf)
-	i.Columns = columns
+	bc := NewBufIdentifierList(columns)
+	buf.Pin(bc)
+	i.Columns = bc
 	i.Rows = rows
 	return i
 }
@@ -76,7 +78,7 @@ func NewAssignment(column Identifier, expr Expr, buf *buffer.Buffer) *Assignment
 	i := buffer.Alloc[Assignment](buf)
 	c := NewBufIdentifier(column)
 	buf.Pin(c)
-	
+
 	i.Column = c
 	i.Expr = expr
 	return i

@@ -20,8 +20,8 @@ import "github.com/matrixorigin/matrixone/pkg/common/buffer"
 type Replace struct {
 	statementImpl
 	Table          TableExpr
-	PartitionNames IdentifierList
-	Columns        IdentifierList
+	PartitionNames *BufIdentifierList
+	Columns        *BufIdentifierList
 	Rows           *Select
 }
 
@@ -51,7 +51,9 @@ func (node *Replace) GetQueryType() string     { return QueryTypeDML }
 
 func NewReplace(columns IdentifierList, rows *Select, buf *buffer.Buffer) *Replace {
 	r := buffer.Alloc[Replace](buf)
-	r.Columns = columns
+	bc := NewBufIdentifierList(columns)
+	buf.Pin(bc)
+	r.Columns = bc
 	r.Rows = rows
 	return r
 }

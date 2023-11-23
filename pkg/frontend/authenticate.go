@@ -3802,8 +3802,8 @@ func doCreatePublication(ctx context.Context, ses *Session, cp *tree.CreatePubli
 	if cp.AccountsSet == nil || cp.AccountsSet.All {
 		accountList = "all"
 	} else {
-		accts := make([]string, 0, len(cp.AccountsSet.SetAccounts))
-		for _, acct := range cp.AccountsSet.SetAccounts {
+		accts := make([]string, 0, len(cp.AccountsSet.SetAccounts.Get()))
+		for _, acct := range cp.AccountsSet.SetAccounts.Get() {
 			accName := string(acct)
 			if accountNameIsInvalid(accName) {
 				return moerr.NewInternalError(ctx, "invalid account name '%s'", accName)
@@ -3925,10 +3925,10 @@ func doAlterPublication(ctx context.Context, ses *Session, ap *tree.AlterPublica
 		switch {
 		case ap.AccountsSet.All:
 			accountList = "all"
-		case len(ap.AccountsSet.SetAccounts) > 0:
+		case len(ap.AccountsSet.SetAccounts.Get()) > 0:
 			/* do not check accountName if exists here */
-			accts := make([]string, 0, len(ap.AccountsSet.SetAccounts))
-			for _, acct := range ap.AccountsSet.SetAccounts {
+			accts := make([]string, 0, len(ap.AccountsSet.SetAccounts.Get()))
+			for _, acct := range ap.AccountsSet.SetAccounts.Get() {
 				s := string(acct)
 				if accountNameIsInvalid(s) {
 					return moerr.NewInternalError(ctx, "invalid account name '%s'", s)
@@ -3937,12 +3937,12 @@ func doAlterPublication(ctx context.Context, ses *Session, ap *tree.AlterPublica
 			}
 			sort.Strings(accts)
 			accountList = strings.Join(accts, ",")
-		case len(ap.AccountsSet.DropAccounts) > 0:
+		case len(ap.AccountsSet.DropAccounts.Get()) > 0:
 			if allAccount {
 				return moerr.NewInternalError(ctx, "cannot drop accounts from all account option")
 			}
 			accountListSep = strings.Split(accountList, ",")
-			for _, acct := range ap.AccountsSet.DropAccounts {
+			for _, acct := range ap.AccountsSet.DropAccounts.Get() {
 				if accountNameIsInvalid(string(acct)) {
 					return moerr.NewInternalError(ctx, "invalid account name '%s'", acct)
 				}
@@ -3952,12 +3952,12 @@ func doAlterPublication(ctx context.Context, ses *Session, ap *tree.AlterPublica
 				}
 			}
 			accountList = strings.Join(accountListSep, ",")
-		case len(ap.AccountsSet.AddAccounts) > 0:
+		case len(ap.AccountsSet.AddAccounts.Get()) > 0:
 			if allAccount {
 				return moerr.NewInternalError(ctx, "cannot add account from all account option")
 			}
 			accountListSep = strings.Split(accountList, ",")
-			for _, acct := range ap.AccountsSet.AddAccounts {
+			for _, acct := range ap.AccountsSet.AddAccounts.Get() {
 				if accountNameIsInvalid(string(acct)) {
 					return moerr.NewInternalError(ctx, "invalid account name '%s'", acct)
 				}

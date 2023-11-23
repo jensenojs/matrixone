@@ -450,7 +450,7 @@ func NewOnJoinCond(e Expr, buf *buffer.Buffer) *OnJoinCond {
 // the USING condition
 type UsingJoinCond struct {
 	JoinCond
-	Cols IdentifierList
+	Cols *BufIdentifierList
 }
 
 func (node *UsingJoinCond) Format(ctx *FmtCtx) {
@@ -461,7 +461,9 @@ func (node *UsingJoinCond) Format(ctx *FmtCtx) {
 
 func NewUsingJoinCond(c IdentifierList, buf *buffer.Buffer) *UsingJoinCond {
 	ujc := buffer.Alloc[UsingJoinCond](buf)
-	ujc.Cols = c
+	bc := NewBufIdentifierList(c)
+	buf.Pin(bc)
+	ujc.Cols = bc
 	return ujc
 }
 
@@ -488,7 +490,7 @@ func NewParenTableExpr(e TableExpr, buf *buffer.Buffer) *ParenTableExpr {
 type AliasClause struct {
 	NodeFormatter
 	Alias *BufIdentifier
-	Cols  IdentifierList
+	Cols  *BufIdentifierList
 }
 
 func NewAliasClause(alias Identifier, cols IdentifierList, buf *buffer.Buffer) *AliasClause {
@@ -496,7 +498,9 @@ func NewAliasClause(alias Identifier, cols IdentifierList, buf *buffer.Buffer) *
 	al := NewBufIdentifier(alias)
 	buf.Pin(al)
 	a.Alias = al
-	a.Cols = cols
+	bc := NewBufIdentifierList(cols)
+	buf.Pin(bc)
+	a.Cols = bc
 	return a
 }
 
