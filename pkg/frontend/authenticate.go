@@ -7854,7 +7854,7 @@ func createTablesInMoCatalogOfGeneralTenant2(bh BackgroundExec, ca *tree.CreateA
 		err = moerr.NewInternalError(newTenantCtx, "only support password verification now")
 		return err
 	}
-	name := ca.AuthOption.AdminName
+	name := ca.AuthOption.AdminName.Get()
 	password := ca.AuthOption.IdentifiedType.Str.Get()
 	if len(password) == 0 {
 		err = moerr.NewInternalError(newTenantCtx, "password is empty string")
@@ -8484,7 +8484,7 @@ func InitProcedure(ctx context.Context, ses *Session, tenant *TenantInfo, cp *tr
 	initMoProcedure = fmt.Sprintf(initMoStoredProcedureFormat,
 		string(cp.Name.Name.ObjectName.Get()),
 		string(argsJson),
-		cp.Body, dbName,
+		cp.Body.Get(), dbName,
 		tenant.User, types.CurrentTimestamp().String2(time.UTC, 0), types.CurrentTimestamp().String2(time.UTC, 0), "PROCEDURE", "DEFINER", "", "utf8mb4", "utf8mb4_0900_ai_ci", "utf8mb4_0900_ai_ci")
 	err = bh.Exec(ctx, initMoProcedure)
 	if err != nil {

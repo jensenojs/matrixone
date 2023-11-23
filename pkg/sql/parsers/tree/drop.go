@@ -200,7 +200,9 @@ type DropAccount struct {
 func NewDropAccount(i bool, n string, buf *buffer.Buffer) *DropAccount {
 	d := buffer.Alloc[DropAccount](buf)
 	d.IfExists = i
-	d.Name = NewBufString(n)
+	bn := NewBufString(n)
+	buf.Pin(bn)
+	d.Name = bn
 	return d
 }
 

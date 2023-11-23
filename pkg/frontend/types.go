@@ -16,6 +16,7 @@ package frontend
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/fagongzi/goetty/v2/buf"
@@ -276,13 +277,26 @@ func (s *sessionBuf) Free() {
 	s.sessionLevelBuf = nil
 }
 
+func isPrepareOrSetSQL(sql string) bool {
+    // Normalize SQL string by removing leading/trailing whitespace
+    sql = strings.TrimSpace(sql)
+
+    // First, check for normal PREPARE or SET at the beginning of the string
+    if strings.HasPrefix(strings.ToLower(sql), "prepare ") || strings.HasPrefix(strings.ToLower(sql), "set ") {
+        return true
+    }
+
+    // Now, compile a regular expression to match executable comments
+    // that contain PREPARE or SET
+    re := regexp.MustCompile(`\/\*!\d{5}\s(set|prepare)\s`)
+
+    // Check if the SQL contains executable comment with PREPARE or SET
+    return re.MatchString(strings.ToLower(sql))
+}
+
 // TODO: need comments here
 func (s *sessionBuf) Get(sql string) *buffer.Buffer {
-	sqlLower := strings.ToLower(sql)
-	isPrepare := strings.HasPrefix(sqlLower, "prepare")
-	isSet := strings.HasPrefix(sqlLower, "set")
-
-	match := isPrepare || isSet
+	match := isPrepareOrSetSQL(sql)
 	if match {
 		return s.sessionLevelBuf
 	} else {

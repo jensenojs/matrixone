@@ -308,33 +308,33 @@ func checkPartitionIntegrity(ctx context.Context, partitionBinder *PartitionBind
 	return nil
 }
 
-func getPrimaryKeyAndUniqueKey(defs tree.TableDefs) (primaryKeys []*tree.UnresolvedName, uniqueIndexs []*tree.UniqueIndex) {
+func getPrimaryKeyAndUniqueKey(defs tree.TableDefs, buf *buffer.Buffer) (primaryKeys []*tree.UnresolvedName, uniqueIndexs []*tree.UniqueIndex) {
+	primaryKeys = buffer.MakeSlice[*tree.UnresolvedName](buf)
+	uniqueIndexs = buffer.MakeSlice[*tree.UniqueIndex](buf)
 	for _, item := range defs {
 		switch def := item.(type) {
 		case *tree.ColumnTableDef:
 			for _, attr := range def.Attributes {
 				if _, ok := attr.(*tree.AttributePrimaryKey); ok {
-					primaryKeys = append(primaryKeys, def.Name)
+					primaryKeys = buffer.AppendSlice[*tree.UnresolvedName](buf, primaryKeys, def.Name)
 				}
 
 				if _, ok := attr.(*tree.AttributeUniqueKey); ok {
-					part := &tree.KeyPart{
-						ColName: def.Name,
-					}
-					uniqueKey := &tree.UniqueIndex{
-						KeyParts: []*tree.KeyPart{part},
-						Name:     tree.NewBufString(""),
-						Empty:    true,
-					}
-					uniqueIndexs = append(uniqueIndexs, uniqueKey)
+					part := buffer.Alloc[tree.KeyPart](buf)
+					part.ColName = def.Name
+					parts := buffer.MakeSlice[*tree.KeyPart](buf)
+					parts = buffer.AppendSlice[*tree.KeyPart](buf, parts, part)
+					uniqueKey := tree.NewUniqueIndex(parts, "", true, nil, buf)
+
+					uniqueIndexs = buffer.AppendSlice[*tree.UniqueIndex](buf, uniqueIndexs, uniqueKey)
 				}
 			}
 		case *tree.PrimaryKeyIndex:
 			for _, key := range def.KeyParts {
-				primaryKeys = append(primaryKeys, key.ColName)
+				primaryKeys = buffer.AppendSlice[*tree.UnresolvedName](buf, primaryKeys, key.ColName)
 			}
 		case *tree.UniqueIndex:
-			uniqueIndexs = append(uniqueIndexs, def)
+			uniqueIndexs = buffer.AppendSlice[*tree.UniqueIndex](buf, uniqueIndexs, def)
 		}
 	}
 	return

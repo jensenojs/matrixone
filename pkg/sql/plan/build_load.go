@@ -160,7 +160,12 @@ func checkFileExist(param *tree.ExternParam, ctx CompilerContext) (string, error
 	if param.ScanType == tree.INLINE {
 		return "", nil
 	}
-	param.Ctx = ctx.GetContext()
+	
+	ctx2 := ctx.GetContext()
+	buf := ctx.GetBuffer()
+	buf.Pin(ctx2)
+	param.Ctx = ctx2
+
 	if param.ScanType == tree.S3 {
 		if err := InitS3Param(param); err != nil {
 			return "", err

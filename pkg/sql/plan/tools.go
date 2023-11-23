@@ -31,18 +31,19 @@ const (
 )
 
 func makeZeroRecursiveLevel(buf *buffer.Buffer) *tree.SelectExpr {
-	return &tree.SelectExpr{
-		Expr: tree.NewNumValWithType(constant.MakeInt64(0), "0", false, tree.P_int64, buf),
-		As:   tree.NewCStr(moRecursiveLevelCol, 1, buf),
-	}
+	sel := buffer.Alloc[tree.SelectExpr](buf)
+	sel.Expr = tree.NewNumValWithType(constant.MakeInt64(0), "0", false, tree.P_int64, buf)
+	sel.As = tree.NewCStr(moRecursiveLevelCol, 1, buf)
+	return sel
 
 }
 
 func makePlusRecursiveLevel(name string, buf *buffer.Buffer) *tree.SelectExpr {
+	sel := buffer.Alloc[tree.SelectExpr](buf)
 	a := tree.SetUnresolvedName(buf, name, moRecursiveLevelCol)
 	b := tree.NewNumValWithType(constant.MakeInt64(1), "1", false, tree.P_int64, buf)
-	return &tree.SelectExpr{
-		Expr: tree.NewBinaryExpr(tree.PLUS, a, b, buf),
-		As:   tree.NewCStr("", 1, buf),
-	}
+	expr := tree.NewBinaryExpr(tree.PLUS, a, b, buf)
+	sel.Expr = expr
+	sel.As = tree.NewCStr("", 1, buf)
+	return sel
 }

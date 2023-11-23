@@ -77,7 +77,9 @@ func (node *ExplainStmt) GetQueryType() string     { return QueryTypeOth }
 func NewExplainStmt(stmt Statement, format string, buf *buffer.Buffer) *ExplainStmt {
 	e := buffer.Alloc[ExplainStmt](buf)
 	e.explainImpl.Statement = stmt
-	e.explainImpl.Format = NewBufString(format)
+	sb := NewBufString(format)
+	buf.Pin(sb)
+	e.explainImpl.Format = sb
 	return e
 }
 

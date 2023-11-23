@@ -120,7 +120,9 @@ type MaxValueOption struct {
 }
 
 func NewMaxValueOption(m bool, n any, buf *buffer.Buffer) *MaxValueOption {
-	s := buffer.Alloc[MaxValueOption](buf)
+	// s := buffer.Alloc[MaxValueOption](buf)
+	s := new(MaxValueOption)
+	buf.Pin(s)
 	s.Minus = m
 	s.Num = n
 	return s
@@ -137,7 +139,9 @@ type StartWithOption struct {
 }
 
 func NewStartWithOption(m bool, n any, buf *buffer.Buffer) *StartWithOption {
-	s := buffer.Alloc[StartWithOption](buf)
+	// s := buffer.Alloc[StartWithOption](buf)
+	s := new(StartWithOption)
+	buf.Pin(s)
 	s.Minus = m
 	s.Num = n
 	return s
