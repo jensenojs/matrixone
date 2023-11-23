@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/catalog"
+	"github.com/matrixorigin/matrixone/pkg/common/buffer"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -1964,9 +1965,10 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 		ctx.binder = NewWhereBinder(builder, ctx, builder.compCtx.GetBuffer())
 		if !ctx.isTryBindingCTE {
 			if ctx.initSelect {
-				clause.Exprs = append(clause.Exprs, makeZeroRecursiveLevel(nil))
+				buf := builder.compCtx.GetBuffer()
+				clause.Exprs = buffer.AppendSlice(buf, clause.Exprs, makeZeroRecursiveLevel(buf))
 			} else if ctx.recSelect {
-				clause.Exprs = append(clause.Exprs, makePlusRecursiveLevel(ctx.cteName, nil))
+				clause.Exprs = buffer.AppendSlice(buf, clause.Exprs, makePlusRecursiveLevel(ctx.cteName, buf))
 			}
 		}
 		// unfold stars and generate headings
@@ -2087,14 +2089,17 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 		builder.rewriteRightJoinToLeftJoin(nodeID)
 
 		if !ctx.isTryBindingCTE && ctx.recSelect {
-			f := &tree.FuncExpr{
-				Func:  tree.FuncName2ResolvableFunctionReference(tree.SetUnresolvedName(nil, moCheckRecursionLevelFun), nil),
-				Exprs: tree.Exprs{tree.NewComparisonExpr(tree.LESS_THAN, tree.SetUnresolvedName(nil, ctx.cteName, moRecursiveLevelCol), tree.NewNumValWithType(constant.MakeInt64(moDefaultRecursionMax), fmt.Sprintf("%d", moDefaultRecursionMax), false, tree.P_int64, nil), nil)},
-			}
+			exprs := buffer.MakeSlice[tree.Expr](buf)
+			exprs = buffer.AppendSlice[tree.Expr](buf, exprs, tree.NewComparisonExpr(tree.LESS_THAN, tree.SetUnresolvedName(buf, ctx.cteName, moRecursiveLevelCol),
+				tree.NewNumValWithType(constant.MakeInt64(moDefaultRecursionMax), fmt.Sprintf("%d", moDefaultRecursionMax), false, tree.P_int64, buf),
+				buf))
+
+			f := tree.NewFuncExpr(tree.FuncName2ResolvableFunctionReference(tree.SetUnresolvedName(buf, moCheckRecursionLevelFun), buf), exprs, buf)
+
 			if clause.Where != nil {
-				clause.Where = &tree.Where{Type: tree.NewBufString(tree.AstWhere), Expr: tree.NewAndExpr(clause.Where.Expr, f, nil)}
+				clause.Where = tree.NewWhere(tree.AstWhere, tree.NewAndExpr(clause.Where.Expr, f, buf), buf)
 			} else {
-				clause.Where = &tree.Where{Type: tree.NewBufString(tree.AstWhere), Expr: f}
+				clause.Where = tree.NewWhere(tree.AstWhere, f, buf)
 			}
 		}
 		if clause.Where != nil {

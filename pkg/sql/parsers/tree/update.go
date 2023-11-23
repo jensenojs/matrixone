@@ -153,8 +153,9 @@ type ExternParam struct {
 }
 
 func NewExternParam(ec *ExParamConst, buf *buffer.Buffer) *ExternParam {
-	extermParam := buffer.Alloc[ExternParam](buf)
-	extermParam.ExParam = buffer.Alloc[ExParam](buf)
+	extermParam := new(ExternParam)
+	buf.Pin(extermParam)
+	extermParam.ExParam = new(ExParam) // have to use go memory because of map
 	extermParam.ExParamConst = ec
 	return extermParam
 }

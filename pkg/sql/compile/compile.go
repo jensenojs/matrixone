@@ -1412,7 +1412,10 @@ func (c *Compile) compileExternScan(ctx context.Context, n *plan.Node) ([]*Scope
 		mcpu += c.cnList[i].Mcpu
 		ID2Addr[i] = mcpu - tmp
 	}
-	param := &tree.ExternParam{}
+	param := &tree.ExternParam{
+		ExParamConst: &tree.ExParamConst{},
+		ExParam: &tree.ExParam{},
+	}
 	if n.ExternScan == nil || n.ExternScan.Type != tree.INLINE {
 		err := json.Unmarshal([]byte(n.TableDef.Createsql), param)
 		if err != nil {

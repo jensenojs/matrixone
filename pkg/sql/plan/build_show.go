@@ -53,7 +53,7 @@ func buildShowCreateDatabase(stmt *tree.ShowCreateDatabase,
 
 	sqlStr := "select \"%s\" as `Database`, \"%s\" as `Create Database`"
 	createSql := fmt.Sprintf("CREATE DATABASE `%s`", stmt.Name.Get())
-	sqlStr = fmt.Sprintf(sqlStr, stmt.Name, createSql)
+	sqlStr = fmt.Sprintf(sqlStr, stmt.Name.Get(), createSql)
 	// logutil.Info(sqlStr)
 
 	return returnByRewriteSQL(ctx, sqlStr, plan.DataDefinition_SHOW_CREATEDATABASE)
@@ -919,7 +919,7 @@ func buildShowGrants(stmt *tree.ShowGrants, ctx CompilerContext) (*Plan, error) 
 
 	ddlType := plan.DataDefinition_SHOW_TARGET
 	if stmt.ShowGrantType == tree.GrantForRole {
-		role_name := stmt.Roles[0].UserName
+		role_name := stmt.Roles[0].UserName.Get()
 		sql := "select concat(\"GRANT \", p.privilege_name, ' ON ', p.obj_type, ' ', case p.obj_type when 'account' then '' else p.privilege_level end,   \" `%s`\")  as `Grants for %s` from  %s.mo_role_privs as p where p.role_name = '%s';"
 		sql = fmt.Sprintf(sql, role_name, role_name, MO_CATALOG_DB_NAME, role_name)
 		return returnByRewriteSQL(ctx, sql, ddlType)
@@ -931,7 +931,7 @@ func buildShowGrants(stmt *tree.ShowGrants, ctx CompilerContext) (*Plan, error) 
 			stmt.Username = stmt.Username.Set(ctx.GetUserName())
 		}
 		sql := "select concat(\"GRANT \", p.privilege_name, ' ON ', p.obj_type, ' ', case p.obj_type when 'account' then '' else p.privilege_level end,   \" `%s`\", \"@\", \"`%s`\")  as `Grants for %s@localhost` from mo_catalog.mo_user as u, mo_catalog.mo_role_privs as p, mo_catalog.mo_user_grant as g where g.role_id = p.role_id and g.user_id = u.user_id and u.user_name = '%s' and u.user_host = '%s';"
-		sql = fmt.Sprintf(sql, stmt.Username, stmt.Hostname, stmt.Username, stmt.Username, stmt.Hostname)
+		sql = fmt.Sprintf(sql, stmt.Username.Get(), stmt.Hostname.Get(), stmt.Username.Get(), stmt.Username.Get(), stmt.Hostname.Get())
 		return returnByRewriteSQL(ctx, sql, ddlType)
 	}
 }
@@ -1083,6 +1083,10 @@ func returnByLikeAndSQL(ctx CompilerContext, sql string, like *tree.ComparisonEx
 			},
 		}
 	}
+
+	buf := ctx.GetBuffer()
+	buf.Pin(whereExpr)
+
 	// set show statement's like clause to new statement
 	newStmt.(*tree.Select).Select.(*tree.SelectClause).Where = whereExpr
 	// logutil.Info(tree.String(newStmt, dialect.MYSQL))

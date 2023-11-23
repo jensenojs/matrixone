@@ -193,8 +193,12 @@ func (interpreter *Interpreter) MatchExpr(expr tree.Expr) (tree.Expr, error) {
 		retName := &tree.UnresolvedName{
 			NumParts: e.NumParts,
 			Star:     e.Star,
-			Parts:    e.Parts,
 		}
+
+		for i := 0; i < e.NumParts; i++ {
+			retName.Parts[i] = tree.NewBufString(e.Parts[i].Get())
+		}
+
 		retName.Parts[0] = retName.Parts[0].Set(fmt.Sprintf("%v", val))
 		return retName, nil
 	default:
