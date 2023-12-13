@@ -99,6 +99,8 @@ type Argument struct {
 	ShuffleRegIdxLocal  []int
 	ShuffleRegIdxRemote []int
 
+	Debug bool
+
 	info     *vm.OperatorInfo
 	Children []vm.Operator
 }

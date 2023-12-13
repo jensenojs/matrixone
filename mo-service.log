@@ -1,0 +1,28 @@
+2023/12/13 14:36:59.056788 +0800 INFO local CNStore loaded {"metadata": "dd1dccb4-4d3c-41f8-b482-5251dc7a41bf/TP"}
+2023/12/13 14:37:00.060671 +0800 DEBUG application accept loop started {"name": "pipeline-server", "listen-addresses": "[0.0.0.0:18000]"}
+2023/12/13 14:37:00.060708 +0800 DEBUG application accept loop stopped {"name": "pipeline-server", "listen-addresses": "[0.0.0.0:18000]"}
+2023/12/13 14:37:00.060717 +0800 DEBUG application started {"name": "pipeline-server", "listen-addresses": "[0.0.0.0:18000]"}
+-----------Compile Run-----------
+
+Scope 1 (Magic: Merge, Receiver: [7, 8]): [merge -> output]
+  PreScopes: {
+  Scope 1 (Magic: Merge, Receiver: [0, 1]): [merge -> fuzzy filter -> connect to MergeReceiver 7]
+  Scope 2 (Magic: Merge, Receiver: [2, 3]): [merge -> fuzzy filter -> connect to MergeReceiver 8]
+  Scope 3 (Magic: Merge, Receiver: [4]): [merge -> dispatch to all of MergeReceiver [0, 2].]
+    PreScopes: {
+    Scope 1 (Magic: Remote, Receiver: []): [projection -> connect to MergeReceiver unknown -> connect to MergeReceiver 4]
+    DataSource: shdb1.test_tb[id],
+  }
+  Scope 4 (Magic: Merge, Receiver: [6]): [merge -> dispatch to any of MergeReceiver [1, 3].]
+    PreScopes: {
+    Scope 1 (Magic: Merge, Receiver: [5]): [merge -> projection -> connect to MergeReceiver unknown -> connect to MergeReceiver 6]
+  }
+}
+Scope 2 (Magic: Merge, Receiver: [9]): [merge -> projection -> insert]
+Scope 3 (Magic: Merge, Receiver: [10]): [merge -> dispatch to all of MergeReceiver [5, 9].]
+  PreScopes: {
+  Scope 1 (Magic: Normal, Receiver: []): [projection -> projection -> projection -> pre insert -> lockop -> connect to MergeReceiver 10]
+  DataSource: [],
+}
+--------------------------------
+1

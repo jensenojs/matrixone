@@ -775,7 +775,6 @@ func newParallelScope(s *Scope, ss []*Scope) (*Scope, error) {
 					},
 				})
 			}
-		case vm.Output:
 		default:
 			for j := range ss {
 				ss[j].appendInstruction(dupInstruction(&in, nil, j))

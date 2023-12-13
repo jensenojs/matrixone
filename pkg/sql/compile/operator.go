@@ -64,6 +64,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/offset"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/onduplicatekey"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/order"
+	"github.com/matrixorigin/matrixone/pkg/sql/colexec/output"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/partition"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/preinsert"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/preinsertsecondaryindex"
@@ -501,6 +502,12 @@ func dupInstruction(sourceIns *vm.Instruction, regMap map[*process.WaitRegister]
 			PkName:             t.PkName,
 			PkTyp:              t.PkTyp,
 			RuntimeFilterSpecs: t.RuntimeFilterSpecs,
+		}
+	case vm.Output:
+		t := sourceIns.Arg.(*output.Argument)
+		res.Arg = &output.Argument{
+			Data: t.Data,
+			Func: t.Func,
 		}
 	default:
 		panic(fmt.Sprintf("unexpected instruction type '%d' to dup", sourceIns.Op))

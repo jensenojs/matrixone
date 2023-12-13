@@ -17,6 +17,7 @@ package dispatch
 import (
 	"bytes"
 	"context"
+	"fmt"
 
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 
@@ -108,6 +109,10 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 	result, err := arg.Children[0].Call(proc)
 	if err != nil {
 		return result, err
+	}
+
+	if arg.Debug {
+		fmt.Println(1)
 	}
 
 	analy := proc.GetAnalyze(arg.info.Idx)

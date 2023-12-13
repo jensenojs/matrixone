@@ -424,6 +424,13 @@ func (c *Compile) Run(_ uint64) (result *util2.RunResult, err error) {
 	}
 
 	v2.TxnStatementTotalCounter.Inc()
+
+	if strings.Contains(c.sql, "INSERT INTO `test_tb`") {
+		fmt.Println("-----------Compile Run-----------")
+		fmt.Println(DebugShowScopes(c.scope))
+		fmt.Println("--------------------------------")
+	}
+
 	if err = c.runOnce(); err != nil {
 		c.fatalLog(0, err)
 
@@ -2565,8 +2572,11 @@ func (c *Compile) compileLimit(n *plan.Node, ss []*Scope) []*Scope {
 }
 
 func (c *Compile) compileFuzzyFilter(n *plan.Node, ns []*plan.Node, left []*Scope, right []*Scope) ([]*Scope, error) {
-	left = append(left, right...)
-	rs := c.newMergeScope(left)
+	var rs *Scope
+	var rs2 *Scope
+
+	all := append(left, right...)
+	rs = c.newMergeScope(all)
 	rs.Instructions[0].Idx = c.anal.curr
 
 	arg := constructFuzzyFilter(c, n, ns[n.Children[0]], ns[n.Children[1]])
@@ -2602,6 +2612,44 @@ func (c *Compile) compileFuzzyFilter(n *plan.Node, ns []*plan.Node, left []*Scop
 			},
 		},
 	})
+
+	if strings.Contains(c.sql, "INSERT INTO `test_tb`") {
+		parallel := 2
+		ss := make([]*Scope, parallel)
+		for i := 0; i < parallel; i++ {
+			ss[i] = &Scope{
+				Magic: Merge,
+				// NodeInfo: s.NodeInfo,
+			}
+			ss[i].Proc = process.NewWithAnalyze(rs.Proc, rs.Proc.Ctx, 2, c.anal.Nodes())
+			ss[i].Proc.Reg.MergeReceivers[1].Ch = make(chan *batch.Batch, 10)
+		}
+
+		newBuild := c.newMergeScope(left)
+		newBuildDispatchArg := constructDispatchLocal(true, false, false, extraRegisters(ss, 0))
+		newBuildDispatchArg.Debug = true
+		newBuild.appendInstruction(vm.Instruction{
+			Op:  vm.Dispatch,
+			Arg: newBuildDispatchArg,
+		})
+
+		newProbe := c.newMergeScope(right)
+		newProbeDispatchArg := constructDispatchLocal(false, false, false, extraRegisters(ss, 1))
+		newProbeDispatchArg.Debug = true
+		newProbe.appendInstruction(vm.Instruction{
+			Op:  vm.Dispatch,
+			Arg: newProbeDispatchArg,
+		})
+		var err error
+		rs2, err = newParallelScope(rs, ss)
+		if err != nil {
+			return nil, err
+		}
+
+		rs2.PreScopes = append(rs2.PreScopes, newBuild)
+		rs2.PreScopes = append(rs2.PreScopes, newProbe)
+		return []*Scope{rs2}, nil
+	}
 
 	return []*Scope{rs}, nil
 }
