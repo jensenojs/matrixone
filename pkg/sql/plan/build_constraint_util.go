@@ -26,7 +26,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/defines"
-	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
@@ -384,7 +383,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 		dbName = builder.compCtx.DefaultDatabase()
 	}
 
-	existAutoPkCol := false
+	insertAutoPkWithOutValues := false
 
 	insertWithoutUniqueKeyMap := make(map[string]bool)
 	var ifInsertFromUniqueColMap map[string]bool
@@ -581,7 +580,9 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 	projectList := make([]*Expr, 0, len(tableDef.Cols))
 	pkCols := make(map[string]struct{})
 	for _, name := range tableDef.Pkey.Names {
-		pkCols[name] = struct{}{}
+		if name != catalog.FakePrimaryKeyColName {
+			pkCols[name] = struct{}{}
+		}
 	}
 	for _, col := range tableDef.Cols {
 		if oldExpr, exists := insertColToExpr[col.Name]; exists {
@@ -605,7 +606,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 
 			if col.Typ.AutoIncr {
 				if _, exists := pkCols[col.Name]; exists {
-					existAutoPkCol = true
+					insertAutoPkWithOutValues = true
 					uniqueCheckOnAutoIncr, err = builder.compCtx.GetDbLevelConfig(dbName, "unique_check_on_autoincr")
 					if err != nil {
 						return false, nil, nil, err
@@ -617,16 +618,14 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 		}
 	}
 
-	if existAutoPkCol {
+	if insertAutoPkWithOutValues {
 		switch uniqueCheckOnAutoIncr {
 		case "None":
 			if builder.compCtx.GetProcess().AutoPkGenByIncrService {
-				logutil.Errorf("-- : -- in retry mode")
 				skipDupCheckForAutoPk = false
 			} else {
 				skipDupCheckForAutoPk = true
 				builder.compCtx.GetProcess().AutoPkGenByIncrService = true
-				logutil.Errorf("-- : -- mark InsertOnAutoUnique as true for sql %s", builder.compCtx.GetRootSql())
 			}
 		case "Check":
 			skipDupCheckForAutoPk = false

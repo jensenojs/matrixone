@@ -482,7 +482,7 @@ func buildDeletePlans(ctx CompilerContext, builder *QueryBuilder, bindCtx *BindC
 						addAffectedRows := false
 						isFkRecursionCall := false
 						updatePkCol := true
-                        skipDupCheckForAutoPk := false
+						skipDupCheckForAutoPk := false
 						ifInsertFromUnique := false
 						var pkFilterExprs []*Expr
 						var partitionExpr *Expr

@@ -250,7 +250,7 @@ func (m *MockCompilerContext2) GetRootSql() string {
 	return ret0
 }
 
-func (m *MockCompilerContext2) GetDbLevelConfig(dbName , varName string) (string, error) {
+func (m *MockCompilerContext2) GetDbLevelConfig(dbName, varName string) (string, error) {
 	return "", nil
 }
 
