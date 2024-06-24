@@ -26,6 +26,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/defines"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
@@ -361,8 +362,9 @@ func getDmlTableInfo(ctx CompilerContext, tableExprs tree.TableExprs, with *tree
 
 func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Insert, info *dmlSelectInfo) (bool, map[string]bool, map[string]bool, error) {
 	var err error
+	var skipDupCheckForAutoPk bool
 	var syntaxHasColumnNames bool
-	// var uniqueCheckOnAutoIncr string
+	var uniqueCheckOnAutoIncr string
 	var insertColumns []string
 	tableDef := info.tblInfo.tableDefs[0]
 	tableObjRef := info.tblInfo.objRef[0]
@@ -377,10 +379,10 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 	info.tblInfo.oldColPosMap = append(info.tblInfo.oldColPosMap, oldColPosMap)
 	info.tblInfo.newColPosMap = append(info.tblInfo.newColPosMap, oldColPosMap)
 
-	// dbName := string(stmt.Table.(*tree.TableName).SchemaName)
-	// if dbName == "" {
-	// 	dbName = builder.compCtx.DefaultDatabase()
-	// }
+	dbName := string(stmt.Table.(*tree.TableName).SchemaName)
+	if dbName == "" {
+		dbName = builder.compCtx.DefaultDatabase()
+	}
 
 	existAutoPkCol := false
 
@@ -584,17 +586,17 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 	for _, col := range tableDef.Cols {
 		if oldExpr, exists := insertColToExpr[col.Name]; exists {
 			projectList = append(projectList, oldExpr)
-			// if col.Typ.AutoIncr {
-			// if _, ok := pkCols[col.Name]; ok {
-			// 	uniqueCheckOnAutoIncr, err = builder.compCtx.GetDbLevelConfig(dbName, "unique_check_on_autoincr")
-			// 	if err != nil {
-			// 		return false, nil, err
-			// 	}
-			// 	if uniqueCheckOnAutoIncr == "Error" {
-			// 		return false, nil, moerr.NewInvalidInput(builder.GetContext(), "When unique_check_on_autoincr is set to error, insertion of the specified value into auto-incr pk column is not allowed.")
-			// 	}
-			// }
-			// }
+			if col.Typ.AutoIncr {
+				if _, ok := pkCols[col.Name]; ok {
+					uniqueCheckOnAutoIncr, err = builder.compCtx.GetDbLevelConfig(dbName, "unique_check_on_autoincr")
+					if err != nil {
+						return false, nil, nil, err
+					}
+					if uniqueCheckOnAutoIncr == "Error" {
+						return false, nil, nil, moerr.NewInvalidInput(builder.GetContext(), "When unique_check_on_autoincr is set to error, insertion of the specified value into auto-incr pk column is not allowed.")
+					}
+				}
+			}
 		} else {
 			defExpr, err := getDefaultExpr(builder.GetContext(), col)
 			if err != nil {
@@ -602,12 +604,32 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 			}
 
 			if col.Typ.AutoIncr {
-				if _, ok := pkCols[col.Name]; ok {
+				if _, exists := pkCols[col.Name]; exists {
 					existAutoPkCol = true
+					uniqueCheckOnAutoIncr, err = builder.compCtx.GetDbLevelConfig(dbName, "unique_check_on_autoincr")
+					if err != nil {
+						return false, nil, nil, err
+					}
 				}
 			}
 
 			projectList = append(projectList, defExpr)
+		}
+	}
+
+	if existAutoPkCol {
+		switch uniqueCheckOnAutoIncr {
+		case "None":
+			if builder.compCtx.GetProcess().AutoPkGenByIncrService {
+				logutil.Errorf("-- : -- in retry mode")
+				skipDupCheckForAutoPk = false
+			} else {
+				skipDupCheckForAutoPk = true
+				builder.compCtx.GetProcess().AutoPkGenByIncrService = true
+				logutil.Errorf("-- : -- mark InsertOnAutoUnique as true for sql %s", builder.compCtx.GetRootSql())
+			}
+		case "Check":
+			skipDupCheckForAutoPk = false
 		}
 	}
 
@@ -804,7 +826,7 @@ func initInsertStmt(builder *QueryBuilder, bindCtx *BindContext, stmt *tree.Inse
 		}
 	}
 
-	return existAutoPkCol, insertWithoutUniqueKeyMap, ifInsertFromUniqueColMap, nil
+	return skipDupCheckForAutoPk, insertWithoutUniqueKeyMap, ifInsertFromUniqueColMap, nil
 }
 
 func deleteToSelect(builder *QueryBuilder, bindCtx *BindContext, node *tree.Delete, haveConstraint bool, tblInfo *dmlTableInfo) (int32, error) {

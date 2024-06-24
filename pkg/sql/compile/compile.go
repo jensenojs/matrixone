@@ -236,6 +236,7 @@ func (c *Compile) clear() {
 	for k := range c.cnLabel {
 		delete(c.cnLabel, k)
 	}
+	c.Debug = false
 }
 
 // helper function to judge if init temporary engine is needed
@@ -569,6 +570,7 @@ func (c *Compile) Run(_ uint64) (result *util2.RunResult, err error) {
 			}
 			return nil, err
 		}
+		isDebug := c.Debug
 
 		retryTimes++
 		releaseRunC()
@@ -577,6 +579,10 @@ func (c *Compile) Run(_ uint64) (result *util2.RunResult, err error) {
 			moerr.ErrTxnNeedRetryWithDefChanged)
 		if runC, err = c.prepareRetry(defChanged); err != nil {
 			return nil, err
+		}
+		if isDebug {
+			runC.Debug = true
+			logutil.Errorf("-- : -- finish compile for sql %s the %d time", c.sql, retryTimes)
 		}
 	}
 
@@ -640,7 +646,26 @@ func (c *Compile) isRetryErr(err error) bool {
 }
 
 func (c *Compile) canRetry(err error) bool {
-	return !c.disableRetry && c.isRetryErr(err)
+	if c.proc.AutoPkGenByIncrService {
+		c.Debug = true
+		logutil.Errorf("-- : -- The values in the auto-incr cache interval may have been manually inserted, resulting in the generation of data that is actually duplicated.")
+		logutil.Errorf("-- : -- the sql is %s", c.sql)
+
+		if me, ok := err.(*moerr.Error); ok {
+			logutil.Errorf("-- : -- error code is %v", me.ErrorCode())
+		}
+
+		logutil.Errorf("-- : -- error is %v", err)
+	}	
+
+	if !c.disableRetry && c.isRetryErr(err) {
+		return true
+	} else if !c.disableRetry && c.proc.AutoPkGenByIncrService {
+		logutil.Errorf("-- : -- temporary debug")
+		return true
+	}
+	return false
+
 }
 
 func (c *Compile) IsTpQuery() bool {
@@ -658,9 +683,20 @@ func (c *Compile) printPipeline() {
 }
 */
 // run once
-func (c *Compile) runOnce() error {
+func (c *Compile) runOnce() (err error){
+	defer func() {
+		if c.Debug {
+			logutil.Errorf("-- : -- rerun auto pk sql")
+			if err != nil {
+				logutil.Errorf("-- : -- still report %v when rerun", err)
+			} else {
+				logutil.Errorf("-- : -- successfully insert")
+			}
+		}
+	}()
+
 	var wg sync.WaitGroup
-	err := c.lockMetaTables()
+	err = c.lockMetaTables()
 	if err != nil {
 		return err
 	}
