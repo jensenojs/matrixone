@@ -259,10 +259,91 @@ func (cwft *TxnComputationWrapper) Compile(any any, fill func(*batch.Batch) erro
 		   }
 		*/
 	} else {
-		cwft.compile, err = createCompile(execCtx, cwft.ses, cwft.proc, execCtx.sqlOfStmt, cwft.stmt, cwft.plan, fill, false)
+		addr := ""
+		if len(getGlobalPu().ClusterNodes) > 0 {
+			addr = getGlobalPu().ClusterNodes[0].Addr
+		}
+		cwft.proc.Ctx = execCtx.reqCtx
+		cwft.proc.Base.FileService = getGlobalPu().FileService
+	
+		var tenant string
+		tInfo := cwft.ses.GetTenantInfo()
+		if tInfo != nil {
+			tenant = tInfo.GetTenant()
+		}
+	
+		stats := statistic.StatsInfoFromContext(execCtx.reqCtx)
+		stats.CompileStart()
+		defer stats.CompileEnd()
+		retCompile := compile.NewCompile(
+			addr,
+			cwft.ses.GetDatabaseName(),
+			cwft.ses.GetSql(),
+			tenant,
+			cwft.ses.GetUserName(),
+			cwft.ses.GetTxnHandler().GetStorage(),
+			cwft.proc,
+			cwft.stmt,
+			cwft.ses.GetIsInternal(),
+			deepcopy.Copy(cwft.ses.getCNLabels()).(map[string]string),
+			getStatementStartAt(execCtx.reqCtx),
+		)
+		defer func() {
+			if err != nil && retCompile != nil {
+				retCompile.SetIsPrepare(false)
+				retCompile.Release()
+				retCompile = nil
+			}
+		}()
+		retCompile.SetIsPrepare(false)
+		retCompile.SetBuildPlanFunc(func() (*plan2.Plan, error) {
+			plan, err := buildPlan(execCtx.reqCtx, cwft.ses, cwft.ses.GetTxnCompileCtx(), cwft.stmt)
+			if err != nil {
+				return nil, err
+			}
+			if plan.IsPrepare {
+				_, _, err = plan2.ResetPreparePlan(cwft.ses.GetTxnCompileCtx(), plan)
+			}
+			return plan, err
+		})
+	
+		if _, ok := cwft.stmt.(*tree.ExplainAnalyze); ok {
+			fill = func(bat *batch.Batch) error { return nil }
+		}
+		err = retCompile.Compile(execCtx.reqCtx, cwft.plan, fill)
 		if err != nil {
 			return nil, err
 		}
+		// check if it is necessary to initialize the temporary engine
+		if !cwft.ses.GetTxnHandler().HasTempEngine() && retCompile.NeedInitTempEngine() {
+			// 0. init memory-non-dist storage
+			err = cwft.ses.GetTxnHandler().CreateTempStorage(runtime.ServiceRuntime(cwft.ses.GetService()).Clock())
+			if err != nil {
+				return nil, err
+			}
+	
+			// temporary storage is passed through Ctx
+			updateTempStorageInCtx(execCtx, cwft.proc, cwft.ses.GetTxnHandler().GetTempStorage())
+	
+			// 1. init memory-non-dist engine
+			cwft.ses.GetTxnHandler().CreateTempEngine()
+			tempEngine := cwft.ses.GetTxnHandler().GetTempEngine()
+	
+			// 2. bind the temporary engine to the session and txnHandler
+			retCompile.SetTempEngine(tempEngine, cwft.ses.GetTxnHandler().GetTempStorage())
+	
+			// 3. init temp-db to store temporary relations
+			txnOp2 := cwft.ses.GetTxnHandler().GetTxn()
+			err = tempEngine.Create(execCtx.reqCtx, defines.TEMPORARY_DBNAME, txnOp2)
+			if err != nil {
+				return nil, err
+			}
+		}
+		retCompile.SetOriginSQL(originSQL)
+		if err != nil {
+			return nil, err
+		}
+		cwft.compile = retCompile
 	}
 
 	return cwft.compile, err
