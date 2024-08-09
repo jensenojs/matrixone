@@ -16,9 +16,9 @@ package fuzzyfilter
 
 import (
 	"bytes"
-	"fmt"
+	// "fmt"
 
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
+	// "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/message"
 
 	"github.com/matrixorigin/matrixone/pkg/common/bloomfilter"
@@ -184,10 +184,10 @@ func (fuzzyFilter *FuzzyFilter) Call(proc *process.Process) (vm.CallResult, erro
 				continue
 			}
 
-			if fuzzyFilter.Debug {
-				fmt.Println("--- Fuzzy : Build stage ---")
-				fmt.Println(common.MoBatchToString(bat, 100))
-			}
+			// if fuzzyFilter.Debug {
+			// 	fmt.Println("--- Fuzzy : Build stage ---")
+			// 	fmt.Println(common.MoBatchToString(bat, 100))
+			// }
 
 			pkCol := bat.GetVector(0)
 			fuzzyFilter.appendPassToRuntimeFilter(pkCol, proc)
@@ -244,10 +244,10 @@ func (fuzzyFilter *FuzzyFilter) Call(proc *process.Process) (vm.CallResult, erro
 				continue
 			}
 
-			if fuzzyFilter.Debug {
-				fmt.Println("--- Fuzzy : Probe stage ---")
-				fmt.Println(common.MoBatchToString(bat, 100))
-			}
+			// if fuzzyFilter.Debug {
+			// 	fmt.Println("--- Fuzzy : Probe stage ---")
+			// 	fmt.Println(common.MoBatchToString(bat, 100))
+			// }
 
 			pkCol := bat.GetVector(0)
 

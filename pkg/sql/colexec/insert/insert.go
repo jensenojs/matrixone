@@ -16,6 +16,7 @@ package insert
 
 import (
 	"bytes"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 	"github.com/matrixorigin/matrixone/pkg/vm"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -241,6 +243,12 @@ func (insert *Insert) insert_table(proc *process.Process, anal process.Analyze) 
 		}
 	} else {
 		// insert into table, insertBat will be deeply copied into txn's workspace.
+		if tbl.tableName == "test_17907" {
+			fmt.Printf("+++++txn_table.Write+++++++ insert batch %v \n",
+				common.MoBatchToString(bat, 10),
+			)
+		}
+
 		err := insert.ctr.source.Write(proc.Ctx, insert.ctr.buf)
 		if err != nil {
 			return result, err

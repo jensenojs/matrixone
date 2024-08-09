@@ -55,6 +55,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/disttae/logtailreplay"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/mergesort"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -64,8 +65,10 @@ const (
 	AllColumns = "*"
 )
 
-var traceFilterExprInterval atomic.Uint64
-var traceFilterExprInterval2 atomic.Uint64
+var (
+	traceFilterExprInterval  atomic.Uint64
+	traceFilterExprInterval2 atomic.Uint64
+)
 
 var _ engine.Relation = new(txnTable)
 
@@ -508,12 +511,11 @@ func (tbl *txnTable) LoadDeletesForMemBlocksIn(
 	state *logtailreplay.PartitionState,
 	deletesRowId map[types.Rowid]uint8,
 ) error {
-
 	tbl.getTxn().blockId_tn_delete_metaLoc_batch.RLock()
 	defer tbl.getTxn().blockId_tn_delete_metaLoc_batch.RUnlock()
 
 	for blk, bats := range tbl.getTxn().blockId_tn_delete_metaLoc_batch.data {
-		//if blk is in partitionState.blks, it means that blk is persisted.
+		// if blk is in partitionState.blks, it means that blk is persisted.
 		if state.BlockPersisted(blk) {
 			continue
 		}
@@ -567,15 +569,15 @@ func (tbl *txnTable) CollectTombstones(
 		offset = tbl.getTxn().GetSnapshotWriteOffset()
 	}
 
-	//collect in memory
+	// collect in memory
 
-	//collect uncommitted in-memory tombstones from txn.writes
+	// collect uncommitted in-memory tombstones from txn.writes
 	tbl.getTxn().ForEachTableWrites(tbl.db.databaseId, tbl.tableId,
 		offset, func(entry Entry) {
 			if entry.typ == INSERT {
 				return
 			}
-			//entry.typ == DELETE
+			// entry.typ == DELETE
 			if entry.bat.GetVector(0).GetType().Oid == types.T_Rowid {
 				/*
 					CASE:
@@ -597,10 +599,10 @@ func (tbl *txnTable) CollectTombstones(
 			}
 		})
 
-	//collect uncommitted in-memory tombstones belongs to blocks persisted by CN writing S3
+	// collect uncommitted in-memory tombstones belongs to blocks persisted by CN writing S3
 	tbl.getTxn().deletedBlocks.getDeletedRowIDs(tombstone.inMemTombstones)
 
-	//collect committed in-memory tombstones from partition state.
+	// collect committed in-memory tombstones from partition state.
 	state, err := tbl.getPartitionState(ctx)
 	if err != nil {
 		return nil, err
@@ -616,11 +618,11 @@ func (tbl *txnTable) CollectTombstones(
 		iter.Close()
 	}
 
-	//collect uncommitted persisted tombstones.
+	// collect uncommitted persisted tombstones.
 	if err := tbl.getTxn().getUncommittedS3Tombstone(tombstone.blk2UncommitLoc); err != nil {
 		return nil, err
 	}
-	//collect committed persisted tombstones from partition state.
+	// collect committed persisted tombstones from partition state.
 	state.GetTombstoneDeltaLocs(tombstone.blk2CommitLoc)
 	return tombstone, nil
 }
@@ -652,9 +654,7 @@ func (tbl *txnTable) Ranges(
 	defer func() {
 		cost := time.Since(start)
 
-		var (
-			step, slowStep uint64
-		)
+		var step, slowStep uint64
 
 		rangesLen := blocks.Len()
 		if rangesLen < 5 {
@@ -915,7 +915,6 @@ func (tbl *txnTable) rangesOnePart(
 				outBlocks.AppendBlockInfo(blk)
 
 				return true
-
 			},
 				obj.ObjectStats,
 			)
@@ -1035,7 +1034,7 @@ func (tbl *txnTable) collectUnCommittedObjects(txnOffset int) []objectio.ObjectS
 
 // the return defs has no rowid column
 func (tbl *txnTable) TableDefs(ctx context.Context) ([]engine.TableDef, error) {
-	//return tbl.defs, nil
+	// return tbl.defs, nil
 	// I don't understand why the logic now is not to get all the tableDef. Don't understand.
 	// copy from tae's logic
 	defs := make([]engine.TableDef, 0, len(tbl.defs))
@@ -1153,7 +1152,7 @@ func (tbl *txnTable) GetTableDef(ctx context.Context) *plan.TableDef {
 			p := &plan.PartitionByDef{}
 			err := p.UnMarshalPartitionInfo(([]byte)(tbl.partition))
 			if err != nil {
-				//panic(fmt.Sprintf("cannot unmarshal partition metadata information: %s", err))
+				// panic(fmt.Sprintf("cannot unmarshal partition metadata information: %s", err))
 				return nil
 			}
 			partitionInfo = p
@@ -1169,7 +1168,7 @@ func (tbl *txnTable) GetTableDef(ctx context.Context) *plan.TableDef {
 			c := &engine.ConstraintDef{}
 			err := c.UnmarshalBinary(tbl.constraint)
 			if err != nil {
-				//panic(fmt.Sprintf("cannot unmarshal table constraint information: %s", err))
+				// panic(fmt.Sprintf("cannot unmarshal table constraint information: %s", err))
 				return nil
 			}
 			for _, ct := range c.Cts {
@@ -1483,10 +1482,17 @@ func (tbl *txnTable) Write(ctx context.Context, bat *batch.Batch) error {
 	if bat == nil || bat.RowCount() == 0 {
 		return nil
 	}
+
+	if tbl.tableName == "test_17907" {
+		fmt.Printf("+++++txn_table.Write+++++++ insert batch %v \n",
+			common.MoBatchToString(bat, 10),
+		)
+	}
+
 	// for writing S3 Block
 	if bat.Attrs[0] == catalog.BlockMeta_BlockInfo {
 		tbl.getTxn().hasS3Op.Store(true)
-		//bocks maybe come from different S3 object, here we just need to make sure fileName is not Nil.
+		// bocks maybe come from different S3 object, here we just need to make sure fileName is not Nil.
 		fileName := objectio.DecodeBlockInfo(bat.Vecs[0].GetBytesAt(0)).MetaLocation().Name().String()
 		return tbl.getTxn().WriteFile(
 			INSERT,
@@ -1558,8 +1564,7 @@ func (tbl *txnTable) EnhanceDelete(bat *batch.Batch, name string) error {
 		}
 
 		tbl.getTxn().blockId_tn_delete_metaLoc_batch.RWMutex.Lock()
-		tbl.getTxn().blockId_tn_delete_metaLoc_batch.data[*blkId] =
-			append(tbl.getTxn().blockId_tn_delete_metaLoc_batch.data[*blkId], copBat)
+		tbl.getTxn().blockId_tn_delete_metaLoc_batch.data[*blkId] = append(tbl.getTxn().blockId_tn_delete_metaLoc_batch.data[*blkId], copBat)
 		tbl.getTxn().blockId_tn_delete_metaLoc_batch.RWMutex.Unlock()
 
 	case deletion.CNBlockOffset:
@@ -1609,7 +1614,7 @@ func (tbl *txnTable) compaction(
 	s3writer.SetSeqnums(tbl.seqnums)
 
 	for blkmetaloc, deletes := range compactedBlks {
-		//blk.MetaLocation()
+		// blk.MetaLocation()
 		bat, e := blockio.BlockCompactionRead(
 			tbl.getTxn().proc.Ctx,
 			blkmetaloc[:],
@@ -1641,7 +1646,7 @@ func (tbl *txnTable) Delete(
 	if tbl.db.op.IsSnapOp() {
 		return moerr.NewInternalErrorNoCtx("delete operation is not allowed in snapshot transaction")
 	}
-	//for S3 delete
+	// for S3 delete
 	if name != catalog.Row_ID {
 		return tbl.EnhanceDelete(bat, name)
 	}
@@ -1693,12 +1698,11 @@ func buildRemoteDS(
 	txnOffset int,
 	relData engine.RelData,
 ) (source engine.DataSource, err error) {
-
 	tombstones, err := tbl.CollectTombstones(ctx, txnOffset)
 	if err != nil {
 		return nil, err
 	}
-	//tombstones.Init()
+	// tombstones.Init()
 
 	relData.AttachTombstones(tombstones)
 	buf, err := relData.MarshalBinary()
@@ -1728,7 +1732,6 @@ func BuildLocalDataSource(
 	ranges engine.RelData,
 	txnOffset int,
 ) (source engine.DataSource, err error) {
-
 	var (
 		ok  bool
 		tbl *txnTable
@@ -1747,7 +1750,6 @@ func (tbl *txnTable) buildLocalDataSource(
 	relData engine.RelData,
 	policy TombstoneApplyPolicy,
 ) (source engine.DataSource, err error) {
-
 	switch relData.GetType() {
 	case engine.RelDataBlockList:
 		ranges := relData.GetBlockInfoSlice()
@@ -1804,7 +1806,7 @@ func (tbl *txnTable) BuildReaders(
 	orderBy bool,
 ) ([]engine.Reader, error) {
 	proc := p.(*process.Process)
-	//copy from NewReader.
+	// copy from NewReader.
 	if plan2.IsFalseExpr(expr) {
 		return []engine.Reader{new(emptyReader)}, nil
 	}
@@ -1813,7 +1815,7 @@ func (tbl *txnTable) BuildReaders(
 		return nil, moerr.NewInternalErrorNoCtx("orderBy only support one reader")
 	}
 
-	//relData maybe is nil, indicate that only read data from memory.
+	// relData maybe is nil, indicate that only read data from memory.
 	if relData == nil || relData.DataCnt() == 0 {
 		relData = NewEmptyBlockListRelationData()
 		relData.AppendBlockInfo(objectio.EmptyBlockInfo)
@@ -1897,7 +1899,6 @@ func (tbl *txnTable) tryToSubscribe(ctx context.Context) (ps *logtailreplay.Part
 	}
 
 	return tbl.getTxn().engine.PushClient().toSubscribeTable(ctx, tbl)
-
 }
 
 func (tbl *txnTable) PKPersistedBetween(
@@ -1906,7 +1907,6 @@ func (tbl *txnTable) PKPersistedBetween(
 	to types.TS,
 	keys *vector.Vector,
 ) (bool, error) {
-
 	ctx := tbl.proc.Load().Ctx
 	fs := tbl.getTxn().engine.fs
 	primaryIdx := tbl.primaryIdx
@@ -1918,7 +1918,7 @@ func (tbl *txnTable) PKPersistedBetween(
 
 	candidateBlks := make(map[types.Blockid]*objectio.BlockInfo)
 
-	//only check data objects.
+	// only check data objects.
 	delObjs, cObjs := p.GetChangedObjsBetween(from.Next(), types.MaxTs())
 	isFakePK := tbl.GetTableDef(ctx).Pkey.PkeyColName == catalog.FakePrimaryKeyColName
 	if err := ForeachCommittedObjects(cObjs, delObjs, p,
@@ -1956,7 +1956,7 @@ func (tbl *txnTable) PKPersistedBetween(
 			}
 
 			bf = nil
-			//fake pk has no bf
+			// fake pk has no bf
 			if !isFakePK {
 				if bf, err2 = objectio.LoadBFWithMeta(
 					ctx, meta, location, fs,
@@ -1971,7 +1971,7 @@ func (tbl *txnTable) PKPersistedBetween(
 						!blkMeta.MustGetColumn(uint16(primaryIdx)).ZoneMap().AnyIn(keys) {
 						return true
 					}
-					//fake pk has no bf
+					// fake pk has no bf
 					if !isFakePK {
 						blkBf := bf.GetBloomFilter(uint32(blk.BlockID.Sequence()))
 						blkBfIdx := index.NewEmptyBloomFilter()
@@ -2006,7 +2006,7 @@ func (tbl *txnTable) PKPersistedBetween(
 
 	var filter blockio.ReadFilterSearchFuncType
 	buildFilter := func() blockio.ReadFilterSearchFuncType {
-		//keys must be sorted.
+		// keys must be sorted.
 		keys.InplaceSort()
 		bytes, _ := keys.MarshalBinary()
 		colExpr := newColumnExpr(0, plan2.MakePlan2Type(keys.GetType()), tbl.tableDef.Pkey.PkeyColName)
@@ -2028,7 +2028,7 @@ func (tbl *txnTable) PKPersistedBetween(
 		return getNonSortedPKSearchFuncByPKVec(keys)
 	}
 
-	//read block ,check if keys exist in the block.
+	// read block ,check if keys exist in the block.
 	pkDef := tbl.tableDef.Cols[tbl.primaryIdx]
 	pkSeq := pkDef.Seqnum
 	pkType := types.T(pkDef.Typ.Id).ToType()
@@ -2058,7 +2058,7 @@ func (tbl *txnTable) PKPersistedBetween(
 			continue
 		}
 
-		//for sorted block, we can use binary search to find the keys.
+		// for sorted block, we can use binary search to find the keys.
 		if filter == nil {
 			filter = buildFilter()
 			if filter == nil {
@@ -2114,7 +2114,7 @@ func (tbl *txnTable) PrimaryKeysMayBeModified(
 	// 	return true, nil
 	// }
 
-	//need check pk whether exist on S3 block.
+	// need check pk whether exist on S3 block.
 	return tbl.PKPersistedBetween(
 		snap,
 		from,
