@@ -22,13 +22,6 @@ spec:
           operator: Exists
       imagePullSecrets:
         - name: tke-registry
-      podAnnotations:
-        profiles.grafana.com/memory.scrape: "true"
-        profiles.grafana.com/memory.port: "6060"
-        profiles.grafana.com/cpu.scrape: "true"
-        profiles.grafana.com/cpu.port: "6060"
-        profiles.grafana.com/goroutine.scrape: "true"
-        profiles.grafana.com/goroutine.port: "6060"
     config: |
       # TOML format config file below
       [log]
@@ -63,13 +56,6 @@ spec:
         - configMapRef:
             name: proxy-env
             optional: false
-      podAnnotations:
-        profiles.grafana.com/memory.scrape: "true"
-        profiles.grafana.com/memory.port: "6060"
-        profiles.grafana.com/cpu.scrape: "true"
-        profiles.grafana.com/cpu.port: "6060"
-        profiles.grafana.com/goroutine.scrape: "true"
-        profiles.grafana.com/goroutine.port: "6060"
     cacheVolume:
       size: 100Gi
       storageClassName: cbs-hssd
@@ -121,13 +107,6 @@ spec:
         operator: Exists    
       imagePullSecrets:
       - name: tke-registry
-      podAnnotations:
-        profiles.grafana.com/memory.scrape: "true"
-        profiles.grafana.com/memory.port: "6060"
-        profiles.grafana.com/cpu.scrape: "true"
-        profiles.grafana.com/cpu.port: "6060"
-        profiles.grafana.com/goroutine.scrape: "true"
-        profiles.grafana.com/goroutine.port: "6060"
     replicas: 3
     resources:
       requests:
@@ -224,13 +203,6 @@ spec:
         - configMapRef:
             name: proxy-env
             optional: false
-      podAnnotations:
-        profiles.grafana.com/memory.scrape: "true"
-        profiles.grafana.com/memory.port: "6060"
-        profiles.grafana.com/cpu.scrape: "true"
-        profiles.grafana.com/cpu.port: "6060"
-        profiles.grafana.com/goroutine.scrape: "true"
-        profiles.grafana.com/goroutine.port: "6060"
     resources:
       requests:
         cpu: 7
