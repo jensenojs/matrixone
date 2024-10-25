@@ -600,3 +600,60 @@ func TestLockNeedUpgrade(t *testing.T) {
 		},
 	)
 }
+
+func TestSelectForUpdateWithRetry(t *testing.T) {
+	embed.RunBaseClusterTests(
+		func(c embed.Cluster) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*3000)
+			defer cancel()
+
+			cn1, err := c.GetCNService(0)
+			require.NoError(t, err)
+
+			cn2, err := c.GetCNService(1)
+			require.NoError(t, err)
+
+			db := testutils.GetDatabaseName(t)
+			table := "t"
+
+			testutils.CreateTableAndWaitCNApplied(
+				t,
+				db,
+				table,
+				"create table "+table+" (id int primary key, id2 int)",
+				cn1,
+				cn2,
+			)
+
+			_ = testutils.ExecSQL(
+				t,
+				db,
+				cn1,
+				"insert into "+table+" select result, result from generate_series(1,100) g;",
+			)
+
+			exec1 := testutils.GetSQLExecutor(cn1)
+			res, err := exec1.Exec(
+				ctx,
+				"select * from " + table + " where id < 3 for update",
+				executor.Options{}.
+					WithDatabase(db).
+					WithWaitCommittedLogApplied(),
+			)
+			require.NoError(t, err)
+
+			res.ReadRows(
+				func(rows int, cols []*vector.Vector) bool {
+					require.Equal(t, 2, rows)
+					for i := 0; i < rows; i++ {
+						n := executor.GetFixedRows[int32](cols[0])[i]
+						t.Logf("the value of rows %d is %d", i, n)
+					}
+					return true
+				},
+			)
+			res.Close()
+
+		},
+	)
+}
