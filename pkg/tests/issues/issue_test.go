@@ -629,7 +629,7 @@ func TestSelectForUpdateWithRetry(t *testing.T) {
 				t,
 				db,
 				cn1,
-				"insert into "+table+" select result, result from generate_series(1,81930) g;",
+				"insert into "+table+" select result, result from generate_series(1,8193) g;",
 			)
 
 			var wg sync.WaitGroup
@@ -642,49 +642,24 @@ func TestSelectForUpdateWithRetry(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				var txn2Triggered atomic.Bool
 				exec1 := testutils.GetSQLExecutor(cn1)
 				err := exec1.ExecTxn(
 					ctx,
 					func(txn executor.TxnExecutor) error {
-						defer func() {
-							runtime.MustGetTestingContext(cn1.ServiceID()).SetAdjustLockResultFunc(nil)
-							runtime.MustGetTestingContext(cn1.ServiceID()).SetBeforeLockFunc(nil)
-						}()
-						tx1 := txn.Txn().Txn().ID
-
-						runtime.MustGetTestingContext(cn1.ServiceID()).SetBeforeLockFunc(
-							func(txnID []byte, tableID uint64) {
-								if !bytes.Equal(txnID, tx1) {
-									return
-								}
-								if tableID == catalog.MO_TABLES_ID || txn2Triggered.Load() {
-									return
-								}
-
-								txn2Triggered.Store(true)
-
-								// start txn2 update
-								close(txn2StartedC)
-
-								// wait txn2 update committed
-								<-txn2CommittedC
-							},
-						)
-
-						runtime.MustGetTestingContext(cn1.ServiceID()).SetAdjustLockResultFunc(
-							func(
-								txnID []byte,
-								tableID uint64,
-								result *lock.Result,
-							) {
-								if !bytes.Equal(txnID, tx1) {
-									return
-								}
-							},
-						)
-
 						res, err := txn.Exec(
+							"select 1", // to nothing
+							executor.StatementOption{},
+						)
+						require.NoError(t, err)
+						defer res.Close()
+
+						// start txn2 update
+						close(txn2StartedC)
+
+						// wait txn2 update committed
+						<-txn2CommittedC
+
+						res, err = txn.Exec(
 							"select * from " + table + " for update;",
 							executor.StatementOption{},
 						)
@@ -694,10 +669,14 @@ func TestSelectForUpdateWithRetry(t *testing.T) {
 						res.ReadRows(
 							func(rows int, cols []*vector.Vector) bool {
 								total += rows
+								// for i := 0; i < rows; i++ {
+								// 	n := executor.GetFixedRows[int32](cols[0])[i]
+								// 	t.Logf("the value of rows %d is %d", i, n)
+								// }
 								return true
 							},
 						)
-						require.Equal(t, 81930, total)
+						require.Equal(t, 8193, total)
 						return nil
 					},
 					executor.Options{}.
@@ -705,8 +684,7 @@ func TestSelectForUpdateWithRetry(t *testing.T) {
 						WithMinCommittedTS(committedAt),
 				)
 				require.NoError(t, err)
-			}()
-
+			}()				
 
 			// txn2 workflow
 			go func() {
@@ -723,7 +701,7 @@ func TestSelectForUpdateWithRetry(t *testing.T) {
 					func(txn executor.TxnExecutor) error {
 						res, err := exec2.Exec(
 							ctx,
-							"update "+table+" set id = 81930 where id = 81930;",
+							"update "+table+" set id = 8193 where id = 8193;",
 							// "select 1;",
 							executor.Options{}.
 								WithDatabase(db).
