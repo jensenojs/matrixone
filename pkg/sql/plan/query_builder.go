@@ -2459,6 +2459,11 @@ func (builder *QueryBuilder) buildSelect(stmt *tree.Select, ctx *BindContext, is
 				RefreshTsIdxInBat:  -1, //unsupport now
 				FilterColIdxInBat:  -1, //unsupport now
 			}
+			sql := builder.compCtx.GetRootSql()
+			if strings.Contains(sql, "select * from t for update") {
+				// lockTarget.LockTable = true
+				fmt.Println("build Select")
+			}
 			lockNode = &Node{
 				NodeType:    plan.Node_LOCK_OP,
 				Children:    []int32{nodeID},

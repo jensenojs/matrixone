@@ -3307,8 +3307,15 @@ func (c *Compile) compileDelete(n *plan.Node, ss []*Scope) ([]*Scope, error) {
 func (c *Compile) compileLock(n *plan.Node, ss []*Scope) ([]*Scope, error) {
 	lockRows := make([]*plan.LockTarget, 0, len(n.LockTargets))
 	for _, tbl := range n.LockTargets {
+		if strings.Contains(c.sql, "select * from t for update") {
+			fmt.Println("in compileLock")
+		}
 		if tbl.LockTable {
 			c.lockTables[tbl.TableId] = tbl
+			// block := n.LockTargets[0].Block
+			// if block {
+			// 	c.needBlock = true
+			// }
 		} else {
 			if _, ok := c.lockTables[tbl.TableId]; !ok {
 				lockRows = append(lockRows, tbl)

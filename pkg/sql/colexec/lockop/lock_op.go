@@ -226,6 +226,7 @@ func performLock(
 	// when you retry. We need to return the conflict after all the locks have been added successfully,
 	// so that the retry will definitely succeed because all the locks have been put.
 	if needRetry && lockOp.ctr.retryError == nil {
+		fmt.Println("retryError")
 		lockOp.ctr.retryError = retryError
 	}
 	if lockOp.ctr.defChanged {

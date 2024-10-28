@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -336,6 +337,9 @@ func (exec *txnExecutor) Exec(
 		pn,
 		func(bat *batch.Batch, crs *perfcounter.CounterSet) error {
 			if bat != nil {
+				if strings.Contains(sql, "select * from t for update") {
+					fmt.Println("call output")
+				}
 				// the bat is valid only in current method. So we need copy data.
 				// FIXME: add a custom streaming apply handler to consume readed data. Now
 				// our current internal sql will never read too much data.
@@ -352,6 +356,9 @@ func (exec *txnExecutor) Exec(
 	}
 	var runResult *util.RunResult
 	runResult, err = c.Run(0)
+	if strings.Contains(c.sql, "select * from t for update") {
+		fmt.Println("finish output")
+	}
 	if err != nil {
 		for _, bat := range batches {
 			if bat != nil {

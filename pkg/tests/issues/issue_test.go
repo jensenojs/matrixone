@@ -625,35 +625,122 @@ func TestSelectForUpdateWithRetry(t *testing.T) {
 				cn2,
 			)
 
-			_ = testutils.ExecSQL(
+			committedAt := testutils.ExecSQL(
 				t,
 				db,
 				cn1,
-				"insert into "+table+" select result, result from generate_series(1,100) g;",
+				"insert into "+table+" select result, result from generate_series(1,81930) g;",
 			)
 
-			exec1 := testutils.GetSQLExecutor(cn1)
-			res, err := exec1.Exec(
-				ctx,
-				"select * from " + table + " where id < 3 for update",
-				executor.Options{}.
-					WithDatabase(db).
-					WithWaitCommittedLogApplied(),
-			)
-			require.NoError(t, err)
+			var wg sync.WaitGroup
+			wg.Add(2)
 
-			res.ReadRows(
-				func(rows int, cols []*vector.Vector) bool {
-					require.Equal(t, 2, rows)
-					for i := 0; i < rows; i++ {
-						n := executor.GetFixedRows[int32](cols[0])[i]
-						t.Logf("the value of rows %d is %d", i, n)
-					}
-					return true
-				},
-			)
-			res.Close()
+			txn2StartedC := make(chan struct{})
+			txn2CommittedC := make(chan struct{})
 
+			// txn1 workflow
+			go func() {
+				defer wg.Done()
+
+				var txn2Triggered atomic.Bool
+				exec1 := testutils.GetSQLExecutor(cn1)
+				err := exec1.ExecTxn(
+					ctx,
+					func(txn executor.TxnExecutor) error {
+						defer func() {
+							runtime.MustGetTestingContext(cn1.ServiceID()).SetAdjustLockResultFunc(nil)
+							runtime.MustGetTestingContext(cn1.ServiceID()).SetBeforeLockFunc(nil)
+						}()
+						tx1 := txn.Txn().Txn().ID
+
+						runtime.MustGetTestingContext(cn1.ServiceID()).SetBeforeLockFunc(
+							func(txnID []byte, tableID uint64) {
+								if !bytes.Equal(txnID, tx1) {
+									return
+								}
+								if tableID == catalog.MO_TABLES_ID || txn2Triggered.Load() {
+									return
+								}
+
+								txn2Triggered.Store(true)
+
+								// start txn2 update
+								close(txn2StartedC)
+
+								// wait txn2 update committed
+								<-txn2CommittedC
+							},
+						)
+
+						runtime.MustGetTestingContext(cn1.ServiceID()).SetAdjustLockResultFunc(
+							func(
+								txnID []byte,
+								tableID uint64,
+								result *lock.Result,
+							) {
+								if !bytes.Equal(txnID, tx1) {
+									return
+								}
+							},
+						)
+
+						res, err := txn.Exec(
+							"select * from " + table + " for update;",
+							executor.StatementOption{},
+						)
+						require.NoError(t, err)
+						defer res.Close()
+						total := 0
+						res.ReadRows(
+							func(rows int, cols []*vector.Vector) bool {
+								total += rows
+								return true
+							},
+						)
+						require.Equal(t, 81930, total)
+						return nil
+					},
+					executor.Options{}.
+						WithDatabase(db).
+						WithMinCommittedTS(committedAt),
+				)
+				require.NoError(t, err)
+			}()
+
+
+			// txn2 workflow
+			go func() {
+				defer func() {
+					close(txn2CommittedC)
+					wg.Done()
+				}()
+
+				<-txn2StartedC
+				exec2 := testutils.GetSQLExecutor(cn2)
+
+				err := exec2.ExecTxn(
+					ctx,
+					func(txn executor.TxnExecutor) error {
+						res, err := exec2.Exec(
+							ctx,
+							"update "+table+" set id = 81930 where id = 81930;",
+							// "select 1;",
+							executor.Options{}.
+								WithDatabase(db).
+								WithMinCommittedTS(committedAt),
+						)
+						require.NoError(t, err)
+						defer res.Close()
+						return nil
+					},
+					executor.Options{}.
+						WithDatabase(db).
+						WithMinCommittedTS(committedAt),
+				)
+				require.NoError(t, err)
+			}()
+
+			wg.Wait()
 		},
 	)
 }
